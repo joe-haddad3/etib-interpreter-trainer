@@ -1,0 +1,226 @@
+/* ============================================================
+   ETIB Interpreter Training Platform — Main Stylesheet
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --color-bg: #f5f5f0;
+  --color-surface: #ffffff;
+  --color-border: #e0ddd5;
+  --color-primary: #1a1a2e;
+  --color-accent: #4a4a8a;
+  --color-text: #1a1a1a;
+  --color-text-muted: #6b6b6b;
+  --color-success: #1a6b3c;
+  --color-error: #c0392b;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+header {
+  background: var(--color-primary);
+  color: white;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.logo { font-size: 1rem; opacity: 0.9; }
+.logo-sep { margin: 0 0.4rem; opacity: 0.4; }
+.logo-ar { font-family: 'Noto Naskh Arabic', sans-serif; font-size: 1.05rem; }
+
+nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.nav-btn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.75);
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.15s;
+}
+
+.nav-btn:hover, .nav-btn.active {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border-color: rgba(255,255,255,0.5);
+}
+
+.lang-toggle {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: white;
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: 'Noto Naskh Arabic', sans-serif;
+  font-size: 0.95rem;
+  margin-left: 0.5rem;
+  transition: background 0.15s;
+}
+
+.lang-toggle:hover { background: rgba(255,255,255,0.2); }
+
+/* ── Main layout ─────────────────────────────────────────── */
+main {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── Cards ───────────────────────────────────────────────── */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.card h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: 1.25rem;
+}
+
+/* ── Form elements ───────────────────────────────────────── */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.field { display: flex; flex-direction: column; gap: 0.35rem; }
+
+label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+select, input[type="number"] {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  background: white;
+  color: var(--color-text);
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+select:focus, input[type="number"]:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.btn-primary {
+  padding: 0.65rem 1.5rem;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-primary:hover { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Speech output ───────────────────────────────────────── */
+.speech-result { margin-top: 1.5rem; }
+
+.result-meta {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.result-meta span {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+}
+
+.speech-text {
+  background: #fafaf8;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1.25rem;
+  line-height: 1.9;
+  font-size: 1rem;
+  white-space: pre-wrap;
+}
+
+.speech-text.arabic {
+  font-family: 'Noto Naskh Arabic', serif;
+  font-size: 1.15rem;
+  direction: rtl;
+  text-align: right;
+  line-height: 2.1;
+}
+
+/* ── States ──────────────────────────────────────────────── */
+.loading {
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: 1rem 0;
+}
+
+.error-msg {
+  color: var(--color-error);
+  padding: 0.75rem 1rem;
+  background: #fef0f0;
+  border-radius: var(--radius-sm);
+  border: 1px solid #f5c6c6;
+  margin-top: 1rem;
+}
+
+.coming-soon {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--color-text-muted);
+}
+
+.coming-soon h2 { color: var(--color-primary); margin-bottom: 0.75rem; }
