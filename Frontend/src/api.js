@@ -61,6 +61,34 @@ export async function generateSpeech(params) {
   return parseJsonResponse(res);
 }
 
+export async function generateSpeechFromDocument(file, params) {
+  const form = new FormData();
+  form.append('document', file);
+  Object.entries(params).forEach(([key, value]) => {
+    form.append(key, String(value));
+  });
+
+  const res = await fetch(`${BASE}/module-a/from-document`, {
+    method: 'POST',
+    body: form
+  });
+  return parseJsonResponse(res);
+}
+
+export async function retrieveDocumentContext(file, params) {
+  const form = new FormData();
+  form.append('document', file);
+  Object.entries(params).forEach(([key, value]) => {
+    form.append(key, String(value));
+  });
+
+  const res = await fetch(`${BASE}/module-a/retrieve-document-context`, {
+    method: 'POST',
+    body: form
+  });
+  return parseJsonResponse(res);
+}
+
 export async function textToSpeech(params) {
   const res = await fetch(`${BASE}/module-b/tts`, {
     method: 'POST',

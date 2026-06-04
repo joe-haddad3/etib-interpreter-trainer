@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { generateSpeech, loginUser, logoutUser, signupUser } from './api.js';
+import {
+  generateSpeech,
+  generateSpeechFromDocument,
+  loginUser,
+  logoutUser,
+  retrieveDocumentContext,
+  signupUser
+} from './api.js';
 
 const UI = {
   en: {
@@ -50,6 +57,11 @@ const UI = {
     summary: 'Summary',
     mcq: 'MCQ',
     glossary: 'Glossary',
+    documentGrounding: 'Document grounding',
+    documentFile: 'Source document',
+    generateFromDocument: 'Generate from document',
+    retrieveContext: 'Preview retrieved context',
+    retrievedContext: 'Retrieved context',
     submit: 'Generate speech',
     generating: 'Generating - please wait...',
     wordsUnit: 'words',
@@ -433,6 +445,8 @@ function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedSc
 
 function ModuleA({ labels, onGenerated }) {
   const [form, setForm] = useState(initialSpeechForm);
+  const [documentFile, setDocumentFile] = useState(null);
+  const [retrievalResult, setRetrievalResult] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -459,6 +473,58 @@ function ModuleA({ labels, onGenerated }) {
       });
       setResult(data);
       onGenerated(data);
+      setStatus('success');
+    } catch (err) {
+      setError(err.message);
+      setStatus('error');
+    }
+  }
+
+  async function handleDocumentGenerate() {
+    setStatus('loading');
+    setError('');
+    setResult(null);
+    setRetrievalResult(null);
+
+    try {
+      if (!documentFile) {
+        throw new Error('Choose a TXT, DOCX, or PDF document first.');
+      }
+
+      const data = await generateSpeechFromDocument(documentFile, {
+        ...form,
+        word_count: Number(form.word_count)
+      });
+      setResult(data);
+      onGenerated(data);
+      setStatus('success');
+    } catch (err) {
+      setError(err.message);
+      setStatus('error');
+    }
+  }
+
+  async function handleRetrieveContext() {
+    setStatus('loading');
+    setError('');
+    setRetrievalResult(null);
+
+    try {
+      if (!documentFile) {
+        throw new Error('Choose a TXT, DOCX, or PDF document first.');
+      }
+
+      const data = await retrieveDocumentContext(documentFile, {
+        query: form.topic,
+        language: form.language,
+        domain: form.domain,
+        scenario: 'UN General Assembly',
+        difficulty: form.difficulty,
+        mode: form.mode,
+        number_density: form.number_density,
+        max_chunks: 4
+      });
+      setRetrievalResult(data);
       setStatus('success');
     } catch (err) {
       setError(err.message);
@@ -567,8 +633,33 @@ function ModuleA({ labels, onGenerated }) {
         </button>
       </form>
 
+      <section className="document-panel">
+        <h3>{labels.documentGrounding || 'Document grounding'}</h3>
+        <div className="document-actions">
+          <div className="field">
+            <label htmlFor="f-document">{labels.documentFile || 'Source document'}</label>
+            <input
+              id="f-document"
+              type="file"
+              accept=".txt,.docx,.pdf"
+              onChange={event => {
+                setDocumentFile(event.target.files?.[0] || null);
+                setRetrievalResult(null);
+              }}
+            />
+          </div>
+          <button type="button" className="secondary-action" onClick={handleRetrieveContext} disabled={isLoading || !documentFile}>
+            {labels.retrieveContext || 'Preview retrieved context'}
+          </button>
+          <button type="button" className="btn-primary" onClick={handleDocumentGenerate} disabled={isLoading || !documentFile}>
+            {isLoading ? labels.generating : (labels.generateFromDocument || 'Generate from document')}
+          </button>
+        </div>
+      </section>
+
       {isLoading && <p className="loading">{labels.generating}</p>}
       {error && <div className="error-msg">{labels.errorPrefix}: {error}</div>}
+      {retrievalResult && <RetrievalResult data={retrievalResult} labels={labels} />}
       {result && <SpeechResult data={result} labels={labels} />}
     </div>
   );
@@ -582,6 +673,37 @@ function SelectField({ label, id, name, value, onChange, children }) {
         {children}
       </select>
     </div>
+  );
+}
+
+function RetrievalResult({ data, labels }) {
+  return (
+    <section className="retrieval-result">
+      <h3>{labels.retrievedContext || 'Retrieved context'}</h3>
+      <div className="result-meta">
+        <span>{data.selected_chunk_count || 0} chunks</span>
+        {(data.documents_processed || []).map((doc, index) => (
+          <span key={`${doc.filename}-${index}`}>{doc.filename}</span>
+        ))}
+      </div>
+      <div className="chunk-list">
+        {(data.selected_chunks || []).map((chunk, index) => (
+          <article className="chunk-item" key={`${chunk.source_filename}-${chunk.chunk_index}-${index}`}>
+            <p className="chunk-source">
+              {chunk.source_filename} · chunk {Number(chunk.chunk_index || 0) + 1}
+            </p>
+            <p>{chunk.text}</p>
+          </article>
+        ))}
+      </div>
+      {Array.isArray(data.document_errors) && data.document_errors.length > 0 && (
+        <div className="error-msg">
+          {data.document_errors.map((item, index) => (
+            <p key={`${item.filename}-${index}`}>{item.filename}: {item.error}</p>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
