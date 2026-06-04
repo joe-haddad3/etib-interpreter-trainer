@@ -11,6 +11,7 @@ import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+from config import LLM_PROVIDER, LOCAL_MODEL_ID
 
 load_dotenv()
 
@@ -50,6 +51,7 @@ def get_config():
     """Return available options for frontend dropdowns."""
     return jsonify({
         'languages': ['ar', 'fr', 'en'],
+        'target_languages': ['ar', 'fr', 'en'],
         'domains': [
             'politics', 'diplomacy', 'economics',
             'climate', 'health', 'human rights', 'education'
@@ -60,7 +62,12 @@ def get_config():
             'UN General Assembly', 'EU Parliament', 'Arab League summit',
             'press conference', 'diplomatic meeting', 'political debate', 'interview'
         ],
-        'modes': ['sight_translation', 'consecutive', 'simultaneous']
+        'modes': ['sight_translation', 'consecutive', 'simultaneous'],
+        'speed_pressures': ['normal', 'fast', 'very_fast'],
+        'topic_shifts': ['none', 'mild', 'frequent'],
+        'cognitive_loads': ['low', 'medium', 'high'],
+        'llm_provider': LLM_PROVIDER,
+        'local_model_id': LOCAL_MODEL_ID
     })
 
 if __name__ == '__main__':

@@ -33,6 +33,8 @@ const UI = {
     navD: 'Evaluation',
     moduleATitle: 'Generate training speech',
     language: 'Speech language',
+    targetLanguage: 'Target language',
+    topic: 'Topic',
     domain: 'Domain',
     wordCount: 'Word count',
     difficulty: 'Difficulty',
@@ -40,6 +42,14 @@ const UI = {
     mode: 'Interpretation mode',
     numbers: 'Number density',
     hesitations: 'Simulate hesitations',
+    pressureMode: 'Pressure mode',
+    speedPressure: 'Speed pressure',
+    topicShifts: 'Topic shifts',
+    contextNoise: 'Context noise',
+    cognitiveLoad: 'Cognitive load',
+    summary: 'Summary',
+    mcq: 'MCQ',
+    glossary: 'Glossary',
     submit: 'Generate speech',
     generating: 'Generating - please wait...',
     wordsUnit: 'words',
@@ -83,6 +93,7 @@ const UI = {
     navD: 'التقييم',
     moduleATitle: 'توليد خطاب تدريبي',
     language: 'لغة الخطاب',
+    targetLanguage: 'لغة الترجمة',
     domain: 'المجال',
     wordCount: 'عدد الكلمات',
     difficulty: 'مستوى الصعوبة',
@@ -133,6 +144,7 @@ const UI = {
     navD: 'Évaluation',
     moduleATitle: 'Générer un discours d’entraînement',
     language: 'Langue du discours',
+    targetLanguage: 'Langue cible',
     domain: 'Domaine',
     wordCount: 'Nombre de mots',
     difficulty: 'Difficulté',
@@ -162,14 +174,21 @@ const NAV_ITEMS = [
 ];
 
 const initialSpeechForm = {
+  topic: '',
   language: 'en',
+  target_language: 'fr',
   domain: 'politics',
   word_count: 200,
   difficulty: 'intermediate',
   mode: 'consecutive',
   structure: 'well-organized',
   number_density: 'low',
-  include_hesitations: false
+  include_hesitations: false,
+  pressure_enabled: false,
+  speed_pressure: 'normal',
+  topic_shifts: 'none',
+  context_noise: false,
+  cognitive_load: 'medium'
 };
 
 export default function App() {
@@ -451,8 +470,27 @@ function ModuleA({ labels, onGenerated }) {
     <div className="card">
       <h2>{labels.moduleATitle}</h2>
       <form onSubmit={handleSubmit}>
+        <div className="field topic-field">
+          <label htmlFor="f-topic">{labels.topic || 'Topic'}</label>
+          <input
+            id="f-topic"
+            name="topic"
+            type="text"
+            value={form.topic}
+            minLength="3"
+            maxLength="180"
+            required
+            placeholder="Climate finance for developing countries"
+            onChange={updateField}
+          />
+        </div>
         <div className="form-grid">
           <SelectField label={labels.language} id="f-lang" name="language" value={form.language} onChange={updateField}>
+            <option value="ar">العربية - Arabic</option>
+            <option value="fr">Français - French</option>
+            <option value="en">English</option>
+          </SelectField>
+          <SelectField label={labels.targetLanguage} id="f-target-lang" name="target_language" value={form.target_language} onChange={updateField}>
             <option value="ar">العربية - Arabic</option>
             <option value="fr">Français - French</option>
             <option value="en">English</option>
@@ -496,6 +534,33 @@ function ModuleA({ labels, onGenerated }) {
               {labels.hesitations}
             </label>
           </div>
+          <div className="field checkbox-field">
+            <label>
+              <input type="checkbox" name="pressure_enabled" checked={form.pressure_enabled} onChange={updateField} />
+              {labels.pressureMode || 'Pressure mode'}
+            </label>
+          </div>
+          <SelectField label={labels.speedPressure || 'Speed pressure'} id="f-speed-pressure" name="speed_pressure" value={form.speed_pressure} onChange={updateField}>
+            <option value="normal">Normal</option>
+            <option value="fast">Fast</option>
+            <option value="very_fast">Very fast</option>
+          </SelectField>
+          <SelectField label={labels.topicShifts || 'Topic shifts'} id="f-topic-shifts" name="topic_shifts" value={form.topic_shifts} onChange={updateField}>
+            <option value="none">None</option>
+            <option value="mild">Mild</option>
+            <option value="frequent">Frequent</option>
+          </SelectField>
+          <SelectField label={labels.cognitiveLoad || 'Cognitive load'} id="f-cognitive-load" name="cognitive_load" value={form.cognitive_load} onChange={updateField}>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </SelectField>
+          <div className="field checkbox-field">
+            <label>
+              <input type="checkbox" name="context_noise" checked={form.context_noise} onChange={updateField} />
+              {labels.contextNoise || 'Context noise'}
+            </label>
+          </div>
         </div>
         <button type="submit" className="btn-primary" disabled={isLoading}>
           {isLoading ? labels.generating : labels.submit}
@@ -536,12 +601,66 @@ function SpeechResult({ data, labels }) {
       <div className="result-meta">
         <span>{data.word_count} {labels.wordsUnit}</span>
         {duration && <span>~{duration}</span>}
+        {data.topic && <span>{data.topic}</span>}
         <span>{data.domain}</span>
-        <span>{String(data.language || '').toUpperCase()}</span>
+        <span>{String(data.language || '').toUpperCase()} → {String(data.target_language || '').toUpperCase()}</span>
       </div>
       <div className={`speech-text ${isArabic ? 'arabic' : ''}`}>
         {data.script}
       </div>
+      {data.summary && (
+        <section className="result-section">
+          <h3>{labels.summary || 'Summary'}</h3>
+          <p>{data.summary}</p>
+        </section>
+      )}
+      {Array.isArray(data.mcqs) && data.mcqs.length > 0 && (
+        <section className="result-section">
+          <h3>{labels.mcq || 'MCQ'}</h3>
+          <div className="mcq-list">
+            {data.mcqs.map((item, index) => (
+              <div className="mcq-item" key={`${item.question || 'question'}-${index}`}>
+                <p className="mcq-question">{index + 1}. {item.question}</p>
+                <ul>
+                  {(item.options || []).map((option, optionIndex) => (
+                    <li key={`${option}-${optionIndex}`}>{option}</li>
+                  ))}
+                </ul>
+                {item.answer && <p className="mcq-answer">Answer: {item.answer}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {Array.isArray(data.glossary) && data.glossary.length > 0 && (
+        <section className="result-section">
+          <h3>{labels.glossary || 'Glossary'}</h3>
+          <div className="glossary-table-wrap">
+            <table className="glossary-table">
+              <thead>
+                <tr>
+                  <th>Term</th>
+                  <th>Arabic</th>
+                  <th>French</th>
+                  <th>English</th>
+                  <th>Definition</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.glossary.map((item, index) => (
+                  <tr key={`${item.term || 'term'}-${index}`}>
+                    <td>{item.term}</td>
+                    <td>{item.arabic}</td>
+                    <td>{item.french}</td>
+                    <td>{item.english}</td>
+                    <td>{item.definition}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

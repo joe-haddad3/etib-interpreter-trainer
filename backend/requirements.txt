@@ -13,6 +13,11 @@ python-dotenv==1.0.1
 groq==0.9.0                  # Groq free tier (Llama 3.1 70B) — primary LLM
 google-generativeai==0.7.2   # Gemini free tier — secondary LLM
 ollama==0.2.1                # Local Ollama client — offline fallback
+torch
+transformers
+accelerate
+sentencepiece
+huggingface-hub
 
 # --- TTS (Text-to-Speech) ---
 edge-tts==6.1.9              # Microsoft Edge voices — no API key needed, free
