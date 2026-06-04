@@ -1,5 +1,5 @@
 # ============================================================
-# ETIB Platform — Python Dependencies
+# ETIB Platform - Python Dependencies
 # ============================================================
 # Install with: pip install -r requirements.txt
 # ============================================================
@@ -10,9 +10,9 @@ flask-cors==4.0.1
 python-dotenv==1.0.1
 
 # --- Free LLM clients ---
-groq==0.9.0                  # Groq free tier (Llama 3.1 70B) — primary LLM
-google-generativeai==0.7.2   # Gemini free tier — secondary LLM
-ollama==0.2.1                # Local Ollama client — offline fallback
+groq==0.9.0
+google-generativeai==0.7.2
+ollama==0.2.1
 torch
 transformers
 accelerate
@@ -20,22 +20,23 @@ sentencepiece
 huggingface-hub
 
 # --- TTS (Text-to-Speech) ---
-edge-tts==6.1.9              # Microsoft Edge voices — no API key needed, free
+edge-tts==6.1.9
 
 # --- ASR (Automatic Speech Recognition) ---
-faster-whisper==1.0.3        # Best free Arabic ASR — runs locally
+faster-whisper==1.0.3
 
 # --- Audio processing ---
-pydub==0.25.1                # Audio file manipulation
-ffmpeg-python==0.2.0         # ffmpeg bindings (requires ffmpeg system install)
+pydub==0.25.1
+ffmpeg-python==0.2.0
 
-# --- File generation ---
-python-docx==1.1.0           # DOCX glossary export (requirement B11)
-fpdf2==2.7.9                 # PDF generation
+# --- File generation and extraction ---
+python-docx==1.1.0
+pypdf==4.2.0
+fpdf2==2.7.9
 
 # --- Database ---
-# MongoDB
 pymongo==4.10.1
+flask-sqlalchemy==3.1.1
 
 # --- Testing ---
 pytest==8.2.0
