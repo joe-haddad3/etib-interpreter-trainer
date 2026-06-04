@@ -17,7 +17,7 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-change-in-prod')
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
-CORS(app)  # Allow frontend (different port) to call the API
+CORS(app, supports_credentials=True)  # Allow frontend (different port) to call the API
 
 # Ensure output directories exist at startup
 os.makedirs(os.getenv('UPLOAD_FOLDER', './uploads'), exist_ok=True)
@@ -28,11 +28,13 @@ from modules.module_a import module_a_bp
 from modules.module_b import module_b_bp
 from modules.module_c import module_c_bp
 from modules.module_d import module_d_bp
+from modules.auth import auth_bp
 
 app.register_blueprint(module_a_bp, url_prefix='/api/module-a')
 app.register_blueprint(module_b_bp, url_prefix='/api/module-b')
 app.register_blueprint(module_c_bp, url_prefix='/api/module-c')
 app.register_blueprint(module_d_bp, url_prefix='/api/module-d')
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
 # ── Health check ────────────────────────────────────────────────────────────
 @app.route('/health')
