@@ -10,10 +10,32 @@ body.rtl {
 
 body.rtl .header-inner { flex-direction: row-reverse; }
 body.rtl nav { flex-direction: row-reverse; }
-body.rtl .lang-toggle { margin-left: 0; margin-right: 0.5rem; }
+body.rtl .language-picker {
+  margin-left: 0;
+  margin-right: 0.5rem;
+  flex-direction: row-reverse;
+}
 body.rtl .form-grid { direction: rtl; }
 body.rtl .field { align-items: flex-end; }
+body.rtl .checkbox-field label { flex-direction: row-reverse; }
 body.rtl select, body.rtl input { text-align: right; direction: rtl; }
+body.rtl .password-control input {
+  padding-right: 0.75rem;
+  padding-left: 4.75rem;
+}
+body.rtl .password-toggle {
+  right: auto;
+  left: 0.35rem;
+}
 body.rtl .result-meta { flex-direction: row-reverse; }
 body.rtl .btn-primary { align-self: flex-end; }
 body.rtl .coming-soon { direction: rtl; }
+body.rtl .login-layout { direction: rtl; }
+body.rtl .workspace-heading { flex-direction: row-reverse; }
+body.rtl .secondary-action { direction: rtl; }
+
+@media (max-width: 780px) {
+  body.rtl .workspace-heading {
+    align-items: flex-end;
+  }
+}

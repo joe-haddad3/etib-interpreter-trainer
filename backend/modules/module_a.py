@@ -18,7 +18,17 @@ from groq import Groq
 from config import GROQ_API_KEY, PRIMARY_LLM_MODEL, DEFAULT_WPM
 
 module_a_bp = Blueprint('module_a', __name__)
-client = Groq(api_key=GROQ_API_KEY)
+client = None
+
+
+def get_groq_client():
+    """Create the Groq client only when Module A generation is called."""
+    global client
+    if not GROQ_API_KEY:
+        raise RuntimeError('GROQ_API_KEY is not configured')
+    if client is None:
+        client = Groq(api_key=GROQ_API_KEY)
+    return client
 
 LANGUAGE_NAMES = {
     'ar': 'Arabic (Modern Standard Arabic / الفصحى)',
@@ -121,7 +131,7 @@ def generate_speech():
     try:
         prompt = build_prompt(params)
 
-        response = client.chat.completions.create(
+        response = get_groq_client().chat.completions.create(
             model=PRIMARY_LLM_MODEL,
             messages=[
                 {
