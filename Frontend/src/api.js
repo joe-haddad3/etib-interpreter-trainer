@@ -70,10 +70,12 @@ export async function textToSpeech(params) {
   return parseJsonResponse(res);
 }
 
-export async function transcribeAudio(audioBlob, language = 'ar') {
+export async function transcribeAudio(audioFile, language = 'ar', sourceText = '') {
   const form = new FormData();
-  form.append('audio', audioBlob, 'recording.mp3');
+  const filename = audioFile.name || 'recording.webm';
+  form.append('audio', audioFile, filename);
   form.append('language', language);
+  if (sourceText) form.append('source_text', sourceText);
   const res = await fetch(`${BASE}/module-c/transcribe`, {
     method: 'POST',
     body: form
@@ -81,11 +83,42 @@ export async function transcribeAudio(audioBlob, language = 'ar') {
   return parseJsonResponse(res);
 }
 
+export async function generateMaterials(params) {
+  const res = await fetch(`${BASE}/module-b/materials`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  });
+  return parseJsonResponse(res);
+}
+
+export async function downloadGlossary(params) {
+  const res = await fetch(`${BASE}/module-b/glossary/download`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+  return res.blob();
+}
+
 export async function evaluatePerformance(sourceScript, transcript, language) {
   const res = await fetch(`${BASE}/module-d/evaluate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ source_script: sourceScript, transcript, language })
+  });
+  return parseJsonResponse(res);
+}
+
+export async function generateFeedback(params) {
+  const res = await fetch(`${BASE}/module-d/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
   });
   return parseJsonResponse(res);
 }

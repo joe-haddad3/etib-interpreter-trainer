@@ -63,5 +63,13 @@ def get_config():
         'modes': ['sight_translation', 'consecutive', 'simultaneous']
     })
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Return JSON for all unhandled errors so the browser gets CORS headers."""
+    import traceback
+    traceback.print_exc()
+    return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=os.getenv('FLASK_DEBUG', 'true').lower() == 'true', port=5000)

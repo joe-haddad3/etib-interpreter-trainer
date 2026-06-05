@@ -28,8 +28,72 @@ Endpoints:
   GET  /api/module-d/history/<session_id> — retrieve past session results (TODO)
 """
 import re
+import json
 from flask import Blueprint, request, jsonify
 from config import GROQ_API_KEY, PRIMARY_LLM_MODEL
+
+
+def _extract_json(text: str) -> dict:
+    text = text.strip()
+    fence = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
+    if fence:
+        text = fence.group(1).strip()
+    s, e = text.find('{'), text.rfind('}') + 1
+    if s >= 0 and e > s:
+        text = text[s:e]
+    return json.loads(text)
+
+
+LLM_ANALYSIS_PROMPT = """You are a professional interpreter training evaluator at ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).
+
+Analyze this student interpretation performance and produce a detailed pedagogical report.
+
+SOURCE SPEECH ({language}):
+{source}
+
+STUDENT INTERPRETATION TRANSCRIPT:
+{transcript}
+
+ALGORITHMIC FINDINGS (already detected):
+- Long silences / omissions: {silence_count}
+- Word repetitions: {repetition_count}
+- Hesitation markers: {hesitation_count}
+- Number reproduction errors: {number_errors}
+
+Return ONLY a valid JSON object (no markdown, no code fences):
+
+{{
+  "overall_score": 7.5,
+  "language_errors": [
+    {{"text": "incorrect phrase from student speech", "explanation": "what is wrong", "correction": "correct form"}}
+  ],
+  "auto_corrections": [
+    {{"text": "phrase that was self-corrected mid-speech"}}
+  ],
+  "false_starts": [
+    {{"text": "incomplete utterance before restarting"}}
+  ],
+  "lapsus_linguae": [
+    {{"text": "slip of the tongue", "likely_intended": "what student meant to say"}}
+  ],
+  "terminology_problems": [
+    {{"source_term": "term in source speech", "student_used": "what student said instead", "correct_equivalent": "proper translation/equivalent"}}
+  ],
+  "information_loss": [
+    {{"lost_content": "content omitted or significantly distorted", "importance": "high"}}
+  ],
+  "strengths": ["specific strength 1", "specific strength 2"],
+  "recommendations": ["specific actionable recommendation 1", "specific actionable recommendation 2"],
+  "summary": "2-3 sentence overall assessment of the interpretation."
+}}
+
+Rules:
+- overall_score: float 0-10 based on accuracy, fluency, terminology, completeness
+- Cite actual text from the student's transcript when possible
+- For Arabic: check grammar errors, wrong case endings, terminology precision
+- Empty array [] is valid when nothing found
+- Be pedagogically specific and constructive
+"""
 
 module_d_bp = Blueprint('module_d', __name__)
 
@@ -185,20 +249,85 @@ def evaluate():
 @module_d_bp.route('/feedback', methods=['POST'])
 def generate_feedback():
     """
-    Generate a natural-language feedback report using the LLM.
-    Takes the structured error report from /evaluate and writes human feedback.
+    Full evaluation: combines algorithmic detection + LLM multi-agent analysis.
 
     Request body (JSON):
-      error_report    dict  output from /evaluate
-      params_used     dict  the speech parameters (domain, language, difficulty)
-      target_language str   language for the feedback text itself
+      source_script   str   the original source speech (from Module A)
+      transcript_text str   the student's transcribed interpretation
+      transcript      dict  full Whisper output with segments (for algorithmic)
+      language        str   'ar'|'fr'|'en'
 
     Response (JSON):
-      feedback_text   str   the written feedback report
-
-    TODO: Person 5 — implement in Week 4.
+      overall_score, language_errors, auto_corrections, false_starts,
+      lapsus_linguae, terminology_problems, information_loss,
+      strengths, recommendations, summary, algorithmic
     """
-    return jsonify({'status': 'not yet implemented — planned for Week 4'}), 501
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Request body required'}), 400
+
+    source_script  = data.get('source_script', '')
+    transcript_text = data.get('transcript_text', '')
+    transcript_obj  = data.get('transcript', {})
+    language        = data.get('language', 'ar')
+
+    if not transcript_text:
+        return jsonify({'error': 'transcript_text is required'}), 400
+
+    # Run algorithmic analysis on segments
+    algo = run_full_analysis(source_script, transcript_obj, language) if transcript_obj else {
+        'long_silences': [], 'repetitions': [], 'hesitation_words': [],
+        'number_errors': [], 'summary': {}
+    }
+    s = algo.get('summary', {})
+
+    if not GROQ_API_KEY:
+        return jsonify({'error': 'GROQ_API_KEY not configured', 'algorithmic': algo}), 500
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=GROQ_API_KEY)
+
+        prompt = LLM_ANALYSIS_PROMPT.format(
+            language={'ar': 'Arabic', 'fr': 'French', 'en': 'English'}.get(language, language),
+            source=source_script or '(source speech not provided)',
+            transcript=transcript_text,
+            silence_count=s.get('silence_count', 0),
+            repetition_count=s.get('repetition_count', 0),
+            hesitation_count=s.get('hesitation_count', 0),
+            number_errors=s.get('number_errors', 0)
+        )
+
+        response = client.chat.completions.create(
+            model=PRIMARY_LLM_MODEL,
+            messages=[
+                {
+                    'role': 'system',
+                    'content': (
+                        'You are an expert interpreter training evaluator at ETIB Beirut. '
+                        'You return only valid JSON for pedagogical evaluation reports.'
+                    )
+                },
+                {'role': 'user', 'content': prompt}
+            ],
+            max_tokens=2000,
+            temperature=0.2
+        )
+
+        llm_result = _extract_json(response.choices[0].message.content)
+        llm_result['algorithmic'] = {
+            'long_silences':    algo.get('long_silences', []),
+            'repetitions':      algo.get('repetitions', []),
+            'hesitation_words': algo.get('hesitation_words', []),
+            'number_errors':    algo.get('number_errors', []),
+            'summary':          s
+        }
+        return jsonify(llm_result)
+
+    except json.JSONDecodeError as e:
+        return jsonify({'error': f'JSON parse error: {e}', 'algorithmic': algo}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @module_d_bp.route('/history/<session_id>')

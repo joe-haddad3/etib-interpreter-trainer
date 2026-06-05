@@ -1,7 +1,8 @@
 """
 Authentication endpoints for the ETIB platform.
 
-Uses MongoDB for local development and production-like account persistence.
+Uses MongoDB when available; falls back to an in-memory store so the app
+runs without a MongoDB installation during development.
 Expected defaults:
   MONGODB_URI=mongodb://127.0.0.1:27017
   MONGODB_DB=etib_interpreter_trainer
@@ -11,8 +12,6 @@ import uuid
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request, session
-from pymongo import ASCENDING, MongoClient
-from pymongo.errors import DuplicateKeyError, ServerSelectionTimeoutError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
@@ -28,24 +27,42 @@ SEED_USERS = [
     ('Demo Coordinator', 'coordinator@etib.edu', 'coordinator', 'coordinator123'),
 ]
 
+# ── Storage backend (MongoDB or in-memory fallback) ──────────────────────────
+
 _mongo_client = None
+_use_mongo = None          # None = not yet decided
 _auth_initialized = False
+
+# In-memory fallback: { email: user_dict }
+_mem_users: dict = {}
 
 
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def get_mongo_client():
-    global _mongo_client
-    if _mongo_client is None:
-        _mongo_client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=3000)
-    return _mongo_client
+def _try_mongo():
+    """Return True if MongoDB is reachable, False otherwise."""
+    global _mongo_client, _use_mongo
+    if _use_mongo is not None:
+        return _use_mongo
+    try:
+        from pymongo import MongoClient
+        from pymongo.errors import ServerSelectionTimeoutError
+        client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=2000)
+        client.admin.command('ping')
+        _mongo_client = client
+        _use_mongo = True
+        print('[Auth] MongoDB connected.')
+    except Exception:
+        _use_mongo = False
+        print('[Auth] MongoDB not available — using in-memory store (data resets on restart).')
+    return _use_mongo
 
 
 def get_users_collection():
-    client = get_mongo_client()
-    return client[MONGODB_DB]['users']
+    from pymongo import ASCENDING
+    return _mongo_client[MONGODB_DB]['users']
 
 
 def init_auth_db():
@@ -53,28 +70,30 @@ def init_auth_db():
     if _auth_initialized:
         return
 
-    users = get_users_collection()
-    try:
-        users.database.client.admin.command('ping')
-    except ServerSelectionTimeoutError as exc:
-        raise RuntimeError('MongoDB is not reachable at MONGODB_URI') from exc
-
-    users.create_index([('email', ASCENDING)], unique=True)
-    for name, email, role, password in SEED_USERS:
-        users.update_one(
-            {'email': email},
-            {
-                '$setOnInsert': {
+    if _try_mongo():
+        from pymongo import ASCENDING
+        users = get_users_collection()
+        users.create_index([('email', ASCENDING)], unique=True)
+        for name, email, role, password in SEED_USERS:
+            users.update_one(
+                {'email': email},
+                {'$setOnInsert': {
                     'id': f'user-{uuid.uuid4().hex}',
-                    'name': name,
-                    'email': email,
-                    'role': role,
+                    'name': name, 'email': email, 'role': role,
+                    'password_hash': generate_password_hash(password),
+                    'created_at': utc_now(),
+                }},
+                upsert=True
+            )
+    else:
+        for name, email, role, password in SEED_USERS:
+            if email not in _mem_users:
+                _mem_users[email] = {
+                    'id': f'user-{uuid.uuid4().hex}',
+                    'name': name, 'email': email, 'role': role,
                     'password_hash': generate_password_hash(password),
                     'created_at': utc_now(),
                 }
-            },
-            upsert=True
-        )
 
     _auth_initialized = True
 
@@ -90,7 +109,9 @@ def public_user(user):
 
 def find_user_by_email(email):
     init_auth_db()
-    return get_users_collection().find_one({'email': email})
+    if _try_mongo():
+        return get_users_collection().find_one({'email': email})
+    return _mem_users.get(email)
 
 
 def validate_signup_payload(payload):
@@ -129,7 +150,6 @@ def signup():
         return jsonify({'error': error}), 400
 
     init_auth_db()
-    users = get_users_collection()
     user = {
         'id': f'user-{uuid.uuid4().hex}',
         'name': user_data['name'],
@@ -139,10 +159,16 @@ def signup():
         'created_at': utc_now(),
     }
 
-    try:
-        users.insert_one(user)
-    except DuplicateKeyError:
-        return jsonify({'error': 'An account with this email already exists'}), 409
+    if _try_mongo():
+        from pymongo.errors import DuplicateKeyError
+        try:
+            get_users_collection().insert_one(user)
+        except DuplicateKeyError:
+            return jsonify({'error': 'An account with this email already exists'}), 409
+    else:
+        if user_data['email'] in _mem_users:
+            return jsonify({'error': 'An account with this email already exists'}), 409
+        _mem_users[user_data['email']] = user
 
     set_user_session(user)
     return jsonify({

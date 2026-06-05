@@ -15,7 +15,7 @@ google-generativeai==0.7.2   # Gemini free tier — secondary LLM
 ollama==0.2.1                # Local Ollama client — offline fallback
 
 # --- TTS (Text-to-Speech) ---
-edge-tts==6.1.9              # Microsoft Edge voices — no API key needed, free
+edge-tts>=7.2.8              # Microsoft Edge voices — no API key needed, free
 
 # --- ASR (Automatic Speech Recognition) ---
 faster-whisper==1.0.3        # Best free Arabic ASR — runs locally

@@ -14,7 +14,7 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GOOGLE_AI_KEY = os.getenv('GOOGLE_AI_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # paid fallback only
 
-PRIMARY_LLM_MODEL = 'llama-3.1-70b-versatile'   # via Groq (free)
+PRIMARY_LLM_MODEL = 'llama-3.3-70b-versatile'   # via Groq (free)
 FALLBACK_LLM_MODEL = 'gemini-1.5-flash'          # via Google AI Studio (free)
 
 # ── TTS ─────────────────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ DEFAULT_VOICE = {
 }
 
 # ── ASR ─────────────────────────────────────────────────────────────────────
-WHISPER_MODEL_SIZE = 'large-v3'   # best Arabic quality
+WHISPER_MODEL_SIZE = 'medium'     # good Arabic quality, practical on CPU (~500MB)
 WHISPER_DEVICE = 'cpu'            # change to 'cuda' if GPU available
 WHISPER_COMPUTE_TYPE = 'int8'     # int8 = faster on CPU
 
