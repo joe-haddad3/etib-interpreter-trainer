@@ -11,11 +11,13 @@ import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+from config import LLM_PROVIDER, LOCAL_MODEL_ID, REMOTE_AYA_URL
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-change-in-prod')
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 CORS(app, supports_credentials=True)  # Allow frontend (different port) to call the API
 
 # Ensure output directories exist at startup
@@ -50,6 +52,7 @@ def get_config():
     """Return available options for frontend dropdowns."""
     return jsonify({
         'languages': ['ar', 'fr', 'en'],
+        'target_languages': ['ar', 'fr', 'en'],
         'domains': [
             'politics', 'diplomacy', 'economics',
             'climate', 'health', 'human rights', 'education'
@@ -60,7 +63,13 @@ def get_config():
             'UN General Assembly', 'EU Parliament', 'Arab League summit',
             'press conference', 'diplomatic meeting', 'political debate', 'interview'
         ],
-        'modes': ['sight_translation', 'consecutive', 'simultaneous']
+        'modes': ['sight_translation', 'consecutive', 'simultaneous'],
+        'speed_pressures': ['normal', 'fast', 'very_fast'],
+        'topic_shifts': ['none', 'mild', 'frequent'],
+        'cognitive_loads': ['low', 'medium', 'high'],
+        'llm_provider': LLM_PROVIDER,
+        'local_model_id': LOCAL_MODEL_ID,
+        'remote_aya_configured': bool(REMOTE_AYA_URL and 'PASTE_' not in REMOTE_AYA_URL)
     })
 
 @app.errorhandler(Exception)

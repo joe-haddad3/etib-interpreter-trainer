@@ -26,6 +26,9 @@ uploads/
 # Whisper model cache (downloaded at runtime, ~1.5GB)
 model_cache/
 
+# Local LLM weights (download manually; do not commit multi-GB files)
+models/
+
 # OS
 .DS_Store
 Thumbs.db

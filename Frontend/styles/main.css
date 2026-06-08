@@ -299,7 +299,7 @@ label {
   color: var(--color-text-muted);
 }
 
-select, input[type="number"], input[type="email"], input[type="password"] {
+select, input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="file"] {
   padding: 0.55rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -310,9 +310,13 @@ select, input[type="number"], input[type="email"], input[type="password"] {
   transition: border-color 0.15s;
 }
 
-select:focus, input[type="number"]:focus, input[type="email"]:focus, input[type="password"]:focus {
+select:focus, input[type="text"]:focus, input[type="number"]:focus, input[type="email"]:focus, input[type="password"]:focus, input[type="file"]:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+
+.topic-field {
+  margin-bottom: 1rem;
 }
 
 .password-control {
@@ -359,8 +363,101 @@ select:focus, input[type="number"]:focus, input[type="email"]:focus, input[type=
 .btn-primary:hover { opacity: 0.85; }
 .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
+.generation-settings {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.section-heading {
+  margin-bottom: 0.25rem;
+}
+
+.section-heading h3 {
+  color: var(--color-primary);
+  font-size: 1rem;
+  margin-bottom: 0.2rem;
+}
+
+.section-heading p {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.generation-methods {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.method-panel {
+  background: #fafaf8;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.method-panel h4 {
+  color: var(--color-primary);
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.method-panel p {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.document-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
 /* ── Speech output ───────────────────────────────────────── */
 .speech-result { margin-top: 1.5rem; }
+
+.retrieval-result {
+  margin-top: 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+}
+
+.retrieval-result h3 {
+  color: var(--color-primary);
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.chunk-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.chunk-item {
+  background: #fafaf8;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+}
+
+.chunk-source {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
 
 .result-meta {
   font-size: 0.8rem;
@@ -394,6 +491,68 @@ select:focus, input[type="number"]:focus, input[type="email"]:focus, input[type=
   direction: rtl;
   text-align: right;
   line-height: 2.1;
+}
+
+.result-section {
+  margin-top: 1rem;
+  background: #fafaf8;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+}
+
+.result-section h3 {
+  color: var(--color-primary);
+  font-size: 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.mcq-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.mcq-item {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.85rem;
+}
+
+.mcq-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.mcq-question,
+.mcq-answer {
+  font-weight: 650;
+}
+
+.mcq-item ul {
+  margin: 0.45rem 0 0.45rem 1.25rem;
+}
+
+.glossary-table-wrap {
+  overflow-x: auto;
+}
+
+.glossary-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.glossary-table th,
+.glossary-table td {
+  border: 1px solid var(--color-border);
+  padding: 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.glossary-table th {
+  background: var(--color-bg);
+  color: var(--color-primary);
 }
 
 /* ── States ──────────────────────────────────────────────── */
@@ -1088,5 +1247,9 @@ select:focus, input[type="number"]:focus, input[type="email"]:focus, input[type=
 
   .workspace-heading {
     flex-direction: column;
+  }
+
+  .method-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,5 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { generateSpeech, loginUser, logoutUser, signupUser, textToSpeech, generateMaterials, downloadGlossary, transcribeAudio, generateFeedback, evaluateWithAudio, tashkeelCompare, alignPronunciation, getPronunciationReport } from './api.js';
+import {
+  generateSpeech,
+  generateSpeechFromDocument,
+  loginUser,
+  logoutUser,
+  retrieveDocumentContext,
+  signupUser,
+  textToSpeech,
+  generateMaterials,
+  downloadGlossary,
+  transcribeAudio,
+  generateFeedback,
+  evaluateWithAudio,
+  tashkeelCompare,
+  alignPronunciation,
+  getPronunciationReport,
+} from './api.js';
 
 const UI = {
   en: {
@@ -33,6 +49,8 @@ const UI = {
     navD: 'Evaluation',
     moduleATitle: 'Generate training speech',
     language: 'Speech language',
+    targetLanguage: 'Target language',
+    topic: 'Topic',
     domain: 'Domain',
     wordCount: 'Word count',
     difficulty: 'Difficulty',
@@ -40,6 +58,25 @@ const UI = {
     mode: 'Interpretation mode',
     numbers: 'Number density',
     hesitations: 'Simulate hesitations',
+    pressureMode: 'Pressure mode',
+    speedPressure: 'Speed pressure',
+    topicShifts: 'Topic shifts',
+    contextNoise: 'Context noise',
+    cognitiveLoad: 'Cognitive load',
+    summary: 'Summary',
+    mcq: 'MCQ',
+    glossary: 'Glossary',
+    documentGrounding: 'Document grounding',
+    documentFile: 'Source document',
+    sharedSettings: 'Generation settings',
+    sharedSettingsHint: 'These settings apply to both topic-only generation and document-grounded generation.',
+    generationMethods: 'Choose generation source',
+    topicOnlyGeneration: 'Topic-only generation',
+    topicOnlyHint: 'Generate from the topic and selected settings.',
+    documentGenerationHint: 'Upload a source file and generate a speech grounded in its content.',
+    generateFromDocument: 'Generate from document',
+    retrieveContext: 'Preview retrieved context',
+    retrievedContext: 'Retrieved context',
     submit: 'Generate speech',
     generating: 'Generating - please wait...',
     wordsUnit: 'words',
@@ -153,6 +190,7 @@ const UI = {
     navD: 'التقييم',
     moduleATitle: 'توليد خطاب تدريبي',
     language: 'لغة الخطاب',
+    targetLanguage: 'لغة الترجمة',
     domain: 'المجال',
     wordCount: 'عدد الكلمات',
     difficulty: 'مستوى الصعوبة',
@@ -273,6 +311,7 @@ const UI = {
     navD: 'Évaluation',
     moduleATitle: 'Générer un discours d’entraînement',
     language: 'Langue du discours',
+    targetLanguage: 'Langue cible',
     domain: 'Domaine',
     wordCount: 'Nombre de mots',
     difficulty: 'Difficulté',
@@ -472,14 +511,21 @@ function TranscriptBubble({ text, vocalizedText, isArabic, onRetranscribe }) {
 }
 
 const initialSpeechForm = {
+  topic: '',
   language: 'en',
+  target_language: 'fr',
   domain: 'politics',
   word_count: 200,
   difficulty: 'intermediate',
   mode: 'consecutive',
   structure: 'well-organized',
   number_density: 'low',
-  include_hesitations: false
+  include_hesitations: false,
+  pressure_enabled: false,
+  speed_pressure: 'normal',
+  topic_shifts: 'none',
+  context_noise: false,
+  cognitive_load: 'medium'
 };
 
 export default function App() {
@@ -735,6 +781,8 @@ function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedSc
 
 function ModuleA({ labels, onGenerated }) {
   const [form, setForm] = useState(initialSpeechForm);
+  const [documentFile, setDocumentFile] = useState(null);
+  const [retrievalResult, setRetrievalResult] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -768,12 +816,87 @@ function ModuleA({ labels, onGenerated }) {
     }
   }
 
+  async function handleDocumentGenerate() {
+    setStatus('loading');
+    setError('');
+    setResult(null);
+    setRetrievalResult(null);
+
+    try {
+      if (!documentFile) {
+        throw new Error('Choose a TXT, DOCX, or PDF document first.');
+      }
+
+      const data = await generateSpeechFromDocument(documentFile, {
+        ...form,
+        word_count: Number(form.word_count)
+      });
+      setResult(data);
+      onGenerated(data);
+      setStatus('success');
+    } catch (err) {
+      setError(err.message);
+      setStatus('error');
+    }
+  }
+
+  async function handleRetrieveContext() {
+    setStatus('loading');
+    setError('');
+    setRetrievalResult(null);
+
+    try {
+      if (!documentFile) {
+        throw new Error('Choose a TXT, DOCX, or PDF document first.');
+      }
+
+      const data = await retrieveDocumentContext(documentFile, {
+        query: form.topic,
+        language: form.language,
+        domain: form.domain,
+        scenario: 'UN General Assembly',
+        difficulty: form.difficulty,
+        mode: form.mode,
+        number_density: form.number_density,
+        max_chunks: 4
+      });
+      setRetrievalResult(data);
+      setStatus('success');
+    } catch (err) {
+      setError(err.message);
+      setStatus('error');
+    }
+  }
+
   return (
     <div className="card">
       <h2>{labels.moduleATitle}</h2>
-      <form onSubmit={handleSubmit}>
+      <form className="generation-settings" onSubmit={handleSubmit}>
+        <div className="section-heading">
+          <h3>{labels.sharedSettings || 'Generation settings'}</h3>
+          <p>{labels.sharedSettingsHint || 'These settings apply to both topic-only generation and document-grounded generation.'}</p>
+        </div>
+        <div className="field topic-field">
+          <label htmlFor="f-topic">{labels.topic || 'Topic'}</label>
+          <input
+            id="f-topic"
+            name="topic"
+            type="text"
+            value={form.topic}
+            minLength="3"
+            maxLength="180"
+            required
+            placeholder="Artificial intelligence in public policy"
+            onChange={updateField}
+          />
+        </div>
         <div className="form-grid">
           <SelectField label={labels.language} id="f-lang" name="language" value={form.language} onChange={updateField}>
+            <option value="ar">العربية - Arabic</option>
+            <option value="fr">Français - French</option>
+            <option value="en">English</option>
+          </SelectField>
+          <SelectField label={labels.targetLanguage} id="f-target-lang" name="target_language" value={form.target_language} onChange={updateField}>
             <option value="ar">العربية - Arabic</option>
             <option value="fr">Français - French</option>
             <option value="en">English</option>
@@ -782,9 +905,7 @@ function ModuleA({ labels, onGenerated }) {
             <option value="politics">Politics / السياسة</option>
             <option value="diplomacy">Diplomacy / الدبلوماسية</option>
             <option value="economics">Economics / الاقتصاد</option>
-            <option value="climate">Climate / المناخ</option>
             <option value="health">Health / الصحة</option>
-            <option value="human rights">Human rights / حقوق الإنسان</option>
             <option value="education">Education / التعليم</option>
           </SelectField>
           <div className="field">
@@ -799,32 +920,68 @@ function ModuleA({ labels, onGenerated }) {
           <SelectField label={labels.mode} id="f-mode" name="mode" value={form.mode} onChange={updateField}>
             <option value="consecutive">Consecutive / متتابعة</option>
             <option value="simultaneous">Simultaneous / فورية</option>
-            <option value="sight_translation">Sight translation / ترجمة بصرية</option>
           </SelectField>
           <SelectField label={labels.structure} id="f-structure" name="structure" value={form.structure} onChange={updateField}>
             <option value="well-organized">Well organized</option>
-            <option value="semi-structured">Semi-structured</option>
             <option value="deliberately disorganized">Disorganized</option>
           </SelectField>
           <SelectField label={labels.numbers} id="f-numbers" name="number_density" value={form.number_density} onChange={updateField}>
             <option value="low">Low / منخفض</option>
-            <option value="medium">Medium / متوسط</option>
             <option value="high">High / مرتفع</option>
           </SelectField>
-          <div className="field checkbox-field">
-            <label>
-              <input type="checkbox" name="include_hesitations" checked={form.include_hesitations} onChange={updateField} />
-              {labels.hesitations}
-            </label>
-          </div>
+          <SelectField label={labels.speedPressure || 'Speed pressure'} id="f-speed-pressure" name="speed_pressure" value={form.speed_pressure} onChange={updateField}>
+            <option value="normal">Normal</option>
+            <option value="fast">Fast</option>
+            <option value="very_fast">Very fast</option>
+          </SelectField>
+          <SelectField label={labels.topicShifts || 'Topic shifts'} id="f-topic-shifts" name="topic_shifts" value={form.topic_shifts} onChange={updateField}>
+            <option value="none">None</option>
+            <option value="mild">Topic shifts</option>
+          </SelectField>
         </div>
-        <button type="submit" className="btn-primary" disabled={isLoading}>
-          {isLoading ? labels.generating : labels.submit}
-        </button>
+        <section className="generation-methods">
+          <div className="section-heading">
+            <h3>{labels.generationMethods || 'Choose generation source'}</h3>
+          </div>
+          <div className="method-grid">
+            <div className="method-panel">
+              <h4>{labels.topicOnlyGeneration || 'Topic-only generation'}</h4>
+              <p>{labels.topicOnlyHint || 'Generate from the topic and selected settings.'}</p>
+              <button type="submit" className="btn-primary" disabled={isLoading}>
+                {isLoading ? labels.generating : labels.submit}
+              </button>
+            </div>
+            <div className="method-panel">
+              <h4>{labels.documentGrounding || 'Document grounding'}</h4>
+              <p>{labels.documentGenerationHint || 'Upload a source file and generate a speech grounded in its content.'}</p>
+              <div className="document-actions">
+                <div className="field">
+                  <label htmlFor="f-document">{labels.documentFile || 'Source document'}</label>
+                  <input
+                    id="f-document"
+                    type="file"
+                    accept=".txt,.docx,.pdf"
+                    onChange={event => {
+                      setDocumentFile(event.target.files?.[0] || null);
+                      setRetrievalResult(null);
+                    }}
+                  />
+                </div>
+                <button type="button" className="secondary-action" onClick={handleRetrieveContext} disabled={isLoading || !documentFile}>
+                  {labels.retrieveContext || 'Preview retrieved context'}
+                </button>
+                <button type="button" className="btn-primary" onClick={handleDocumentGenerate} disabled={isLoading || !documentFile}>
+                  {isLoading ? labels.generating : (labels.generateFromDocument || 'Generate from document')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
       </form>
 
       {isLoading && <p className="loading">{labels.generating}</p>}
       {error && <div className="error-msg">{labels.errorPrefix}: {error}</div>}
+      {retrievalResult && <RetrievalResult data={retrievalResult} labels={labels} />}
       {result && <SpeechResult data={result} labels={labels} />}
     </div>
   );
@@ -838,6 +995,37 @@ function SelectField({ label, id, name, value, onChange, children }) {
         {children}
       </select>
     </div>
+  );
+}
+
+function RetrievalResult({ data, labels }) {
+  return (
+    <section className="retrieval-result">
+      <h3>{labels.retrievedContext || 'Retrieved context'}</h3>
+      <div className="result-meta">
+        <span>{data.selected_chunk_count || 0} chunks</span>
+        {(data.documents_processed || []).map((doc, index) => (
+          <span key={`${doc.filename}-${index}`}>{doc.filename}</span>
+        ))}
+      </div>
+      <div className="chunk-list">
+        {(data.selected_chunks || []).map((chunk, index) => (
+          <article className="chunk-item" key={`${chunk.source_filename}-${chunk.chunk_index}-${index}`}>
+            <p className="chunk-source">
+              {chunk.source_filename} · chunk {Number(chunk.chunk_index || 0) + 1}
+            </p>
+            <p>{chunk.text}</p>
+          </article>
+        ))}
+      </div>
+      {Array.isArray(data.document_errors) && data.document_errors.length > 0 && (
+        <div className="error-msg">
+          {data.document_errors.map((item, index) => (
+            <p key={`${item.filename}-${index}`}>{item.filename}: {item.error}</p>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -857,12 +1045,66 @@ function SpeechResult({ data, labels }) {
       <div className="result-meta">
         <span>{data.word_count} {labels.wordsUnit}</span>
         {duration && <span>~{duration}</span>}
+        {data.topic && <span>{data.topic}</span>}
         <span>{data.domain}</span>
-        <span>{String(data.language || '').toUpperCase()}</span>
+        <span>{String(data.language || '').toUpperCase()} → {String(data.target_language || '').toUpperCase()}</span>
       </div>
       <div className={`speech-text ${isArabic ? 'arabic' : ''}`}>
         {data.script}
       </div>
+      {data.summary && (
+        <section className="result-section">
+          <h3>{labels.summary || 'Summary'}</h3>
+          <p>{data.summary}</p>
+        </section>
+      )}
+      {Array.isArray(data.mcqs) && data.mcqs.length > 0 && (
+        <section className="result-section">
+          <h3>{labels.mcq || 'MCQ'}</h3>
+          <div className="mcq-list">
+            {data.mcqs.map((item, index) => (
+              <div className="mcq-item" key={`${item.question || 'question'}-${index}`}>
+                <p className="mcq-question">{index + 1}. {item.question}</p>
+                <ul>
+                  {(item.options || []).map((option, optionIndex) => (
+                    <li key={`${option}-${optionIndex}`}>{option}</li>
+                  ))}
+                </ul>
+                {item.answer && <p className="mcq-answer">Answer: {item.answer}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {Array.isArray(data.glossary) && data.glossary.length > 0 && (
+        <section className="result-section">
+          <h3>{labels.glossary || 'Glossary'}</h3>
+          <div className="glossary-table-wrap">
+            <table className="glossary-table">
+              <thead>
+                <tr>
+                  <th>Term</th>
+                  <th>Arabic</th>
+                  <th>French</th>
+                  <th>English</th>
+                  <th>Definition</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.glossary.map((item, index) => (
+                  <tr key={`${item.term || 'term'}-${index}`}>
+                    <td>{item.term}</td>
+                    <td>{item.arabic}</td>
+                    <td>{item.french}</td>
+                    <td>{item.english}</td>
+                    <td>{item.definition}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
