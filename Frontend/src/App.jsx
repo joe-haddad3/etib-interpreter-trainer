@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { generateSpeech, loginUser, logoutUser, signupUser, textToSpeech, generateMaterials, downloadGlossary, transcribeAudio, generateFeedback } from './api.js';
+import { generateSpeech, loginUser, logoutUser, signupUser, textToSpeech, generateMaterials, downloadGlossary, transcribeAudio, generateFeedback, evaluateWithAudio, tashkeelCompare, alignPronunciation, getPronunciationReport } from './api.js';
 
 const UI = {
   en: {
@@ -94,6 +94,24 @@ const UI = {
     source: 'Source',
     used: 'Used',
     correct: 'Correct term',
+    pronunciationTitle: 'Pronunciation Assessment (إعراب)',
+    runPronunciation: 'Run pronunciation check',
+    runningPronunciation: 'Aligning audio against source — may take 1 min...',
+    pronunciationScore: 'Pronunciation confidence',
+    wordView: 'Word-by-word view',
+    legend: 'Legend',
+    legendGood: '≥80% confident',
+    legendWarn: '65–80%',
+    legendPoor: '<65% — likely error',
+    uncertainWords: 'Uncertain words — likely pronunciation errors',
+    expectedForm: 'Expected',
+    likelyError: 'Likely error',
+    grammaticalRole: 'Grammatical role',
+    noUncertain: 'All words pronounced with high confidence',
+    whisperxBadge: 'WhisperX aligned',
+    fallbackBadge: 'Whisper scores',
+    needsArabic: 'Pronunciation check is available for Arabic interpretations only.',
+    needsSource: 'Generate a speech in Module A first so the source text is available.',
     sourceAudio: 'Source speech audio',
     yourInterpretation: 'Your interpretation',
     recordBtn: '🎙 Start recording',
@@ -196,6 +214,24 @@ const UI = {
     source: 'المصدر',
     used: 'ما قيل',
     correct: 'المصطلح الصحيح',
+    pronunciationTitle: 'تقييم النطق والإعراب',
+    runPronunciation: 'تشغيل فحص النطق',
+    runningPronunciation: 'جارٍ المحاذاة الصوتية — قد تستغرق دقيقة...',
+    pronunciationScore: 'ثقة النطق',
+    wordView: 'عرض كلمة بكلمة',
+    legend: 'المفتاح',
+    legendGood: '٪80 أو أكثر',
+    legendWarn: '٪60–80',
+    legendPoor: 'أقل من ٪60 — خطأ محتمل',
+    uncertainWords: 'كلمات غير مؤكدة — أخطاء نطق محتملة',
+    expectedForm: 'الشكل الصحيح',
+    likelyError: 'الخطأ المحتمل',
+    grammaticalRole: 'الدور النحوي',
+    noUncertain: 'جميع الكلمات نُطقت بثقة عالية',
+    whisperxBadge: 'محاذاة WhisperX',
+    fallbackBadge: 'نتائج Whisper',
+    needsArabic: 'فحص النطق متاح للترجمات العربية فقط.',
+    needsSource: 'ولّد خطاباً في الوحدة أ أولاً لتوفير النص المرجعي.',
     sourceAudio: 'الصوت المرجعي للخطاب',
     yourInterpretation: 'ترجمتك الفورية',
     recordBtn: '🎙 بدء التسجيل',
@@ -298,6 +334,24 @@ const UI = {
     source: 'Source',
     used: 'Utilisé',
     correct: 'Terme correct',
+    pronunciationTitle: 'Évaluation de la prononciation (إعراب)',
+    runPronunciation: 'Lancer le contrôle de prononciation',
+    runningPronunciation: 'Alignement audio en cours — peut prendre 1 min...',
+    pronunciationScore: 'Confiance en prononciation',
+    wordView: 'Vue mot par mot',
+    legend: 'Légende',
+    legendGood: '≥80% confiant',
+    legendWarn: '60–80%',
+    legendPoor: '<60% — erreur probable',
+    uncertainWords: 'Mots incertains — erreurs de prononciation probables',
+    expectedForm: 'Forme attendue',
+    likelyError: 'Erreur probable',
+    grammaticalRole: 'Rôle grammatical',
+    noUncertain: 'Tous les mots prononcés avec haute confiance',
+    whisperxBadge: 'WhisperX aligné',
+    fallbackBadge: 'Scores Whisper',
+    needsArabic: 'Le contrôle de prononciation est disponible pour l\'arabe uniquement.',
+    needsSource: 'Générez d\'abord un discours dans le Module A.',
     sourceAudio: 'Audio du discours source',
     yourInterpretation: 'Votre interprétation',
     recordBtn: '🎙 Démarrer l\'enregistrement',
@@ -641,6 +695,7 @@ function LoginScreen({ labels, onLogin, onSignup }) {
 function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedScript, currentUser }) {
   const [sharedAudioUrl, setSharedAudioUrl] = useState(null);
   const [lastTranscript, setLastTranscript] = useState(null);
+  const [lastRecordingBlob, setLastRecordingBlob] = useState(null);
 
   return (
     <section className="workspace-screen">
@@ -666,11 +721,13 @@ function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedSc
       <div style={{ display: activePanel === 'module-c' ? 'block' : 'none' }}>
         <ModuleC labels={labels} referenceAudioUrl={sharedAudioUrl}
           sourceScript={lastGeneratedScript?.script || ''}
-          onTranscriptComplete={setLastTranscript} />
+          onTranscriptComplete={setLastTranscript}
+          onRecordingComplete={setLastRecordingBlob} />
       </div>
       <div style={{ display: activePanel === 'module-d' ? 'block' : 'none' }}>
         <ModuleD labels={labels} lastTranscript={lastTranscript}
-          lastGeneratedScript={lastGeneratedScript} />
+          lastGeneratedScript={lastGeneratedScript}
+          lastRecordingBlob={lastRecordingBlob} />
       </div>
     </section>
   );
@@ -1011,7 +1068,7 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
 
 // ── Module C — ASR Transcription + Browser Recording ────────────────────────
 
-function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete }) {
+function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete, onRecordingComplete }) {
   const [language, setLanguage] = useState('ar');
   const [status, setStatus] = useState('idle');
   const [result, setResult] = useState(null);
@@ -1073,6 +1130,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
         stream.getTracks().forEach(t => t.stop());
         clearInterval(timerRef.current);
         setRecordedBlob(blob);
+        onRecordingComplete?.(blob);
         if (recordedUrl) URL.revokeObjectURL(recordedUrl);
         setRecordedUrl(URL.createObjectURL(blob));
         if (autoTranscribe) runTranscription(blob);
@@ -1248,22 +1306,203 @@ function EvalSection({ title, icon, items, renderItem, emptyLabel }) {
   );
 }
 
-function ModuleD({ labels, lastTranscript, lastGeneratedScript }) {
+// ── Tashkeel / Pronunciation Panel (text comparison — no audio needed) ───────
+
+function PronunciationPanel({ labels, lastTranscript, lastGeneratedScript }) {
+  const [status, setStatus] = useState('idle');
+  const [result, setResult] = useState(null);
+  const [error, setError]   = useState('');
+
+  const language   = lastTranscript?.language || lastTranscript?.language_detected || 'ar';
+  const sourceText = lastGeneratedScript?.script || '';
+  const transcript = lastTranscript?.full_text  || '';
+
+  if (language !== 'ar') return <div className="info-tip">ℹ️ {labels.needsArabic}</div>;
+  if (!sourceText)       return <div className="info-tip">ℹ️ {labels.needsSource}</div>;
+
+  async function runCompare() {
+    setStatus('loading');
+    setError('');
+    setResult(null);
+    try {
+      const data = await tashkeelCompare(sourceText, transcript, language);
+      setResult(data);
+      setStatus('success');
+    } catch (err) {
+      setError(err.message);
+      setStatus('error');
+    }
+  }
+
+  const coverageColor = result
+    ? (result.coverage_score >= 8 ? '#1a6b3c' : result.coverage_score >= 6 ? '#b0772f' : '#c0392b')
+    : 'var(--color-text)';
+
+  return (
+    <div>
+      <button className="btn-primary" onClick={runCompare} disabled={status === 'loading'}>
+        {status === 'loading' ? labels.runningPronunciation : labels.runPronunciation}
+      </button>
+
+      {status === 'loading' && (
+        <div className="transcribing-state" style={{ marginTop: '1rem' }}>
+          <div className="spinner" /><p>{labels.runningPronunciation}</p>
+        </div>
+      )}
+      {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{labels.errorPrefix}: {error}</div>}
+
+      {result && (
+        <div style={{ marginTop: '1.5rem' }}>
+
+          {/* Scores */}
+          <div style={{ display: 'flex', gap: '2rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <p className="report-label">Coverage score</p>
+              <div className="score-number" style={{ color: coverageColor }}>
+                {result.coverage_score?.toFixed(1)}<span>/10</span>
+              </div>
+            </div>
+            <div>
+              <p className="report-label">{labels.overallScore}</p>
+              <div className="score-number" style={{ color: coverageColor }}>
+                {result.overall_score?.toFixed(1)}<span>/10</span>
+              </div>
+            </div>
+          </div>
+
+          {result.summary && (
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+              {result.summary}
+            </p>
+          )}
+
+          {/* Missing information */}
+          {(result.missing_content || []).length > 0 && (
+            <div className="materials-section">
+              <h4 style={{ color: '#c0392b', fontSize: '0.85rem', fontWeight: 700,
+                textTransform: 'uppercase', marginBottom: '0.6rem' }}>
+                📉 {labels.informationLoss} ({result.missing_content.length})
+              </h4>
+              {result.missing_content.map((item, i) => (
+                <div key={i} className="eval-item">
+                  <span className="eval-text">{item.content || item}</span>
+                  {item.importance && (
+                    <span className={`importance-badge importance-${item.importance}`}>
+                      {item.importance}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tashkeel errors */}
+          {(result.tashkeel_errors || []).length > 0 && (
+            <div className="materials-section">
+              <h4 style={{ color: '#b0772f', fontSize: '0.85rem', fontWeight: 700,
+                textTransform: 'uppercase', marginBottom: '0.6rem' }}>
+                ⚠️ {labels.languageErrors} — إعراب / تشكيل ({result.tashkeel_errors.length})
+              </h4>
+              {result.tashkeel_errors.map((err, i) => (
+                <div key={i} className="uncertain-word-card">
+                  <div className="uncertain-word-header">
+                    <span className="uncertain-word arabic">{err.word}</span>
+                    {err.expected_form && (
+                      <span className="detail-label" style={{ marginLeft: '0.5rem' }}>
+                        → <span className="arabic" style={{ fontSize: '1.1rem', color: '#1a6b3c' }}>{err.expected_form}</span>
+                      </span>
+                    )}
+                  </div>
+                  {err.expected_case && (
+                    <div className="uncertain-detail">
+                      <span className="detail-label">{labels.grammaticalRole}:</span>
+                      <span className="detail-value">{err.expected_case}</span>
+                    </div>
+                  )}
+                  {err.likely_student_error && (
+                    <div className="uncertain-detail">
+                      <span className="detail-label">{labels.likelyError}:</span>
+                      <span className="detail-value" style={{ color: '#c0392b' }}>{err.likely_student_error}</span>
+                    </div>
+                  )}
+                  {err.explanation && <p className="uncertain-explanation">{err.explanation}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Correct tashkeel */}
+          {(result.tashkeel_correct || []).length > 0 && (
+            <div className="materials-section">
+              <h4 style={{ color: '#1a6b3c', fontSize: '0.85rem', fontWeight: 700,
+                textTransform: 'uppercase', marginBottom: '0.6rem' }}>
+                ✅ Correct tashkeel ({result.tashkeel_correct.length})
+              </h4>
+              <div className="key-terms-list">
+                {result.tashkeel_correct.map((w, i) => (
+                  <span key={i} className="key-term-badge arabic" style={{ fontSize: '1rem' }}
+                    title={w.note}>{w.form || w.word}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(result.tashkeel_errors || []).length === 0 && (result.missing_content || []).length === 0 && (
+            <div className="eval-item">✓ {labels.noIssues}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlob }) {
   const [report, setReport] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
+
+  const language = lastTranscript?.language || lastTranscript?.language_detected || 'ar';
 
   async function handleEvaluate() {
     setStatus('loading');
     setError('');
     setReport(null);
     try {
-      const data = await generateFeedback({
-        source_script:   lastGeneratedScript?.script || '',
-        transcript_text: lastTranscript.full_text,
-        transcript:      lastTranscript,
-        language:        lastTranscript.language || 'ar'
-      });
+      let data;
+      if (lastRecordingBlob) {
+        // Best path: re-transcribe locally for word timestamps + detect everything
+        const audioFile = new File([lastRecordingBlob], 'recording.webm',
+          { type: lastRecordingBlob.type });
+        data = await evaluateWithAudio(
+          audioFile,
+          lastGeneratedScript?.script || '',
+          language
+        );
+      } else {
+        // Fallback: use stored Groq transcript (less accurate for hesitations)
+        data = await generateFeedback({
+          source_script:   lastGeneratedScript?.script || '',
+          transcript_text: lastTranscript.full_text,
+          transcript:      lastTranscript,
+          language
+        });
+      }
+      // If full-evaluation returned word scores, attach to lastTranscript for pronunciation panel
+      if (data.pronunciation) {
+        const wordDisplay = (data.pronunciation.words || []).map(w => ({
+          ...w,
+          word: w.word
+        }));
+        data._pronunciationForPanel = {
+          word_display:  wordDisplay,
+          overall_score: data.pronunciation.overall_score,
+          errors_found:  data.pronunciation.errors_found,
+          summary:       data.pronunciation.overall_score >= 0.8
+            ? 'Good pronunciation confidence.'
+            : `${data.pronunciation.errors_found} word(s) with low confidence.`,
+          whisperx_used: false
+        };
+      }
       setReport(data);
       setStatus('success');
     } catch (err) {
@@ -1401,6 +1640,18 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript }) {
               </ul>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Pronunciation Assessment — Arabic only */}
+      {lastTranscript && (lastTranscript.language || lastTranscript.language_detected) === 'ar' && (
+        <div className="card" style={{ marginTop: '1rem' }}>
+          <h3 className="report-section-title">🔤 {labels.pronunciationTitle}</h3>
+          <PronunciationPanel
+            labels={labels}
+            lastTranscript={lastTranscript}
+            lastGeneratedScript={lastGeneratedScript}
+          />
         </div>
       )}
     </div>

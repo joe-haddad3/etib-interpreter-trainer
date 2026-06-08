@@ -114,11 +114,51 @@ export async function evaluatePerformance(sourceScript, transcript, language) {
   return parseJsonResponse(res);
 }
 
+export async function tashkeelCompare(sourceText, transcript, language) {
+  const res = await fetch(`${BASE}/module-d/tashkeel-compare`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_text: sourceText, transcript, language })
+  });
+  return parseJsonResponse(res);
+}
+
+export async function alignPronunciation(audioFile, segments, sourceText, language) {
+  const form = new FormData();
+  form.append('audio', audioFile, audioFile.name || 'recording.webm');
+  form.append('segments', JSON.stringify(segments || []));
+  form.append('source_text', sourceText || '');
+  form.append('language', language || 'ar');
+  const res = await fetch(`${BASE}/module-c/align`, { method: 'POST', body: form });
+  return parseJsonResponse(res);
+}
+
+export async function getPronunciationReport(alignment, sourceText, language) {
+  const res = await fetch(`${BASE}/module-d/pronunciation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alignment, source_text: sourceText, language })
+  });
+  return parseJsonResponse(res);
+}
+
 export async function generateFeedback(params) {
   const res = await fetch(`${BASE}/module-d/feedback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params)
+  });
+  return parseJsonResponse(res);
+}
+
+export async function evaluateWithAudio(audioFile, sourceScript, language) {
+  const form = new FormData();
+  form.append('audio', audioFile, audioFile.name || 'recording.webm');
+  form.append('source_script', sourceScript || '');
+  form.append('language', language || 'ar');
+  const res = await fetch(`${BASE}/module-d/full-evaluation`, {
+    method: 'POST',
+    body: form
   });
   return parseJsonResponse(res);
 }

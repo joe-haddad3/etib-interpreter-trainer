@@ -27,10 +27,12 @@ Endpoints:
   POST /api/module-d/feedback     — generate natural-language feedback using LLM
   GET  /api/module-d/history/<session_id> — retrieve past session results (TODO)
 """
+import os
 import re
 import json
+import uuid
 from flask import Blueprint, request, jsonify
-from config import GROQ_API_KEY, PRIMARY_LLM_MODEL
+from config import GROQ_API_KEY, PRIMARY_LLM_MODEL, UPLOAD_FOLDER
 
 
 def _extract_json(text: str) -> dict:
@@ -46,53 +48,65 @@ def _extract_json(text: str) -> dict:
 
 LLM_ANALYSIS_PROMPT = """You are a professional interpreter training evaluator at ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).
 
-Analyze this student interpretation performance and produce a detailed pedagogical report.
-
 SOURCE SPEECH ({language}):
 {source}
 
-STUDENT INTERPRETATION TRANSCRIPT:
+STUDENT INTERPRETATION TRANSCRIPT (raw ASR — includes disfluencies if present):
 {transcript}
 
-ALGORITHMIC FINDINGS (already detected):
-- Long silences / omissions: {silence_count}
-- Word repetitions: {repetition_count}
-- Hesitation markers: {hesitation_count}
-- Number reproduction errors: {number_errors}
+AUTOMATICALLY DETECTED ISSUES:
+- Long silences (> 1.5s gaps): {silence_count} detected
+- Word repetitions: {repetition_count} detected → examples: {repetition_examples}
+- Hesitation markers in text: {hesitation_count} detected → examples: {hesitation_examples}
+- Number reproduction errors: {number_errors} detected
 
-Return ONLY a valid JSON object (no markdown, no code fences):
+IMPORTANT INSTRUCTIONS:
+You MUST check every one of the following categories. If you find nothing, return [].
+Do NOT return empty results if the transcript contains obvious issues.
 
+1. HÉSITATIONS: Look for: آ، آآ، إ، أممم، ممم، يعني، أقصد (Arabic) / euh, heu, ben, voilà (French) / um, uh, er, hmm (English)
+   Also: any repeated syllable (e.g. "في في", "ال-ال-"), word-initial stuttering.
+   Lebanese Arabic students often use French fillers (euh) even in Arabic speech.
+
+2. RÉPÉTITIONS: Find words or short phrases said twice in a row or very close together.
+
+3. FAUX DÉPARTS: Any phrase that starts but stops abruptly before finishing.
+
+4. AUTO-CORRECTIONS: Student says X, then immediately says Y to correct.
+
+5. LAPSUS LINGUAE: Wrong word that slipped out (phonetically similar to intended word).
+
+6. CHIFFRES: Extract ALL numbers/percentages/dates from the source speech.
+   Check each one in the student transcript. Flag any that are wrong or missing.
+
+7. TERMINOLOGIE: Key domain terms (diplomatic, medical, economic vocabulary).
+   Were they translated correctly or imprecisely?
+
+8. PERTE D'INFORMATION: Important ideas from source completely absent in interpretation.
+
+9. ERREURS DE LANGUE: For Arabic — wrong case endings (إعراب), verb agreement.
+   For French/English — grammatical agreement, tense.
+
+Give overall_score 0-10:
+- 9-10: Near-perfect, minimal errors
+- 7-8: Good, minor errors
+- 5-6: Acceptable, several issues
+- 3-4: Many errors, significant information loss
+- 0-2: Incomplete or incomprehensible
+
+Return ONLY valid JSON (no markdown):
 {{
   "overall_score": 7.5,
-  "language_errors": [
-    {{"text": "incorrect phrase from student speech", "explanation": "what is wrong", "correction": "correct form"}}
-  ],
-  "auto_corrections": [
-    {{"text": "phrase that was self-corrected mid-speech"}}
-  ],
-  "false_starts": [
-    {{"text": "incomplete utterance before restarting"}}
-  ],
-  "lapsus_linguae": [
-    {{"text": "slip of the tongue", "likely_intended": "what student meant to say"}}
-  ],
-  "terminology_problems": [
-    {{"source_term": "term in source speech", "student_used": "what student said instead", "correct_equivalent": "proper translation/equivalent"}}
-  ],
-  "information_loss": [
-    {{"lost_content": "content omitted or significantly distorted", "importance": "high"}}
-  ],
-  "strengths": ["specific strength 1", "specific strength 2"],
-  "recommendations": ["specific actionable recommendation 1", "specific actionable recommendation 2"],
-  "summary": "2-3 sentence overall assessment of the interpretation."
+  "language_errors": [{{"text": "exact quote", "explanation": "issue", "correction": "fix"}}],
+  "auto_corrections": [{{"text": "corrected phrase"}}],
+  "false_starts": [{{"text": "incomplete phrase"}}],
+  "lapsus_linguae": [{{"text": "slip", "likely_intended": "intended word"}}],
+  "terminology_problems": [{{"source_term": "term", "student_used": "used", "correct_equivalent": "correct"}}],
+  "information_loss": [{{"lost_content": "what was omitted", "importance": "high"}}],
+  "strengths": ["strength"],
+  "recommendations": ["recommendation"],
+  "summary": "2-3 sentence overall assessment."
 }}
-
-Rules:
-- overall_score: float 0-10 based on accuracy, fluency, terminology, completeness
-- Cite actual text from the student's transcript when possible
-- For Arabic: check grammar errors, wrong case endings, terminology precision
-- Empty array [] is valid when nothing found
-- Be pedagogically specific and constructive
 """
 
 module_d_bp = Blueprint('module_d', __name__)
@@ -100,10 +114,53 @@ module_d_bp = Blueprint('module_d', __name__)
 
 # ── Error detection (algorithmic — no LLM calls, always free) ────────────────
 
-def detect_long_silences(segments: list, threshold_seconds: float = 2.0) -> list:
+# ── Hesitation word lists (all languages — Lebanese Arabic uses French fillers too) ──
+HESITATION_PATTERNS = {
+    'ar': [
+        r'\bآ+\b', r'\bإ+\b', r'\bأممم+\b', r'\bممم+\b', r'\bيعني\b', r'\bأقصد\b',
+        r'\beuh+\b', r'\bheu+\b', r'\bum+\b', r'\buh+\b', r'\bhmm+\b', r'\bhm+\b',
+        r'\bben\b', r'\bvoilà\b', r'\bdonc\b',
+    ],
+    'fr': [r'\beuh+\b', r'\bheu+\b', r'\bhm+\b', r'\bvoilà\b', r'\bdonc\b', r'\bben\b', r'\bquoi\b'],
+    'en': [r'\bum+\b', r'\buh+\b', r'\ber+\b', r'\bhmm+\b', r'\bhm+\b', r'\blike\b'],
+}
+
+
+def detect_hesitations_from_text(full_text: str, language: str = 'ar') -> list:
+    """Detect hesitation markers in transcript text using regex — works without word timestamps."""
+    patterns = HESITATION_PATTERNS.get(language, HESITATION_PATTERNS['en'])
+    # Lebanese Arabic: also check French + English fillers
+    if language == 'ar':
+        patterns = HESITATION_PATTERNS['ar']
+    found = []
+    for pat in patterns:
+        for m in re.finditer(pat, full_text, re.IGNORECASE):
+            found.append({'word': m.group(), 'at_char': m.start()})
+    # Remove duplicates
+    seen = set()
+    unique = []
+    for f in found:
+        key = (f['word'].lower(), f['at_char'])
+        if key not in seen:
+            seen.add(key)
+            unique.append(f)
+    return unique
+
+
+def detect_repetitions_from_text(full_text: str) -> list:
+    """Detect consecutive word repetitions from transcript text — works without word timestamps."""
+    # Strip punctuation for comparison
+    words = re.findall(r'[\w؀-ۿ]+', full_text.lower())
+    repetitions = []
+    for i in range(len(words) - 1):
+        if words[i] == words[i + 1] and len(words[i]) > 1:
+            repetitions.append({'word': words[i], 'position': i})
+    return repetitions
+
+
+def detect_long_silences(segments: list, threshold_seconds: float = 1.5) -> list:
     """
     Detect gaps between segments longer than threshold.
-    These likely indicate omissions (student lost track or gave up on a section).
     """
     silences = []
     for i in range(len(segments) - 1):
@@ -194,23 +251,40 @@ def detect_number_errors(source_script: str, transcript_text: str) -> list:
 
 def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar') -> dict:
     """
-    Run all error detection functions and return a structured report.
-    This is the main function called by the /evaluate endpoint.
+    Run all error detection — combines word-level (when available) and text-based detection.
+    Text-based detection works even when Groq transcript has no word timestamps.
     """
-    segments = transcript.get('segments', [])
+    segments  = transcript.get('segments', [])
     full_text = transcript.get('full_text', '')
 
+    # Word-level detection (works when faster-whisper is used)
+    silences        = detect_long_silences(segments)
+    word_reps       = detect_repetitions(segments)
+    word_hesitations = detect_hesitation_words(segments, language)
+    low_conf        = detect_low_confidence_words(segments)
+    number_errs     = detect_number_errors(source_script, full_text)
+
+    # Text-based detection (always works, even with Groq transcript)
+    text_hesitations = detect_hesitations_from_text(full_text, language)
+    text_repetitions = detect_repetitions_from_text(full_text)
+
+    # Merge: prefer word-level if available, otherwise use text-based
+    all_hesitations = word_hesitations if word_hesitations else text_hesitations
+    all_repetitions = word_reps if word_reps else text_repetitions
+
     return {
-        'long_silences':        detect_long_silences(segments),
-        'repetitions':          detect_repetitions(segments),
-        'hesitation_words':     detect_hesitation_words(segments, language),
-        'low_confidence_words': detect_low_confidence_words(segments),
-        'number_errors':        detect_number_errors(source_script, full_text),
+        'long_silences':        silences,
+        'repetitions':          all_repetitions,
+        'hesitation_words':     all_hesitations,
+        'low_confidence_words': low_conf,
+        'number_errors':        number_errs,
+        'text_hesitations':     text_hesitations,
+        'text_repetitions':     text_repetitions,
         'summary': {
-            'silence_count':     len(detect_long_silences(segments)),
-            'repetition_count':  len(detect_repetitions(segments)),
-            'hesitation_count':  len(detect_hesitation_words(segments, language)),
-            'number_errors':     len(detect_number_errors(source_script, full_text)),
+            'silence_count':     len(silences),
+            'repetition_count':  len(all_repetitions),
+            'hesitation_count':  len(all_hesitations),
+            'number_errors':     len(number_errs),
         }
     }
 
@@ -288,13 +362,18 @@ def generate_feedback():
         from groq import Groq
         client = Groq(api_key=GROQ_API_KEY)
 
+        rep_examples  = ', '.join(f'"{r["word"]}"' for r in (algo.get('repetitions', [])[:3]))
+        hes_examples  = ', '.join(f'"{h["word"]}"' for h in (algo.get('hesitation_words', [])[:3]))
+
         prompt = LLM_ANALYSIS_PROMPT.format(
             language={'ar': 'Arabic', 'fr': 'French', 'en': 'English'}.get(language, language),
             source=source_script or '(source speech not provided)',
             transcript=transcript_text,
             silence_count=s.get('silence_count', 0),
             repetition_count=s.get('repetition_count', 0),
+            repetition_examples=rep_examples or 'none found automatically',
             hesitation_count=s.get('hesitation_count', 0),
+            hesitation_examples=hes_examples or 'none found automatically',
             number_errors=s.get('number_errors', 0)
         )
 
@@ -328,6 +407,334 @@ def generate_feedback():
         return jsonify({'error': f'JSON parse error: {e}', 'algorithmic': algo}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@module_d_bp.route('/full-evaluation', methods=['POST'])
+def full_evaluation():
+    """
+    Complete evaluation from audio file.
+    Re-transcribes with local faster-whisper to get word timestamps,
+    then runs full algorithmic + LLM analysis.
+
+    This endpoint fixes the core problem: Groq transcripts have no word
+    timestamps, so hesitation/repetition algorithmic detection always returns 0.
+    Local faster-whisper gives word-level data so all detectors work correctly.
+
+    Request: multipart/form-data
+      audio         file   student's recording
+      source_script str    original speech text
+      language      str    'ar'|'fr'|'en'
+
+    Response: same as /feedback but with accurate algorithmic data + word scores
+    """
+    if 'audio' not in request.files:
+        return jsonify({'error': 'Audio file required'}), 400
+
+    audio_file    = request.files['audio']
+    source_script = request.form.get('source_script', '')
+    language      = request.form.get('language', 'ar')
+
+    ext       = os.path.splitext(audio_file.filename)[1] or '.webm'
+    temp_path = os.path.join(UPLOAD_FOLDER, f'eval_{uuid.uuid4().hex[:8]}{ext}')
+    audio_file.save(temp_path)
+
+    try:
+        # Use local faster-whisper: gives real segment timestamps (silence detection)
+        # and word-level probabilities. Groq normalizes silence/repetitions away.
+        from modules.module_c import _get_local_model
+        model = _get_local_model()
+
+        segments_iter, info = model.transcribe(
+            temp_path,
+            language=language,
+            task='transcribe',
+            word_timestamps=True,
+            vad_filter=True,
+            vad_parameters={'min_silence_duration_ms': 500},
+            condition_on_previous_text=False,
+        )
+
+        full_text = ''
+        all_segments = []
+        all_word_scores = []
+
+        for seg in segments_iter:
+            seg_data = {
+                'start': round(seg.start, 2),
+                'end':   round(seg.end, 2),
+                'text':  seg.text.strip(),
+                'words': []
+            }
+            for w in (seg.words or []):
+                seg_data['words'].append({
+                    'word': w.word, 'start': round(w.start, 2),
+                    'end': round(w.end, 2), 'probability': round(w.probability, 3)
+                })
+                all_word_scores.append({
+                    'word':  w.word.strip(),
+                    'start': round(w.start, 2),
+                    'end':   round(w.end, 2),
+                    'score': round(w.probability, 3),
+                    'grade': 'good' if w.probability >= 0.8 else ('warn' if w.probability >= 0.65 else 'poor')
+                })
+            all_segments.append(seg_data)
+            full_text += seg.text + ' '
+
+        full_text = full_text.strip()
+        transcript = {
+            'full_text':           full_text,
+            'segments':            all_segments,
+            'language_detected':   info.language,
+            'language_confidence': round(info.language_probability, 3),
+            'duration_seconds':    round(info.duration, 1),
+        }
+
+        # Step 2: Full algorithmic analysis (now WITH word timestamps)
+        algo = run_full_analysis(source_script, transcript, language)
+        s    = algo.get('summary', {})
+
+        # Step 3: LLM analysis with accurate data
+        if not GROQ_API_KEY:
+            return jsonify({'error': 'GROQ_API_KEY not configured', 'algorithmic': algo}), 500
+
+        from groq import Groq
+        client = Groq(api_key=GROQ_API_KEY)
+
+        rep_examples = ', '.join(f'"{r.get("word","")}"' for r in algo.get('repetitions', [])[:3])
+        hes_examples = ', '.join(f'"{h.get("word","")}"' for h in algo.get('hesitation_words', [])[:3])
+
+        prompt = LLM_ANALYSIS_PROMPT.format(
+            language={'ar': 'Arabic', 'fr': 'French', 'en': 'English'}.get(language, language),
+            source=source_script or '(source speech not provided)',
+            transcript=full_text,
+            silence_count=s.get('silence_count', 0),
+            repetition_count=s.get('repetition_count', 0),
+            repetition_examples=rep_examples or 'none found automatically',
+            hesitation_count=s.get('hesitation_count', 0),
+            hesitation_examples=hes_examples or 'none found automatically',
+            number_errors=s.get('number_errors', 0)
+        )
+
+        response = client.chat.completions.create(
+            model=PRIMARY_LLM_MODEL,
+            messages=[
+                {'role': 'system', 'content':
+                 'You are an expert interpreter training evaluator at ETIB Beirut. '
+                 'Return only valid JSON. Be thorough — detect ALL error types listed.'},
+                {'role': 'user', 'content': prompt}
+            ],
+            max_tokens=2000,
+            temperature=0.2
+        )
+
+        llm_result = _extract_json(response.choices[0].message.content)
+        llm_result['algorithmic'] = {
+            'long_silences':    algo.get('long_silences', []),
+            'repetitions':      algo.get('repetitions', []),
+            'hesitation_words': algo.get('hesitation_words', []),
+            'number_errors':    algo.get('number_errors', []),
+            'summary':          s
+        }
+
+        # Step 4: Pronunciation scores from word data
+        overall_pronun = (
+            sum(w['score'] for w in all_word_scores) / len(all_word_scores)
+            if all_word_scores else 0
+        )
+        uncertain_words = [w for w in all_word_scores if w['grade'] == 'poor']
+
+        llm_result['pronunciation'] = {
+            'words':         all_word_scores,
+            'uncertain':     uncertain_words,
+            'overall_score': round(overall_pronun, 3),
+            'errors_found':  len(uncertain_words)
+        }
+        llm_result['transcript'] = transcript
+
+        return jsonify(llm_result)
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+TASHKEEL_COMPARE_PROMPT = """You are an Arabic linguistics expert for ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).
+
+SOURCE SPEECH generated by LLM (this is what the student should have interpreted — may contain tashkeel):
+{source}
+
+STUDENT INTERPRETATION TRANSCRIPT (what the student actually said):
+{transcript}
+
+Perform a DETAILED comparison. You must check EVERY key term.
+
+TASK 1 — INFORMATION COMPLETENESS:
+Go through the source speech sentence by sentence.
+List every important concept, name, number, or argument that is MISSING from the student's transcript.
+
+TASK 2 — TASHKEEL / إعراب ANALYSIS (Arabic case endings):
+For each key word that appears in BOTH the source and the student transcript:
+- What is the grammatical role of this word in the source sentence?
+- What case ending (إعراب) should it have? (nominative ُ / accusative َ / genitive ِ / etc.)
+- Based on the student's transcript context, did they likely use the correct case ending?
+- If the word has tanween (تنوين): did the student likely use the correct nunation?
+
+IMPORTANT: Even if the transcript doesn't show tashkeel, you can INFER from sentence structure
+whether the student likely used the correct grammatical ending.
+
+Return ONLY valid JSON:
+{{
+  "coverage_score": 8.5,
+  "missing_content": [
+    {{"content": "what was omitted", "importance": "high"}}
+  ],
+  "tashkeel_errors": [
+    {{
+      "word": "word without tashkeel",
+      "expected_form": "word with correct tashkeel",
+      "expected_case": "nominative — subject of verb",
+      "likely_student_error": "probably said فتحة instead of ضمة",
+      "explanation": "pedagogical explanation"
+    }}
+  ],
+  "tashkeel_correct": [
+    {{
+      "word": "word",
+      "form": "with tashkeel",
+      "note": "correctly used"
+    }}
+  ],
+  "overall_score": 7.5,
+  "summary": "2-3 sentence assessment of information accuracy and Arabic case ending usage."
+}}
+"""
+
+
+@module_d_bp.route('/tashkeel-compare', methods=['POST'])
+def tashkeel_compare():
+    """
+    LLM text comparison between source speech (vocalized) and student transcript.
+    Detects: missing information, wrong case endings (إعراب), tashkeel errors.
+    No audio processing needed — pure text analysis.
+
+    Request body (JSON):
+      source_text   str  LLM-generated source speech (may have tashkeel)
+      transcript    str  student's transcribed interpretation
+      language      str  'ar' only (tashkeel is Arabic-specific)
+    """
+    data = request.get_json()
+    if not data or not data.get('transcript'):
+        return jsonify({'error': 'transcript required'}), 400
+
+    source_text = data.get('source_text', '')
+    transcript  = data.get('transcript', '')
+    language    = data.get('language', 'ar')
+
+    if language != 'ar':
+        return jsonify({'error': 'Tashkeel comparison is for Arabic only'}), 400
+
+    if not GROQ_API_KEY:
+        return jsonify({'error': 'GROQ_API_KEY not configured'}), 500
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=GROQ_API_KEY)
+
+        response = client.chat.completions.create(
+            model=PRIMARY_LLM_MODEL,
+            messages=[
+                {
+                    'role': 'system',
+                    'content': (
+                        'You are an Arabic linguistics expert for interpreter training. '
+                        'You perform detailed text comparison and إعراب analysis. '
+                        'Return only valid JSON.'
+                    )
+                },
+                {
+                    'role': 'user',
+                    'content': TASHKEEL_COMPARE_PROMPT.format(
+                        source=source_text or '(source speech not provided)',
+                        transcript=transcript
+                    )
+                }
+            ],
+            max_tokens=2000,
+            temperature=0.1
+        )
+
+        result = _extract_json(response.choices[0].message.content)
+        return jsonify(result)
+
+    except json.JSONDecodeError as e:
+        return jsonify({'error': f'JSON parse error: {e}'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@module_d_bp.route('/pronunciation', methods=['POST'])
+def pronunciation_report():
+    """
+    Generate a full pronunciation report from alignment results.
+
+    Request body (JSON):
+      alignment     dict   output from /api/module-c/align
+      source_text   str    vocalized source speech
+      language      str    'ar'|'fr'|'en'
+
+    Response (JSON):
+      overall_score       float
+      word_display        list [{word, score, grade, expected_form?, likely_error?}]
+      errors_found        int
+      summary             str
+    """
+    data     = request.get_json()
+    if not data or 'alignment' not in data:
+        return jsonify({'error': 'alignment result required'}), 400
+
+    alignment    = data['alignment']
+    source_text  = data.get('source_text', '')
+    language     = data.get('language', 'ar')
+
+    words        = alignment.get('words', [])
+    llm_analysis = alignment.get('llm_analysis', [])
+    overall      = alignment.get('overall_score', 0)
+
+    # Merge LLM analysis into word list for display
+    llm_map = {item.get('word', ''): item for item in llm_analysis}
+    enriched = []
+    for w in words:
+        entry = {**w}
+        analysis = llm_map.get(w['word'], {})
+        if analysis:
+            entry['expected_form']  = analysis.get('expected_form', '')
+            entry['likely_error']   = analysis.get('likely_error', '')
+            entry['grammatical_role'] = analysis.get('grammatical_role', '')
+            entry['explanation']    = analysis.get('explanation', '')
+        enriched.append(entry)
+
+    errors_found = len([w for w in words if w.get('grade') == 'poor'])
+
+    # Build summary
+    if overall >= 0.85:
+        summary = 'Excellent pronunciation. Very few uncertain words detected.'
+    elif overall >= 0.70:
+        summary = f'Good pronunciation overall. {errors_found} word(s) may need attention.'
+    elif overall >= 0.55:
+        summary = f'Moderate pronunciation confidence. {errors_found} word(s) show significant uncertainty.'
+    else:
+        summary = f'Low pronunciation confidence detected. {errors_found} word(s) need practice.'
+
+    return jsonify({
+        'overall_score': overall,
+        'word_display':  enriched,
+        'errors_found':  errors_found,
+        'summary':       summary,
+        'whisperx_used': alignment.get('whisperx_used', False)
+    })
 
 
 @module_d_bp.route('/history/<session_id>')

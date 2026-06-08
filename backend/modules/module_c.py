@@ -10,6 +10,7 @@ Endpoints:
 """
 import os
 import uuid
+import json
 from flask import Blueprint, request, jsonify
 from config import (GROQ_API_KEY, WHISPER_MODEL_SIZE, WHISPER_DEVICE,
                     WHISPER_COMPUTE_TYPE, UPLOAD_FOLDER)
@@ -210,6 +211,69 @@ def transcribe():
             result['vocalized_text'] = _add_tashkeel(result['full_text'], source_text)
 
         return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@module_c_bp.route('/align', methods=['POST'])
+def align_pronunciation():
+    """
+    Forced alignment + pronunciation assessment.
+    Aligns the student's transcript to their audio using WAV2VEC2-XLSR-Arabic,
+    then compares uncertain words against the vocalized source speech.
+
+    Request: multipart/form-data
+      audio         file   student's audio (same file as /transcribe)
+      segments      str    JSON — Whisper segments from previous /transcribe call
+      source_text   str    vocalized source speech (AR only)
+      language      str    'ar' | 'fr' | 'en'   default 'ar'
+
+    Response (JSON):
+      words         list  [{word, start, end, score, grade}]
+      uncertain     list  low-confidence words
+      llm_analysis  list  [{word, expected_form, likely_error, explanation}]
+      overall_score float pronunciation confidence 0–1
+      whisperx_used bool
+    """
+    if 'audio' not in request.files:
+        return jsonify({'error': 'No audio file provided'}), 400
+
+    audio_file  = request.files['audio']
+    language    = request.form.get('language', 'ar')
+    source_text = request.form.get('source_text', '')
+    segments_raw = request.form.get('segments', '[]')
+
+    try:
+        segments = json.loads(segments_raw)
+    except Exception:
+        segments = []
+
+    ext       = os.path.splitext(audio_file.filename)[1] or '.webm'
+    temp_path = os.path.join(UPLOAD_FOLDER, f'align_{uuid.uuid4().hex[:8]}{ext}')
+    audio_file.save(temp_path)
+
+    try:
+        from modules.alignment import align_words, extract_word_scores, compare_against_source
+        from config import GROQ_API_KEY, PRIMARY_LLM_MODEL
+
+        # Step 1: WhisperX forced alignment (or fall back to Whisper scores)
+        aligned_segs  = align_words(temp_path, segments)
+        whisperx_used = aligned_segs is not segments  # True if WhisperX ran
+
+        # Step 2: extract flat word list with scores
+        word_scores = extract_word_scores(aligned_segs)
+
+        # Step 3: compare against source + LLM analysis
+        result = compare_against_source(
+            word_scores, source_text, language,
+            GROQ_API_KEY, PRIMARY_LLM_MODEL
+        )
+        result['whisperx_used'] = whisperx_used
+        return jsonify(result)
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
