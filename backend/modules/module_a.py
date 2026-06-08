@@ -4,6 +4,7 @@ Module A - LLM Speech Generation.
 Generates structured interpreter training material and supports document
 grounding/retrieval from TXT, DOCX, and PDF uploads.
 """
+import ast
 import json
 import re
 
@@ -107,13 +108,15 @@ Parameters:
 {grounding_block}
 
 Rules:
-- Output ONLY valid JSON. No markdown, no code block, no preamble.
+- Output ONLY valid compact JSON. No markdown, no code block, no preamble.
 - The script must be in the source/speech language.
 - The summary must be in the source/speech language.
 - MCQ questions must be in the source/speech language.
 - Do not translate the script into the target language.
 - The target language defines the student's interpretation direction.
 - The glossary must include important terms in all three languages: Arabic, French, and English.
+- Every glossary item must have non-empty "arabic", "french", and "english" fields.
+- The "arabic" field must contain Arabic script, not transliteration and not an empty string.
 - Write exactly as a speaker would deliver the script at a real {scenario}.
 - Match the rhetorical register of that scenario.
 - Return 3 MCQs and 8 to 12 glossary terms.
@@ -165,18 +168,8 @@ Arabic requirements:
 
 def parse_generation_output(raw_output: str) -> dict:
     """Parse model JSON and fall back to treating the output as script text."""
-    text = raw_output.strip()
-    data = None
-
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if match:
-            try:
-                data = json.loads(match.group(0))
-            except json.JSONDecodeError:
-                data = None
+    text = clean_model_json_text(raw_output)
+    data = parse_json_like_object(text)
 
     if not isinstance(data, dict):
         data = {'script': text}
@@ -185,9 +178,149 @@ def parse_generation_output(raw_output: str) -> dict:
         'script': str(data.get('script', '')).strip(),
         'summary': str(data.get('summary', '')).strip(),
         'mcqs': data.get('mcqs') if isinstance(data.get('mcqs'), list) else [],
-        'glossary': data.get('glossary') if isinstance(data.get('glossary'), list) else [],
+        'glossary': normalize_glossary(data.get('glossary')),
         'metadata': data.get('metadata') if isinstance(data.get('metadata'), dict) else {},
     }
+
+
+def clean_model_json_text(raw_output: str) -> str:
+    text = raw_output.strip()
+    if text.startswith('```'):
+        text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\s*```$', '', text)
+    return text.strip()
+
+
+def parse_json_like_object(text: str):
+    """Parse strict JSON, fenced JSON, first JSON object, or Python-like dict."""
+    candidates = [text]
+    balanced = first_balanced_json_object(text)
+    if balanced and balanced != text:
+        candidates.append(balanced)
+    candidates.extend(escape_newlines_inside_json_strings(candidate) for candidate in list(candidates))
+
+    for candidate in candidates:
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    for candidate in candidates:
+        try:
+            parsed = ast.literal_eval(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+        except (SyntaxError, ValueError):
+            pass
+
+    return None
+
+
+def escape_newlines_inside_json_strings(text: str) -> str:
+    """Repair common model output: raw newlines inside JSON string values."""
+    repaired = []
+    in_string = False
+    escape = False
+
+    for char in text:
+        if in_string:
+            if escape:
+                repaired.append(char)
+                escape = False
+                continue
+
+            if char == '\\':
+                repaired.append(char)
+                escape = True
+                continue
+
+            if char == '"':
+                repaired.append(char)
+                in_string = False
+                continue
+
+            if char == '\n':
+                repaired.append('\\n')
+                continue
+
+            if char == '\r':
+                continue
+
+            repaired.append(char)
+            continue
+
+        repaired.append(char)
+        if char == '"':
+            in_string = True
+
+    return ''.join(repaired)
+
+
+def first_balanced_json_object(text: str) -> str | None:
+    start = text.find('{')
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    quote_char = ''
+
+    for index in range(start, len(text)):
+        char = text[index]
+
+        if in_string:
+            if escape:
+                escape = False
+            elif char == '\\':
+                escape = True
+            elif char == quote_char:
+                in_string = False
+            continue
+
+        if char in ['"', "'"]:
+            in_string = True
+            quote_char = char
+        elif char == '{':
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:index + 1]
+
+    return None
+
+
+def normalize_glossary(raw_glossary) -> list[dict]:
+    """Normalize likely model variants into the frontend's glossary schema."""
+    if not isinstance(raw_glossary, list):
+        return []
+
+    normalized = []
+    for item in raw_glossary:
+        if not isinstance(item, dict):
+            continue
+
+        row = {
+            'term': first_present(item, ['term', 'source_term', 'key_term', 'word']),
+            'arabic': first_present(item, ['arabic', 'Arabic', 'ar', 'arabic_translation', 'translation_ar']),
+            'french': first_present(item, ['french', 'French', 'fr', 'french_translation', 'translation_fr']),
+            'english': first_present(item, ['english', 'English', 'en', 'english_translation', 'translation_en']),
+            'definition': first_present(item, ['definition', 'meaning', 'explanation']),
+        }
+
+        if any(row.values()):
+            normalized.append(row)
+
+    return normalized
+
+
+def first_present(item: dict, keys: list[str]) -> str:
+    for key in keys:
+        value = item.get(key)
+        if value not in [None, '']:
+            return str(value).strip()
+    return ''
 
 
 def validate_params(params: dict, require_topic: bool = True) -> tuple[dict, int] | tuple[None, None]:

@@ -14,13 +14,21 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GOOGLE_AI_KEY = os.getenv('GOOGLE_AI_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # paid fallback only
 
-LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'groq')  # groq | local_aya
-PRIMARY_LLM_MODEL = 'llama-3.1-70b-versatile'   # via Groq (free)
+LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'groq')  # groq | local_aya | remote_aya
+PRIMARY_LLM_MODEL = 'llama-3.3-70b-versatile'   # via Groq
 FALLBACK_LLM_MODEL = 'gemini-1.5-flash'          # via Google AI Studio (free)
 LOCAL_MODEL_ID = os.getenv('LOCAL_MODEL_ID', 'CohereLabs/aya-expanse-8b')
 LOCAL_MODEL_PATH = os.getenv('LOCAL_MODEL_PATH', '').strip()
 LOCAL_MODEL_DEVICE_MAP = os.getenv('LOCAL_MODEL_DEVICE_MAP', 'auto')
 LOCAL_MODEL_TORCH_DTYPE = os.getenv('LOCAL_MODEL_TORCH_DTYPE', 'auto')
+REMOTE_AYA_URL = os.getenv('REMOTE_AYA_URL', '').strip()
+REMOTE_AYA_TIMEOUT_SECONDS = int(os.getenv('REMOTE_AYA_TIMEOUT_SECONDS', '300'))
+REMOTE_AYA_VERIFY_SSL = os.getenv('REMOTE_AYA_VERIFY_SSL', 'true').strip().lower() not in {
+    '0',
+    'false',
+    'no',
+    'off',
+}
 
 # ── TTS ─────────────────────────────────────────────────────────────────────
 # edge-tts voice names — chosen after Day 1 evaluation

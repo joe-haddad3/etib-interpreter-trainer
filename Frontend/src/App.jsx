@@ -59,6 +59,12 @@ const UI = {
     glossary: 'Glossary',
     documentGrounding: 'Document grounding',
     documentFile: 'Source document',
+    sharedSettings: 'Generation settings',
+    sharedSettingsHint: 'These settings apply to both topic-only generation and document-grounded generation.',
+    generationMethods: 'Choose generation source',
+    topicOnlyGeneration: 'Topic-only generation',
+    topicOnlyHint: 'Generate from the topic and selected settings.',
+    documentGenerationHint: 'Upload a source file and generate a speech grounded in its content.',
     generateFromDocument: 'Generate from document',
     retrieveContext: 'Preview retrieved context',
     retrievedContext: 'Retrieved context',
@@ -535,7 +541,11 @@ function ModuleA({ labels, onGenerated }) {
   return (
     <div className="card">
       <h2>{labels.moduleATitle}</h2>
-      <form onSubmit={handleSubmit}>
+      <form className="generation-settings" onSubmit={handleSubmit}>
+        <div className="section-heading">
+          <h3>{labels.sharedSettings || 'Generation settings'}</h3>
+          <p>{labels.sharedSettingsHint || 'These settings apply to both topic-only generation and document-grounded generation.'}</p>
+        </div>
         <div className="field topic-field">
           <label htmlFor="f-topic">{labels.topic || 'Topic'}</label>
           <input
@@ -546,7 +556,7 @@ function ModuleA({ labels, onGenerated }) {
             minLength="3"
             maxLength="180"
             required
-            placeholder="Climate finance for developing countries"
+            placeholder="Artificial intelligence in public policy"
             onChange={updateField}
           />
         </div>
@@ -565,9 +575,7 @@ function ModuleA({ labels, onGenerated }) {
             <option value="politics">Politics / السياسة</option>
             <option value="diplomacy">Diplomacy / الدبلوماسية</option>
             <option value="economics">Economics / الاقتصاد</option>
-            <option value="climate">Climate / المناخ</option>
             <option value="health">Health / الصحة</option>
-            <option value="human rights">Human rights / حقوق الإنسان</option>
             <option value="education">Education / التعليم</option>
           </SelectField>
           <div className="field">
@@ -582,30 +590,15 @@ function ModuleA({ labels, onGenerated }) {
           <SelectField label={labels.mode} id="f-mode" name="mode" value={form.mode} onChange={updateField}>
             <option value="consecutive">Consecutive / متتابعة</option>
             <option value="simultaneous">Simultaneous / فورية</option>
-            <option value="sight_translation">Sight translation / ترجمة بصرية</option>
           </SelectField>
           <SelectField label={labels.structure} id="f-structure" name="structure" value={form.structure} onChange={updateField}>
             <option value="well-organized">Well organized</option>
-            <option value="semi-structured">Semi-structured</option>
             <option value="deliberately disorganized">Disorganized</option>
           </SelectField>
           <SelectField label={labels.numbers} id="f-numbers" name="number_density" value={form.number_density} onChange={updateField}>
             <option value="low">Low / منخفض</option>
-            <option value="medium">Medium / متوسط</option>
             <option value="high">High / مرتفع</option>
           </SelectField>
-          <div className="field checkbox-field">
-            <label>
-              <input type="checkbox" name="include_hesitations" checked={form.include_hesitations} onChange={updateField} />
-              {labels.hesitations}
-            </label>
-          </div>
-          <div className="field checkbox-field">
-            <label>
-              <input type="checkbox" name="pressure_enabled" checked={form.pressure_enabled} onChange={updateField} />
-              {labels.pressureMode || 'Pressure mode'}
-            </label>
-          </div>
           <SelectField label={labels.speedPressure || 'Speed pressure'} id="f-speed-pressure" name="speed_pressure" value={form.speed_pressure} onChange={updateField}>
             <option value="normal">Normal</option>
             <option value="fast">Fast</option>
@@ -613,49 +606,48 @@ function ModuleA({ labels, onGenerated }) {
           </SelectField>
           <SelectField label={labels.topicShifts || 'Topic shifts'} id="f-topic-shifts" name="topic_shifts" value={form.topic_shifts} onChange={updateField}>
             <option value="none">None</option>
-            <option value="mild">Mild</option>
-            <option value="frequent">Frequent</option>
+            <option value="mild">Topic shifts</option>
           </SelectField>
-          <SelectField label={labels.cognitiveLoad || 'Cognitive load'} id="f-cognitive-load" name="cognitive_load" value={form.cognitive_load} onChange={updateField}>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </SelectField>
-          <div className="field checkbox-field">
-            <label>
-              <input type="checkbox" name="context_noise" checked={form.context_noise} onChange={updateField} />
-              {labels.contextNoise || 'Context noise'}
-            </label>
-          </div>
         </div>
-        <button type="submit" className="btn-primary" disabled={isLoading}>
-          {isLoading ? labels.generating : labels.submit}
-        </button>
+        <section className="generation-methods">
+          <div className="section-heading">
+            <h3>{labels.generationMethods || 'Choose generation source'}</h3>
+          </div>
+          <div className="method-grid">
+            <div className="method-panel">
+              <h4>{labels.topicOnlyGeneration || 'Topic-only generation'}</h4>
+              <p>{labels.topicOnlyHint || 'Generate from the topic and selected settings.'}</p>
+              <button type="submit" className="btn-primary" disabled={isLoading}>
+                {isLoading ? labels.generating : labels.submit}
+              </button>
+            </div>
+            <div className="method-panel">
+              <h4>{labels.documentGrounding || 'Document grounding'}</h4>
+              <p>{labels.documentGenerationHint || 'Upload a source file and generate a speech grounded in its content.'}</p>
+              <div className="document-actions">
+                <div className="field">
+                  <label htmlFor="f-document">{labels.documentFile || 'Source document'}</label>
+                  <input
+                    id="f-document"
+                    type="file"
+                    accept=".txt,.docx,.pdf"
+                    onChange={event => {
+                      setDocumentFile(event.target.files?.[0] || null);
+                      setRetrievalResult(null);
+                    }}
+                  />
+                </div>
+                <button type="button" className="secondary-action" onClick={handleRetrieveContext} disabled={isLoading || !documentFile}>
+                  {labels.retrieveContext || 'Preview retrieved context'}
+                </button>
+                <button type="button" className="btn-primary" onClick={handleDocumentGenerate} disabled={isLoading || !documentFile}>
+                  {isLoading ? labels.generating : (labels.generateFromDocument || 'Generate from document')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
       </form>
-
-      <section className="document-panel">
-        <h3>{labels.documentGrounding || 'Document grounding'}</h3>
-        <div className="document-actions">
-          <div className="field">
-            <label htmlFor="f-document">{labels.documentFile || 'Source document'}</label>
-            <input
-              id="f-document"
-              type="file"
-              accept=".txt,.docx,.pdf"
-              onChange={event => {
-                setDocumentFile(event.target.files?.[0] || null);
-                setRetrievalResult(null);
-              }}
-            />
-          </div>
-          <button type="button" className="secondary-action" onClick={handleRetrieveContext} disabled={isLoading || !documentFile}>
-            {labels.retrieveContext || 'Preview retrieved context'}
-          </button>
-          <button type="button" className="btn-primary" onClick={handleDocumentGenerate} disabled={isLoading || !documentFile}>
-            {isLoading ? labels.generating : (labels.generateFromDocument || 'Generate from document')}
-          </button>
-        </div>
-      </section>
 
       {isLoading && <p className="loading">{labels.generating}</p>}
       {error && <div className="error-msg">{labels.errorPrefix}: {error}</div>}

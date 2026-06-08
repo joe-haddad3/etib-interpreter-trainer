@@ -18,6 +18,8 @@ torch
 transformers
 accelerate
 sentencepiece
+tiktoken
+protobuf
 huggingface-hub
 
 # --- TTS (Text-to-Speech) ---

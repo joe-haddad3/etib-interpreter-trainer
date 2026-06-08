@@ -20,6 +20,9 @@ from config import (
     LOCAL_MODEL_PATH,
     LOCAL_MODEL_TORCH_DTYPE,
     PRIMARY_LLM_MODEL,
+    REMOTE_AYA_TIMEOUT_SECONDS,
+    REMOTE_AYA_URL,
+    REMOTE_AYA_VERIFY_SSL,
 )
 
 _groq_client: Groq | None = None
@@ -41,8 +44,11 @@ def generate_text(
     if provider == 'groq':
         return _generate_with_groq(messages, max_tokens, temperature)
 
+    if provider == 'remote_aya':
+        return _generate_with_remote_aya(messages, max_tokens, temperature)
+
     raise RuntimeError(
-        f"Unsupported LLM_PROVIDER '{LLM_PROVIDER}'. Use 'groq' or 'local_aya'."
+        f"Unsupported LLM_PROVIDER '{LLM_PROVIDER}'. Use 'groq', 'local_aya', or 'remote_aya'."
     )
 
 
@@ -87,6 +93,52 @@ def _generate_with_local_aya(
         return_full_text=False,
     )
     return outputs[0]['generated_text'].strip()
+
+
+def _generate_with_remote_aya(
+    messages: list[dict[str, str]],
+    max_tokens: int,
+    temperature: float,
+) -> str:
+    if not REMOTE_AYA_URL:
+        raise RuntimeError(
+            'REMOTE_AYA_URL is not configured. Set it to your Colab endpoint, '
+            'for example: https://abc123.ngrok-free.app/generate'
+        )
+
+    try:
+        import requests
+    except ImportError as exc:
+        raise RuntimeError('remote_aya requires requests. Run pip install -r requirements.txt') from exc
+
+    response = requests.post(
+        REMOTE_AYA_URL,
+        headers={
+            'ngrok-skip-browser-warning': 'true',
+        },
+        json={
+            'messages': messages,
+            'max_tokens': max_tokens,
+            'temperature': temperature,
+        },
+        timeout=REMOTE_AYA_TIMEOUT_SECONDS,
+        verify=REMOTE_AYA_VERIFY_SSL,
+    )
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        body = response.text.strip()
+        if len(body) > 500:
+            body = f'{body[:500]}...'
+        raise RuntimeError(
+            f"remote_aya request failed with HTTP {response.status_code} from {REMOTE_AYA_URL}. "
+            f"Response body: {body or '<empty>'}"
+        ) from exc
+    data = response.json()
+    text = data.get('text')
+    if not isinstance(text, str) or not text.strip():
+        raise RuntimeError('remote_aya returned an empty or invalid response')
+    return text.strip()
 
 
 def _load_local_aya() -> tuple[Any, Any]:

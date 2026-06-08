@@ -11,7 +11,7 @@ import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
-from config import LLM_PROVIDER, LOCAL_MODEL_ID
+from config import LLM_PROVIDER, LOCAL_MODEL_ID, REMOTE_AYA_URL
 
 load_dotenv()
 
@@ -68,7 +68,8 @@ def get_config():
         'topic_shifts': ['none', 'mild', 'frequent'],
         'cognitive_loads': ['low', 'medium', 'high'],
         'llm_provider': LLM_PROVIDER,
-        'local_model_id': LOCAL_MODEL_ID
+        'local_model_id': LOCAL_MODEL_ID,
+        'remote_aya_configured': bool(REMOTE_AYA_URL and 'PASTE_' not in REMOTE_AYA_URL)
     })
 
 if __name__ == '__main__':

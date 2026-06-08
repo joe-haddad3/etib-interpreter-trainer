@@ -106,6 +106,166 @@ def test_pressure_metadata(client, monkeypatch):
     assert metadata['pressure_settings']['context_noise'] is True
 
 
+def test_glossary_key_variants_are_normalized():
+    raw = json.dumps({
+        'script': ' '.join(['word'] * 80),
+        'glossary': [
+            {
+                'term': 'adaptation grants',
+                'Arabic': 'منح التكيف',
+                'French': "subventions d'adaptation",
+                'English': 'adaptation grants',
+                'meaning': 'Grant funding for adaptation projects.',
+            }
+        ],
+    })
+
+    parsed = module_a.parse_generation_output(raw)
+
+    assert parsed['glossary'][0]['arabic'] == 'منح التكيف'
+    assert parsed['glossary'][0]['french'] == "subventions d'adaptation"
+    assert parsed['glossary'][0]['english'] == 'adaptation grants'
+    assert parsed['glossary'][0]['definition'] == 'Grant funding for adaptation projects.'
+
+
+def test_fenced_json_output_is_parsed():
+    raw = """```json
+{
+  "script": "Generated speech text",
+  "summary": "Generated summary",
+  "mcqs": [],
+  "glossary": [
+    {
+      "term": "early warning systems",
+      "arabic": "نظم الإنذار المبكر",
+      "french": "systèmes d'alerte précoce",
+      "english": "early warning systems",
+      "definition": "Systems that warn communities before hazards occur."
+    }
+  ]
+}
+```"""
+
+    parsed = module_a.parse_generation_output(raw)
+
+    assert parsed['script'] == 'Generated speech text'
+    assert parsed['summary'] == 'Generated summary'
+    assert parsed['glossary'][0]['arabic'] == 'نظم الإنذار المبكر'
+
+
+def test_python_like_dict_output_is_parsed():
+    raw = """Here is the JSON:
+{'script': 'Generated speech text', 'summary': 'Generated summary', 'mcqs': [], 'glossary': [{'term': 'debt relief', 'Arabic': 'تخفيف عبء الدين', 'French': 'allègement de la dette', 'English': 'debt relief'}]}"""
+
+    parsed = module_a.parse_generation_output(raw)
+
+    assert parsed['script'] == 'Generated speech text'
+    assert parsed['summary'] == 'Generated summary'
+    assert parsed['glossary'][0]['arabic'] == 'تخفيف عبء الدين'
+
+
+def test_json_with_raw_newlines_inside_script_is_parsed():
+    raw = """{
+  "script": "Mesdames et Messieurs,
+
+Je me tiens devant vous aujourd'hui.",
+  "summary": "Résumé court.",
+  "mcqs": [
+    {
+      "question": "Quel est le sujet?",
+      "options": ["Climat", "Sport", "Musique", "Voyage"],
+      "answer": "Climat"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Changement climatique",
+      "arabic": "تغير المناخ",
+      "french": "Changement climatique",
+      "english": "Climate change",
+      "definition": "Modification durable du climat."
+    }
+  ]
+}"""
+
+    parsed = module_a.parse_generation_output(raw)
+
+    assert parsed['script'].startswith('Mesdames et Messieurs')
+    assert parsed['summary'] == 'Résumé court.'
+    assert parsed['mcqs'][0]['answer'] == 'Climat'
+    assert parsed['glossary'][0]['arabic'] == 'تغير المناخ'
+
+
+def test_remote_aya_provider_payload(monkeypatch):
+    from services import llm_service
+
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {'text': 'remote aya response'}
+
+    def fake_post(url, headers, json, timeout, verify):
+        captured['url'] = url
+        captured['headers'] = headers
+        captured['json'] = json
+        captured['timeout'] = timeout
+        captured['verify'] = verify
+        return FakeResponse()
+
+    monkeypatch.setattr(llm_service, 'REMOTE_AYA_URL', 'https://example.ngrok-free.app/generate')
+    monkeypatch.setattr(llm_service, 'REMOTE_AYA_TIMEOUT_SECONDS', 123)
+    monkeypatch.setattr(llm_service, 'REMOTE_AYA_VERIFY_SSL', False)
+    monkeypatch.setattr('requests.post', fake_post)
+
+    output = llm_service._generate_with_remote_aya(
+        [{'role': 'user', 'content': 'hello'}],
+        max_tokens=42,
+        temperature=0.3,
+    )
+
+    assert output == 'remote aya response'
+    assert captured['url'] == 'https://example.ngrok-free.app/generate'
+    assert captured['headers']['ngrok-skip-browser-warning'] == 'true'
+    assert captured['json']['max_tokens'] == 42
+    assert captured['json']['temperature'] == 0.3
+    assert captured['timeout'] == 123
+    assert captured['verify'] is False
+
+
+def test_remote_aya_http_error_includes_response_body(monkeypatch):
+    from services import llm_service
+    import pytest
+    import requests
+
+    class FakeResponse:
+        status_code = 403
+        text = 'ngrok blocked this request'
+
+        def raise_for_status(self):
+            raise requests.HTTPError('403 Client Error')
+
+    def fake_post(url, headers, json, timeout, verify):
+        return FakeResponse()
+
+    monkeypatch.setattr(llm_service, 'REMOTE_AYA_URL', 'https://example.ngrok-free.app/generate')
+    monkeypatch.setattr('requests.post', fake_post)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        llm_service._generate_with_remote_aya(
+            [{'role': 'user', 'content': 'hello'}],
+            max_tokens=42,
+            temperature=0.3,
+        )
+
+    message = str(exc_info.value)
+    assert 'HTTP 403' in message
+    assert 'ngrok blocked this request' in message
+
+
 def test_invalid_language(client):
     res = client.post('/api/module-a/generate',
         json={'topic': 'Climate', 'language': 'de', 'domain': 'climate'})
