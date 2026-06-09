@@ -83,7 +83,9 @@ def _transcribe_local(audio_path: str, language: str) -> dict:
     segments_iter, info = model.transcribe(
         audio_path, language=language, task='transcribe',
         word_timestamps=True, vad_filter=True,
-        vad_parameters={'min_silence_duration_ms': 500}
+        vad_parameters={'min_silence_duration_ms': 500},
+        suppress_tokens=[],          # output raw tokens — prevents Arabic grammar normalization
+        condition_on_previous_text=False,  # prevents drift toward "corrected" Arabic across segments
     )
     full_text = ''
     all_segments = []

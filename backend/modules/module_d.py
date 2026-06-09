@@ -48,64 +48,94 @@ def _extract_json(text: str) -> dict:
 
 LLM_ANALYSIS_PROMPT = """You are a professional interpreter training evaluator at ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).
 
-SOURCE SPEECH ({language}):
+THIS IS AN INTERPRETATION TASK — NOT A READING TASK.
+The student heard a speech in {source_language} and interpreted it into {target_language}.
+The two texts are in DIFFERENT languages. Do NOT compare them word-for-word.
+Compare MEANING, CONCEPTS, NUMBERS, and TERMINOLOGY across languages.
+
+SOURCE SPEECH (in {source_language}):
 {source}
 
-STUDENT INTERPRETATION TRANSCRIPT (raw ASR — includes disfluencies if present):
+STUDENT INTERPRETATION TRANSCRIPT (in {target_language}, raw ASR output):
 {transcript}
 
-AUTOMATICALLY DETECTED ISSUES:
+AUTOMATICALLY DETECTED ISSUES (algorithmic):
 - Long silences (> 1.5s gaps): {silence_count} detected
 - Word repetitions: {repetition_count} detected → examples: {repetition_examples}
-- Hesitation markers in text: {hesitation_count} detected → examples: {hesitation_examples}
+- Hesitation markers: {hesitation_count} detected → examples: {hesitation_examples}
 - Number reproduction errors: {number_errors} detected
 
-IMPORTANT INSTRUCTIONS:
-You MUST check every one of the following categories. If you find nothing, return [].
-Do NOT return empty results if the transcript contains obvious issues.
+LOW-CONFIDENCE WORDS (Whisper was uncertain about these — possible pronunciation issues):
+{uncertain_words}
 
-1. HÉSITATIONS: Look for: آ، آآ، إ، أممم، ممم، يعني، أقصد (Arabic) / euh, heu, ben, voilà (French) / um, uh, er, hmm (English)
-   Also: any repeated syllable (e.g. "في في", "ال-ال-"), word-initial stuttering.
-   Lebanese Arabic students often use French fillers (euh) even in Arabic speech.
+EVALUATION TASKS — check every category thoroughly:
 
-2. RÉPÉTITIONS: Find words or short phrases said twice in a row or very close together.
+TASK 1 — TRANSLATION ACCURACY:
+Go through each key concept, argument, and sentence of the source speech.
+Did the student convey the correct meaning in {target_language}?
+Flag any concept that was mistranslated, distorted, or given the wrong equivalent.
+Example: source says "sustainable development", student said "développement durable" (correct) vs "développement stable" (wrong).
 
-3. FAUX DÉPARTS: Any phrase that starts but stops abruptly before finishing.
+TASK 2 — CONTENT COVERAGE:
+List every important idea, fact, number, name, or argument from the source speech.
+For each one, state whether it was COVERED, PARTIALLY COVERED, or MISSING in the student's interpretation.
+Give a coverage_score from 0 to 10.
 
-4. AUTO-CORRECTIONS: Student says X, then immediately says Y to correct.
+TASK 3 — PRONUNCIATION FLAGS:
+The uncertain words listed above are words Whisper was not confident about.
+This often means the student pronounced them unclearly or incorrectly.
+For each uncertain word, note: what word was likely intended, and what the likely pronunciation issue is.
+In {target_language}: check gender agreement, liaison errors (French), or case endings (Arabic).
 
-5. LAPSUS LINGUAE: Wrong word that slipped out (phonetically similar to intended word).
+TASK 4 — FLUENCY ISSUES IN {target_language}:
+- Hesitations: آ، يعني، أقصد (Arabic) / euh, heu, ben (French) / um, uh, er (English)
+- Repetitions: words said twice in a row
+- False starts: phrases that stop abruptly
+- Auto-corrections: student corrects themselves mid-sentence
+- Lapsus linguae: wrong word slipped out
 
-6. CHIFFRES: Extract ALL numbers/percentages/dates from the source speech.
-   Check each one in the student transcript. Flag any that are wrong or missing.
+TASK 5 — LANGUAGE QUALITY IN {target_language}:
+Grammar errors in the INTERPRETATION language (not the source):
+- Arabic: wrong case endings (إعراب), verb agreement, wrong تشكيل
+- French: gender agreement, wrong tense, wrong preposition
+- English: tense, subject-verb agreement
 
-7. TERMINOLOGIE: Key domain terms (diplomatic, medical, economic vocabulary).
-   Were they translated correctly or imprecisely?
+TASK 6 — NUMBERS AND DATES:
+Extract every number, percentage, date, statistic from the SOURCE speech.
+Check each one in the STUDENT interpretation. Flag wrong or missing numbers.
 
-8. PERTE D'INFORMATION: Important ideas from source completely absent in interpretation.
+TASK 7 — TERMINOLOGY:
+Key domain-specific terms from the source — were they rendered with the correct equivalent in the target language?
 
-9. ERREURS DE LANGUE: For Arabic — wrong case endings (إعراب), verb agreement.
-   For French/English — grammatical agreement, tense.
+Give overall_score 0-10 and coverage_score 0-10:
+- 9-10: Excellent — near-complete, accurate, fluent
+- 7-8: Good — minor gaps or errors
+- 5-6: Acceptable — several issues but core meaning preserved
+- 3-4: Weak — significant mistranslations or information loss
+- 0-2: Very poor — incomplete or incomprehensible
 
-Give overall_score 0-10:
-- 9-10: Near-perfect, minimal errors
-- 7-8: Good, minor errors
-- 5-6: Acceptable, several issues
-- 3-4: Many errors, significant information loss
-- 0-2: Incomplete or incomprehensible
-
-Return ONLY valid JSON (no markdown):
+Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
 {{
   "overall_score": 7.5,
-  "language_errors": [{{"text": "exact quote", "explanation": "issue", "correction": "fix"}}],
-  "auto_corrections": [{{"text": "corrected phrase"}}],
+  "coverage_score": 8.0,
+  "translation_errors": [
+    {{"source_text": "exact phrase from source in {source_language}", "student_said": "what student said in {target_language}", "correct_translation": "correct equivalent", "explanation": "why this is wrong"}}
+  ],
+  "missing_content": [
+    {{"content": "idea or fact that was completely omitted", "importance": "high"}}
+  ],
+  "pronunciation_flags": [
+    {{"word": "uncertain word", "confidence": 0.4, "likely_issue": "what was probably wrong about the pronunciation"}}
+  ],
+  "language_errors": [{{"text": "exact quote from student", "explanation": "grammar issue", "correction": "correct form"}}],
+  "auto_corrections": [{{"text": "the corrected phrase"}}],
   "false_starts": [{{"text": "incomplete phrase"}}],
   "lapsus_linguae": [{{"text": "slip", "likely_intended": "intended word"}}],
-  "terminology_problems": [{{"source_term": "term", "student_used": "used", "correct_equivalent": "correct"}}],
+  "terminology_problems": [{{"source_term": "term in source language", "student_used": "what student said", "correct_equivalent": "correct target language term"}}],
   "information_loss": [{{"lost_content": "what was omitted", "importance": "high"}}],
-  "strengths": ["strength"],
-  "recommendations": ["recommendation"],
-  "summary": "2-3 sentence overall assessment."
+  "strengths": ["specific strength observed"],
+  "recommendations": ["specific actionable recommendation"],
+  "summary": "2-3 sentence overall assessment of interpretation quality."
 }}
 """
 
@@ -430,9 +460,10 @@ def full_evaluation():
     if 'audio' not in request.files:
         return jsonify({'error': 'Audio file required'}), 400
 
-    audio_file    = request.files['audio']
-    source_script = request.form.get('source_script', '')
-    language      = request.form.get('language', 'ar')
+    audio_file       = request.files['audio']
+    source_script    = request.form.get('source_script', '')
+    language         = request.form.get('language', 'ar')
+    source_language  = request.form.get('source_language', language)
 
     ext       = os.path.splitext(audio_file.filename)[1] or '.webm'
     temp_path = os.path.join(UPLOAD_FOLDER, f'eval_{uuid.uuid4().hex[:8]}{ext}')
@@ -500,11 +531,18 @@ def full_evaluation():
         from groq import Groq
         client = Groq(api_key=GROQ_API_KEY)
 
-        rep_examples = ', '.join(f'"{r.get("word","")}"' for r in algo.get('repetitions', [])[:3])
-        hes_examples = ', '.join(f'"{h.get("word","")}"' for h in algo.get('hesitation_words', [])[:3])
+        lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
+        rep_examples     = ', '.join(f'"{r.get("word","")}"' for r in algo.get('repetitions', [])[:3])
+        hes_examples     = ', '.join(f'"{h.get("word","")}"' for h in algo.get('hesitation_words', [])[:3])
+        uncertain_words  = [w for w in all_word_scores if w['grade'] == 'poor']
+        uncertain_str    = ', '.join(
+            f'"{w["word"]}" (confidence {w["score"]})'
+            for w in uncertain_words[:10]
+        ) or 'none flagged'
 
         prompt = LLM_ANALYSIS_PROMPT.format(
-            language={'ar': 'Arabic', 'fr': 'French', 'en': 'English'}.get(language, language),
+            source_language=lang_names.get(source_language, source_language),
+            target_language=lang_names.get(language, language),
             source=source_script or '(source speech not provided)',
             transcript=full_text,
             silence_count=s.get('silence_count', 0),
@@ -512,7 +550,8 @@ def full_evaluation():
             repetition_examples=rep_examples or 'none found automatically',
             hesitation_count=s.get('hesitation_count', 0),
             hesitation_examples=hes_examples or 'none found automatically',
-            number_errors=s.get('number_errors', 0)
+            number_errors=s.get('number_errors', 0),
+            uncertain_words=uncertain_str,
         )
 
         response = client.chat.completions.create(

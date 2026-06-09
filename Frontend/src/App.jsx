@@ -1718,7 +1718,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
         data = await evaluateWithAudio(
           audioFile,
           lastGeneratedScript?.script || '',
-          language
+          language,
+          lastGeneratedScript?.language || language
         );
       } else {
         // Fallback: use stored Groq transcript (less accurate for hesitations)
@@ -1827,6 +1828,63 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               ))}
             </div>
           </div>
+
+          {/* Coverage score */}
+          {report.coverage_score !== undefined && (
+            <div className="card">
+              <h3 className="report-section-title">📊 Content coverage</h3>
+              <ScoreBar score={report.coverage_score} />
+              <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                How much of the source speech was conveyed in the interpretation
+              </p>
+            </div>
+          )}
+
+          {/* Translation errors */}
+          {(report.translation_errors || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">🔄 Translation errors</h3>
+              {(report.translation_errors || []).map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid #e53e3e', paddingLeft: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Source said:</div>
+                  <div className="eval-text" style={{ marginBottom: '0.25rem' }}>"{item.source_text}"</div>
+                  <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Student said: <strong style={{ color: '#e53e3e' }}>{item.student_said}</strong></div>
+                  <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Correct: <strong style={{ color: '#38a169' }}>{item.correct_translation}</strong></div>
+                  {item.explanation && <div className="eval-explanation">{item.explanation}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Missing content */}
+          {(report.missing_content || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">📉 Missing content</h3>
+              {(report.missing_content || []).map((item, i) => (
+                <div key={i} className="eval-item" style={{ marginBottom: '0.5rem' }}>
+                  <span className="eval-text">{item.content}</span>
+                  {item.importance && <span className={`importance-badge importance-${item.importance}`}>{item.importance}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pronunciation flags */}
+          {(report.pronunciation_flags || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">🔊 Pronunciation flags</h3>
+              <p style={{ fontSize: '0.82rem', color: '#666', marginBottom: '0.75rem' }}>
+                Words Whisper was uncertain about — may indicate unclear or incorrect pronunciation
+              </p>
+              {(report.pronunciation_flags || []).map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid #ed8936', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                  <strong>"{item.word}"</strong>
+                  {item.confidence !== undefined && <span style={{ fontSize: '0.78rem', color: '#888', marginLeft: '0.5rem' }}>confidence: {(item.confidence * 100).toFixed(0)}%</span>}
+                  {item.likely_issue && <div className="eval-explanation">{item.likely_issue}</div>}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* LLM analysis sections */}
           <div className="card">

@@ -179,11 +179,12 @@ export async function generateFeedback(params) {
   return parseJsonResponse(res);
 }
 
-export async function evaluateWithAudio(audioFile, sourceScript, language) {
+export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage) {
   const form = new FormData();
   form.append('audio', audioFile, audioFile.name || 'recording.webm');
   form.append('source_script', sourceScript || '');
   form.append('language', language || 'ar');
+  form.append('source_language', sourceLanguage || language || 'ar');
   const res = await fetch(`${BASE}/module-d/full-evaluation`, {
     method: 'POST',
     body: form
