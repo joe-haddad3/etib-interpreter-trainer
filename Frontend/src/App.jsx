@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import * as THREE from 'three';
 import {
   generateSpeech,
   generateSpeechFromDocument,
@@ -131,6 +132,14 @@ const UI = {
     source: 'Source',
     used: 'Used',
     correct: 'Correct term',
+    coverageTitle: 'Content coverage',
+    coverageHint: 'How much of the source speech was conveyed',
+    translationErrors: 'Translation errors',
+    sourceSaid: 'Source said',
+    studentSaid: 'Student said',
+    correctTranslation: 'Correct',
+    missingContent: 'Missing content',
+    pronunciationMismatches: 'Word-level mismatches vs source',
     pronunciationTitle: 'Pronunciation Assessment (إعراب)',
     runPronunciation: 'Run pronunciation check',
     runningPronunciation: 'Aligning audio against source — may take 1 min...',
@@ -157,7 +166,30 @@ const UI = {
     autoTranscribe: 'Transcribe automatically after recording',
     orUpload: 'Or upload an audio file',
     copyText: 'Copy',
-    copied: 'Copied!'
+    copied: 'Copied!',
+    topicPlaceholder: 'Enter a topic or paste text to generate a speech…',
+    moreSettings: 'More ⚙',
+    lessSettings: 'Less ⚙',
+    optConsecutive: 'Consecutive',
+    optSimultaneous: 'Simultaneous',
+    optSight: 'Sight translation',
+    optWellOrganized: 'Well organized',
+    optDisorganized: 'Disorganized',
+    optLowNumbers: 'Low numbers',
+    optHighNumbers: 'High numbers',
+    optNormalSpeed: 'Normal speed',
+    optFast: 'Fast',
+    optVeryFast: 'Very fast',
+    optNoShifts: 'No topic shifts',
+    optShifts: 'Topic shifts',
+    domPolitics: 'Politics',
+    domDiplomacy: 'Diplomacy',
+    domEconomics: 'Economics',
+    domHealth: 'Health',
+    domEducation: 'Education',
+    diffBeginner: 'Beginner',
+    diffIntermediate: 'Intermediate',
+    diffAdvanced: 'Advanced',
   },
   ar: {
     uiLanguage: 'لغة الواجهة',
@@ -176,7 +208,7 @@ const UI = {
     signupSubmit: 'إنشاء الحساب',
     signupLoading: 'جارٍ إنشاء الحساب...',
     loginNote: 'استخدم بيانات حسابك، أو أنشئ حساباً جديداً.',
-    switchToSignup: 'إنشاء حساب',
+    switchToSignup: 'إنشاء حساب جديد',
     switchToLogin: 'لديك حساب؟ سجّل الدخول',
     student: 'طالب',
     instructor: 'مدرب',
@@ -190,7 +222,8 @@ const UI = {
     navD: 'التقييم',
     moduleATitle: 'توليد خطاب تدريبي',
     language: 'لغة الخطاب',
-    targetLanguage: 'لغة الترجمة',
+    targetLanguage: 'لغة الترجمة الهدف',
+    topic: 'الموضوع',
     domain: 'المجال',
     wordCount: 'عدد الكلمات',
     difficulty: 'مستوى الصعوبة',
@@ -198,15 +231,34 @@ const UI = {
     mode: 'نوع الترجمة الفورية',
     numbers: 'كثافة الأرقام',
     hesitations: 'محاكاة التردد',
+    pressureMode: 'وضع الضغط',
+    speedPressure: 'ضغط السرعة',
+    topicShifts: 'تحولات الموضوع',
+    contextNoise: 'ضوضاء السياق',
+    cognitiveLoad: 'العبء المعرفي',
+    summary: 'ملخص',
+    mcq: 'أسئلة متعددة الخيارات',
+    glossary: 'المسرد',
+    documentGrounding: 'التوليد من وثيقة',
+    documentFile: 'الوثيقة المصدر',
+    sharedSettings: 'إعدادات التوليد',
+    sharedSettingsHint: 'تُطبَّق هذه الإعدادات على التوليد بالموضوع أو بالوثيقة.',
+    generationMethods: 'اختر مصدر التوليد',
+    topicOnlyGeneration: 'توليد بالموضوع فقط',
+    topicOnlyHint: 'توليد الخطاب من الموضوع والإعدادات المحددة.',
+    documentGenerationHint: 'ارفع وثيقة لتوليد خطاب مستند إلى محتواها.',
+    generateFromDocument: '▷ توليد من وثيقة',
+    retrieveContext: 'معاينة السياق المستخرج',
+    retrievedContext: 'السياق المستخرج',
     submit: 'توليد الخطاب',
     generating: 'جارٍ التوليد، يرجى الانتظار...',
     wordsUnit: 'كلمة',
     moduleBTitle: 'الصوت والمواد التعليمية',
-    moduleBBody: 'سيتم إنتاج الصوت، المصطلحات الأساسية، المسرد، الأسئلة متعددة الخيارات، والبطاقات التعليمية.',
+    moduleBBody: 'إنتاج الصوت، المصطلحات الأساسية، المسرد، والأسئلة متعددة الخيارات.',
     moduleCTitle: 'التسجيل والتفريغ',
-    moduleCBody: 'سيتيح التسجيل داخل المتصفح، التفريغ الآلي، النص الزمني، وتشغيل التسجيل.',
+    moduleCBody: 'تسجيل داخل المتصفح، تفريغ آلي، ونص زمني.',
     moduleDTitle: 'تقييم الأداء',
-    moduleDBody: 'سيكشف التردد، الحذف، أخطاء الأرقام، المشاكل المصطلحية، ونقاط الضعف المتكررة.',
+    moduleDBody: 'رصد التردد، الحذف، أخطاء الأرقام، والمشاكل المصطلحية.',
     comingSoon: 'قريباً',
     errorPrefix: 'خطأ',
     noSpeechYet: 'ولّد خطاباً في الوحدة أ أولاً، ثم عد إلى هنا.',
@@ -219,8 +271,8 @@ const UI = {
     generatingMaterials: 'جارٍ توليد المواد...',
     keyTerms: 'المصطلحات الأساسية',
     summaryTitle: 'الملخص الموضوعي',
-    mcqTitle: 'أسئلة الفهم (MCQ)',
-    glossaryTitle: 'المسرد الثلاثي (AR – FR – EN)',
+    mcqTitle: 'أسئلة الفهم (اختيار متعدد)',
+    glossaryTitle: 'المسرد الثلاثي (عربي – فرنسي – إنجليزي)',
     downloadGlossary: 'تنزيل المسرد (DOCX)',
     uploadAudio: 'ارفع تسجيل ترجمتك (MP3, WAV, M4A)',
     transcribeBtn: 'فرّغ الصوت',
@@ -252,15 +304,23 @@ const UI = {
     source: 'المصدر',
     used: 'ما قيل',
     correct: 'المصطلح الصحيح',
+    coverageTitle: 'تغطية المحتوى',
+    coverageHint: 'مقدار ما تم نقله من الخطاب المصدر',
+    translationErrors: 'أخطاء الترجمة',
+    sourceSaid: 'ما قاله المصدر',
+    studentSaid: 'ما قاله الطالب',
+    correctTranslation: 'الترجمة الصحيحة',
+    missingContent: 'محتوى مفقود',
+    pronunciationMismatches: 'تباينات على مستوى الكلمات',
     pronunciationTitle: 'تقييم النطق والإعراب',
     runPronunciation: 'تشغيل فحص النطق',
     runningPronunciation: 'جارٍ المحاذاة الصوتية — قد تستغرق دقيقة...',
     pronunciationScore: 'ثقة النطق',
     wordView: 'عرض كلمة بكلمة',
-    legend: 'المفتاح',
-    legendGood: '٪80 أو أكثر',
-    legendWarn: '٪60–80',
-    legendPoor: 'أقل من ٪60 — خطأ محتمل',
+    legend: 'مفتاح الألوان',
+    legendGood: '٪80 أو أكثر — صحيح',
+    legendWarn: '٪65–80',
+    legendPoor: 'أقل من ٪65 — خطأ محتمل',
     uncertainWords: 'كلمات غير مؤكدة — أخطاء نطق محتملة',
     expectedForm: 'الشكل الصحيح',
     likelyError: 'الخطأ المحتمل',
@@ -278,7 +338,30 @@ const UI = {
     autoTranscribe: 'تفريغ تلقائي بعد التسجيل',
     orUpload: 'أو ارفع ملف صوتي',
     copyText: 'نسخ',
-    copied: 'تم النسخ!'
+    copied: 'تم النسخ!',
+    topicPlaceholder: 'أدخل موضوعاً أو الصق نصاً لتوليد خطاب...',
+    moreSettings: 'المزيد ⚙',
+    lessSettings: 'أقل ⚙',
+    optConsecutive: 'تتابعي',
+    optSimultaneous: 'فوري',
+    optSight: 'ترجمة بصرية',
+    optWellOrganized: 'منظَّم جيداً',
+    optDisorganized: 'غير منظَّم',
+    optLowNumbers: 'أرقام قليلة',
+    optHighNumbers: 'أرقام كثيرة',
+    optNormalSpeed: 'سرعة عادية',
+    optFast: 'سريع',
+    optVeryFast: 'سريع جداً',
+    optNoShifts: 'بدون تحولات',
+    optShifts: 'تحولات موضوعية',
+    domPolitics: 'السياسة',
+    domDiplomacy: 'الدبلوماسية',
+    domEconomics: 'الاقتصاد',
+    domHealth: 'الصحة',
+    domEducation: 'التعليم',
+    diffBeginner: 'مبتدئ',
+    diffIntermediate: 'متوسط',
+    diffAdvanced: 'متقدم',
   },
   fr: {
     uiLanguage: 'Langue de l’interface',
@@ -373,6 +456,14 @@ const UI = {
     source: 'Source',
     used: 'Utilisé',
     correct: 'Terme correct',
+    coverageTitle: 'Couverture du contenu',
+    coverageHint: 'Quantité du discours source transmise',
+    translationErrors: 'Erreurs de traduction',
+    sourceSaid: 'Source a dit',
+    studentSaid: "L'étudiant a dit",
+    correctTranslation: 'Traduction correcte',
+    missingContent: 'Contenu manquant',
+    pronunciationMismatches: 'Divergences mot par mot',
     pronunciationTitle: 'Évaluation de la prononciation (إعراب)',
     runPronunciation: 'Lancer le contrôle de prononciation',
     runningPronunciation: 'Alignement audio en cours — peut prendre 1 min...',
@@ -399,7 +490,30 @@ const UI = {
     autoTranscribe: 'Transcrire automatiquement après l\'enregistrement',
     orUpload: 'Ou déposez un fichier audio',
     copyText: 'Copier',
-    copied: 'Copié !'
+    copied: 'Copié !',
+    topicPlaceholder: 'Saisissez un sujet ou collez un texte pour générer un discours…',
+    moreSettings: 'Plus ⚙',
+    lessSettings: 'Moins ⚙',
+    optConsecutive: 'Consécutive',
+    optSimultaneous: 'Simultanée',
+    optSight: 'Traduction à vue',
+    optWellOrganized: 'Bien structuré',
+    optDisorganized: 'Peu structuré',
+    optLowNumbers: 'Peu de chiffres',
+    optHighNumbers: 'Beaucoup de chiffres',
+    optNormalSpeed: 'Vitesse normale',
+    optFast: 'Rapide',
+    optVeryFast: 'Très rapide',
+    optNoShifts: 'Sans changements',
+    optShifts: 'Changements de sujet',
+    domPolitics: 'Politique',
+    domDiplomacy: 'Diplomatie',
+    domEconomics: 'Économie',
+    domHealth: 'Santé',
+    domEducation: 'Éducation',
+    diffBeginner: 'Débutant',
+    diffIntermediate: 'Intermédiaire',
+    diffAdvanced: 'Avancé',
   }
 };
 
@@ -528,6 +642,82 @@ const initialSpeechForm = {
   cognitive_load: 'medium'
 };
 
+function ThreeBackground() {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 5);
+
+    const globe = new THREE.Mesh(
+      new THREE.SphereGeometry(2.2, 64, 64),
+      new THREE.MeshStandardMaterial({ color: 0xC8973A, wireframe: true, transparent: true, opacity: 0.08 })
+    );
+    globe.position.set(3, -0.5, -2);
+    scene.add(globe);
+
+    const inner = new THREE.Mesh(
+      new THREE.SphereGeometry(1.8, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0x2D5A4E, wireframe: true, transparent: true, opacity: 0.05 })
+    );
+    inner.position.set(3, -0.5, -2);
+    scene.add(inner);
+
+    const pCount = 120;
+    const pGeo = new THREE.BufferGeometry();
+    const pPos = new Float32Array(pCount * 3);
+    for (let i = 0; i < pCount; i++) {
+      pPos[i * 3]     = (Math.random() - 0.5) * 14;
+      pPos[i * 3 + 1] = (Math.random() - 0.5) * 10;
+      pPos[i * 3 + 2] = (Math.random() - 0.5) * 6 - 3;
+    }
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+    const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xC8973A, size: 0.025, transparent: true, opacity: 0.5 }));
+    scene.add(particles);
+
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(2.8, 0.012, 8, 100),
+      new THREE.MeshBasicMaterial({ color: 0xC8973A, transparent: true, opacity: 0.12 })
+    );
+    ring.position.set(3, -0.5, -2);
+    ring.rotation.x = Math.PI / 3;
+    scene.add(ring);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const pointLight = new THREE.PointLight(0xC8973A, 1.5, 20);
+    pointLight.position.set(5, 3, 3);
+    scene.add(pointLight);
+
+    let t = 0, rafId;
+    const animate = () => {
+      rafId = requestAnimationFrame(animate);
+      t += 0.005;
+      globe.rotation.y = t * 0.3;
+      globe.rotation.x = Math.sin(t * 0.2) * 0.15;
+      inner.rotation.y = -t * 0.2;
+      ring.rotation.z = t * 0.15;
+      particles.rotation.y = t * 0.04;
+      camera.position.y = Math.sin(t * 0.15) * 0.2;
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    const onResize = () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    };
+    window.addEventListener('resize', onResize);
+    return () => { cancelAnimationFrame(rafId); window.removeEventListener('resize', onResize); renderer.dispose(); };
+  }, []);
+  return <canvas ref={canvasRef} id="three-canvas" />;
+}
+
 export default function App() {
   const [uiLang, setUiLang] = useState('en');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -537,8 +727,10 @@ export default function App() {
   const L = UI[uiLang];
 
   useEffect(() => {
+    const isAr = uiLang === 'ar';
     document.documentElement.lang = uiLang;
-    document.body.classList.toggle('rtl', uiLang === 'ar');
+    document.documentElement.dir = isAr ? 'rtl' : 'ltr';
+    document.body.classList.toggle('rtl', isAr);
   }, [uiLang]);
 
   async function handleLogin(event) {
@@ -578,64 +770,66 @@ export default function App() {
 
   return (
     <>
-      <Header
-        isAuthenticated={isAuthenticated}
-        activePanel={activePanel}
-        labels={L}
-        onPanelChange={setActivePanel}
-        uiLang={uiLang}
-        onLanguageChange={setUiLang}
-      />
-      <main>
-        {!isAuthenticated ? (
-          <LoginScreen labels={L} onLogin={handleLogin} onSignup={handleSignup} />
-        ) : (
-          <Workspace
-            labels={L}
-            activePanel={activePanel}
-            onLogout={handleLogout}
-            onGenerated={setLastGeneratedScript}
-            lastGeneratedScript={lastGeneratedScript}
-            currentUser={currentUser}
-          />
-        )}
-      </main>
+      <ThreeBackground />
+      <div className="shell">
+        <Header
+          isAuthenticated={isAuthenticated}
+          activePanel={activePanel}
+          labels={L}
+          onPanelChange={setActivePanel}
+          uiLang={uiLang}
+          onLanguageChange={setUiLang}
+        />
+        <main>
+          {!isAuthenticated ? (
+            <LoginScreen labels={L} onLogin={handleLogin} onSignup={handleSignup} />
+          ) : (
+            <Workspace
+              labels={L}
+              activePanel={activePanel}
+              onLogout={handleLogout}
+              onGenerated={setLastGeneratedScript}
+              lastGeneratedScript={lastGeneratedScript}
+              currentUser={currentUser}
+              isRtl={uiLang === 'ar'}
+            />
+          )}
+        </main>
+      </div>
     </>
   );
 }
 
 function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, onLanguageChange }) {
   return (
-    <header>
-      <div className="header-inner">
-        <span className="logo">
-          <span className="logo-en">ETIB Trainer</span>
-          <span className="logo-sep">·</span>
-          <span className="logo-ar">منصة التدريب</span>
-        </span>
-        {isAuthenticated && (
-          <nav aria-label="Training modules">
-            {NAV_ITEMS.map(item => (
-              <button
-                key={item.id}
-                type="button"
-                className={`nav-btn ${activePanel === item.id ? 'active' : ''}`}
-                onClick={() => onPanelChange(item.id)}
-              >
-                {labels[item.labelKey]}
-              </button>
-            ))}
-          </nav>
-        )}
-        <label className="language-picker">
-          <span>{labels.uiLanguage}</span>
-          <select value={uiLang} onChange={event => onLanguageChange(event.target.value)}>
-            <option value="en">English</option>
-            <option value="fr">Français</option>
-            <option value="ar">العربية</option>
-          </select>
-        </label>
+    <header className="fade-up">
+      <div>
+        <div className="logo-main">ETIB <span>Interpreter</span> Trainer</div>
+        <div className="logo-sub">AI Self-Training Platform · USJ Beirut</div>
       </div>
+      <div className="arabic-badge">مُدرِّب المُترجِم</div>
+      {isAuthenticated && (
+        <nav aria-label="Training modules">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              className={`nav-btn ${activePanel === item.id ? 'active' : ''}`}
+              onClick={() => onPanelChange(item.id)}
+            >
+              {labels[item.labelKey]}
+            </button>
+          ))}
+        </nav>
+      )}
+      <label className="lang-picker">
+        <span>{labels.uiLanguage}</span>
+        <select value={uiLang} onChange={event => onLanguageChange(event.target.value)}>
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="ar">العربية</option>
+        </select>
+      </label>
     </header>
   );
 }
@@ -665,28 +859,50 @@ function LoginScreen({ labels, onLogin, onSignup }) {
   }
 
   return (
-    <section className="login-shell">
-      <div className="login-layout">
-        <div className="login-intro">
-          <p className="eyebrow">ETIB Interpreter Trainer</p>
-          <h1>{isSignup ? labels.signupTitle : labels.loginTitle}</h1>
-          <p>{isSignup ? labels.signupSubtitle : labels.loginSubtitle}</p>
+    <section className="hero fade-up delay-1">
+      {/* Left: marketing copy */}
+      <div className="hero-text">
+        <div className="lang-pills">
+          <span className="pill pill-ar">عربي</span>
+          <span className="pill pill-fr">Français</span>
+          <span className="pill pill-en">English</span>
         </div>
+        <h1>Master interpretation with <em>AI-generated</em> speeches</h1>
+        <p>An adaptive training platform that generates realistic conference speeches, builds multilingual glossaries, and evaluates your interpretation performance across Arabic, French, and English.</p>
+        <div className="stat-cluster">
+          <div className="stat-card">
+            <div className="stat-icon si-gold">🎙️</div>
+            <div className="stat-info"><label>Sessions available</label><strong>∞</strong><span>AI-generated on demand</span></div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon si-sage">📚</div>
+            <div className="stat-info"><label>Languages</label><strong>3</strong><span>Arabic · French · English</span></div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon si-sienna">⭐</div>
+            <div className="stat-info"><label>Evaluation</label><strong>AI</strong><span><span className="pulse-dot"></span>Live feedback</span></div>
+          </div>
+        </div>
+      </div>
 
-        <form className="login-form" onSubmit={handleSubmit}>
+      {/* Right: auth form */}
+      <div className="login-panel">
+        <h2>{isSignup ? labels.signupTitle : labels.loginTitle}</h2>
+        <p className="sub">{isSignup ? labels.signupSubtitle : labels.loginSubtitle}</p>
+        <form onSubmit={handleSubmit}>
           {isSignup && (
             <div className="field">
               <label htmlFor="login-name">{labels.name}</label>
-              <input id="login-name" name="name" type="text" autoComplete="name" required placeholder="Kevin Mansour" />
+              <input id="login-name" name="name" type="text" autoComplete="name" required placeholder="Your full name" />
             </div>
           )}
           <div className="field">
             <label htmlFor="login-email">{labels.email}</label>
-            <input id="login-email" name="email" type="email" autoComplete="email" required placeholder="name@example.com" />
+            <input id="login-email" name="email" type="email" autoComplete="email" required placeholder="name@usj.edu.lb" />
           </div>
           <div className="field">
             <label htmlFor="login-password">{labels.password}</label>
-            <div className="password-control">
+            <div className="field-row">
               <input
                 id="login-password"
                 name="password"
@@ -695,13 +911,7 @@ function LoginScreen({ labels, onLogin, onSignup }) {
                 required
                 minLength="4"
               />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(current => !current)}
-                aria-pressed={showPassword}
-                aria-controls="login-password"
-              >
+              <button type="button" className="show-btn" onClick={() => setShowPassword(v => !v)}>
                 {showPassword ? labels.hidePassword : labels.showPassword}
               </button>
             </div>
@@ -716,49 +926,37 @@ function LoginScreen({ labels, onLogin, onSignup }) {
           </div>
           {error && <div className="error-msg">{labels.errorPrefix}: {error}</div>}
           <button type="submit" className="btn-primary login-submit" disabled={isSubmitting}>
-            {isSubmitting
-              ? (isSignup ? labels.signupLoading : labels.loginLoading)
-              : (isSignup ? labels.signupSubmit : labels.loginSubmit)}
+            {isSubmitting ? (isSignup ? labels.signupLoading : labels.loginLoading) : (isSignup ? labels.signupSubmit : labels.loginSubmit)}
           </button>
           <p className="login-note">{labels.loginNote}</p>
-          <button
-            type="button"
-            className="auth-switch"
-            onClick={() => {
-              setMode(isSignup ? 'login' : 'signup');
-              setError('');
-              setShowPassword(false);
-            }}
-          >
-            {isSignup ? labels.switchToLogin : labels.switchToSignup}
-          </button>
+          <div className="login-switch">
+            <button type="button" onClick={() => { setMode(isSignup ? 'login' : 'signup'); setError(''); setShowPassword(false); }}>
+              {isSignup ? labels.switchToLogin : labels.switchToSignup}
+            </button>
+          </div>
         </form>
       </div>
     </section>
   );
 }
 
-function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedScript, currentUser }) {
+function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedScript, currentUser, isRtl }) {
   const [sharedAudioUrl, setSharedAudioUrl] = useState(null);
   const [lastTranscript, setLastTranscript] = useState(null);
   const [lastRecordingBlob, setLastRecordingBlob] = useState(null);
 
   return (
-    <section className="workspace-screen">
-      <div className="workspace-heading">
-        <div>
-          <p className="eyebrow">{labels.workspaceKicker}</p>
-          <h1>{labels.workspaceTitle}</h1>
-          {currentUser && <p className="user-line">{currentUser.name} · {currentUser.role}</p>}
-        </div>
-        <button type="button" className="secondary-action" onClick={onLogout}>
-          {labels.signOut}
-        </button>
+    <section>
+      <div className="workspace-header fade-up">
+        <span className="workspace-user">
+          {currentUser && <><strong>{currentUser.name}</strong> · {currentUser.role}</>}
+        </span>
+        <button type="button" className="sign-out-btn" onClick={onLogout}>{labels.signOut}</button>
       </div>
 
       {/* Keep all panels mounted — state persists when switching tabs */}
       <div style={{ display: activePanel === 'module-a' ? 'block' : 'none' }}>
-        <ModuleA labels={labels} onGenerated={onGenerated} />
+        <ModuleA labels={labels} onGenerated={onGenerated} isRtl={isRtl} />
       </div>
       <div style={{ display: activePanel === 'module-b' ? 'block' : 'none' }}>
         <ModuleB labels={labels} lastGeneratedScript={lastGeneratedScript}
@@ -775,212 +973,197 @@ function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedSc
           lastGeneratedScript={lastGeneratedScript}
           lastRecordingBlob={lastRecordingBlob} />
       </div>
+
     </section>
   );
 }
 
-function ModuleA({ labels, onGenerated }) {
+function ModuleA({ labels, onGenerated, isRtl }) {
   const [form, setForm] = useState(initialSpeechForm);
   const [documentFile, setDocumentFile] = useState(null);
   const [retrievalResult, setRetrievalResult] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const fileInputRef = useRef(null);
   const isLoading = status === 'loading';
 
   function updateField(event) {
     const { name, value, type, checked } = event.target;
-    setForm(current => ({
-      ...current,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    setForm(current => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setStatus('loading');
-    setError('');
-    setResult(null);
-
+    setStatus('loading'); setError(''); setResult(null);
     try {
-      const data = await generateSpeech({
-        ...form,
-        word_count: Number(form.word_count)
-      });
-      setResult(data);
-      onGenerated(data);
-      setStatus('success');
-    } catch (err) {
-      setError(err.message);
-      setStatus('error');
-    }
+      const data = await generateSpeech({ ...form, word_count: Number(form.word_count) });
+      setResult(data); onGenerated(data); setStatus('success');
+    } catch (err) { setError(err.message); setStatus('error'); }
   }
 
   async function handleDocumentGenerate() {
-    setStatus('loading');
-    setError('');
-    setResult(null);
-    setRetrievalResult(null);
-
+    setStatus('loading'); setError(''); setResult(null); setRetrievalResult(null);
     try {
-      if (!documentFile) {
-        throw new Error('Choose a TXT, DOCX, or PDF document first.');
-      }
-
-      const data = await generateSpeechFromDocument(documentFile, {
-        ...form,
-        word_count: Number(form.word_count)
-      });
-      setResult(data);
-      onGenerated(data);
-      setStatus('success');
-    } catch (err) {
-      setError(err.message);
-      setStatus('error');
-    }
+      if (!documentFile) throw new Error('Choose a TXT, DOCX, or PDF document first.');
+      const data = await generateSpeechFromDocument(documentFile, { ...form, word_count: Number(form.word_count) });
+      setResult(data); onGenerated(data); setStatus('success');
+    } catch (err) { setError(err.message); setStatus('error'); }
   }
 
   async function handleRetrieveContext() {
-    setStatus('loading');
-    setError('');
-    setRetrievalResult(null);
-
+    setStatus('loading'); setError(''); setRetrievalResult(null);
     try {
-      if (!documentFile) {
-        throw new Error('Choose a TXT, DOCX, or PDF document first.');
-      }
-
+      if (!documentFile) throw new Error('Choose a TXT, DOCX, or PDF document first.');
       const data = await retrieveDocumentContext(documentFile, {
-        query: form.topic,
-        language: form.language,
-        domain: form.domain,
-        scenario: 'UN General Assembly',
-        difficulty: form.difficulty,
-        mode: form.mode,
-        number_density: form.number_density,
-        max_chunks: 4
+        query: form.topic, language: form.language, domain: form.domain,
+        scenario: 'UN General Assembly', difficulty: form.difficulty,
+        mode: form.mode, number_density: form.number_density, max_chunks: 4
       });
-      setRetrievalResult(data);
-      setStatus('success');
-    } catch (err) {
-      setError(err.message);
-      setStatus('error');
-    }
+      setRetrievalResult(data); setStatus('success');
+    } catch (err) { setError(err.message); setStatus('error'); }
   }
 
+  const LANG_LABEL = { ar: 'AR', fr: 'FR', en: 'EN' };
+
   return (
-    <div className="card">
-      <h2>{labels.moduleATitle}</h2>
-      <form className="generation-settings" onSubmit={handleSubmit}>
-        <div className="section-heading">
-          <h3>{labels.sharedSettings || 'Generation settings'}</h3>
-          <p>{labels.sharedSettingsHint || 'These settings apply to both topic-only generation and document-grounded generation.'}</p>
-        </div>
-        <div className="field topic-field">
-          <label htmlFor="f-topic">{labels.topic || 'Topic'}</label>
+    <div className="card module-a-card">
+      <form onSubmit={handleSubmit}>
+
+        {/* ── Main topic bar ── */}
+        <div className="topic-bar">
           <input
-            id="f-topic"
+            className="topic-input"
             name="topic"
             type="text"
             value={form.topic}
             minLength="3"
             maxLength="180"
             required
-            placeholder="Artificial intelligence in public policy"
+            placeholder={labels.topicPlaceholder || 'Enter a topic or paste text to generate a speech…'}
             onChange={updateField}
+            disabled={isLoading}
+          />
+          <button
+            type="button"
+            className="topic-attach-btn"
+            title="Attach a document (PDF, DOCX, TXT)"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {documentFile ? '📄' : '+'}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.docx,.pdf"
+            style={{ display: 'none' }}
+            onChange={event => { setDocumentFile(event.target.files?.[0] || null); setRetrievalResult(null); }}
           />
         </div>
-        <div className="form-grid">
-          <SelectField label={labels.language} id="f-lang" name="language" value={form.language} onChange={updateField}>
-            <option value="ar">العربية - Arabic</option>
-            <option value="fr">Français - French</option>
-            <option value="en">English</option>
-          </SelectField>
-          <SelectField label={labels.targetLanguage} id="f-target-lang" name="target_language" value={form.target_language} onChange={updateField}>
-            <option value="ar">العربية - Arabic</option>
-            <option value="fr">Français - French</option>
-            <option value="en">English</option>
-          </SelectField>
-          <SelectField label={labels.domain} id="f-domain" name="domain" value={form.domain} onChange={updateField}>
-            <option value="politics">Politics / السياسة</option>
-            <option value="diplomacy">Diplomacy / الدبلوماسية</option>
-            <option value="economics">Economics / الاقتصاد</option>
-            <option value="health">Health / الصحة</option>
-            <option value="education">Education / التعليم</option>
-          </SelectField>
-          <div className="field">
-            <label htmlFor="f-words">{labels.wordCount}</label>
-            <input id="f-words" name="word_count" type="number" value={form.word_count} min="50" max="800" onChange={updateField} />
+
+        {/* ── Attached file chip ── */}
+        {documentFile && (
+          <div className="file-chip">
+            <span>📄 {documentFile.name}</span>
+            <button type="button" className="file-chip-remove" onClick={() => { setDocumentFile(null); setRetrievalResult(null); }}>×</button>
           </div>
-          <SelectField label={labels.difficulty} id="f-diff" name="difficulty" value={form.difficulty} onChange={updateField}>
-            <option value="beginner">Beginner / مبتدئ</option>
-            <option value="intermediate">Intermediate / متوسط</option>
-            <option value="advanced">Advanced / متقدم</option>
-          </SelectField>
-          <SelectField label={labels.mode} id="f-mode" name="mode" value={form.mode} onChange={updateField}>
-            <option value="consecutive">Consecutive / متتابعة</option>
-            <option value="simultaneous">Simultaneous / فورية</option>
-          </SelectField>
-          <SelectField label={labels.structure} id="f-structure" name="structure" value={form.structure} onChange={updateField}>
-            <option value="well-organized">Well organized</option>
-            <option value="deliberately disorganized">Disorganized</option>
-          </SelectField>
-          <SelectField label={labels.numbers} id="f-numbers" name="number_density" value={form.number_density} onChange={updateField}>
-            <option value="low">Low / منخفض</option>
-            <option value="high">High / مرتفع</option>
-          </SelectField>
-          <SelectField label={labels.speedPressure || 'Speed pressure'} id="f-speed-pressure" name="speed_pressure" value={form.speed_pressure} onChange={updateField}>
-            <option value="normal">Normal</option>
-            <option value="fast">Fast</option>
-            <option value="very_fast">Very fast</option>
-          </SelectField>
-          <SelectField label={labels.topicShifts || 'Topic shifts'} id="f-topic-shifts" name="topic_shifts" value={form.topic_shifts} onChange={updateField}>
-            <option value="none">None</option>
-            <option value="mild">Topic shifts</option>
-          </SelectField>
+        )}
+
+        {/* ── Language + quick settings row ── */}
+        <div className="quick-settings-row">
+          <div className="lang-pair">
+            <select name="language" value={form.language} onChange={updateField} className="lang-select" title="Speech language">
+              <option value="ar">AR</option>
+              <option value="fr">FR</option>
+              <option value="en">EN</option>
+            </select>
+            <span className="lang-arrow">{isRtl ? '←' : '→'}</span>
+            <select name="target_language" value={form.target_language} onChange={updateField} className="lang-select" title="Interpretation target">
+              <option value="ar">AR</option>
+              <option value="fr">FR</option>
+              <option value="en">EN</option>
+            </select>
+          </div>
+
+          <select name="domain" value={form.domain} onChange={updateField} className="quick-select">
+            <option value="politics">{labels.domPolitics || 'Politics'}</option>
+            <option value="diplomacy">{labels.domDiplomacy || 'Diplomacy'}</option>
+            <option value="economics">{labels.domEconomics || 'Economics'}</option>
+            <option value="health">{labels.domHealth || 'Health'}</option>
+            <option value="education">{labels.domEducation || 'Education'}</option>
+          </select>
+
+          <select name="difficulty" value={form.difficulty} onChange={updateField} className="quick-select">
+            <option value="beginner">{labels.diffBeginner || 'Beginner'}</option>
+            <option value="intermediate">{labels.diffIntermediate || 'Intermediate'}</option>
+            <option value="advanced">{labels.diffAdvanced || 'Advanced'}</option>
+          </select>
+
+          <button
+            type="button"
+            className={`advanced-toggle ${showAdvanced ? 'advanced-toggle-active' : ''}`}
+            onClick={() => setShowAdvanced(v => !v)}
+          >
+            {showAdvanced ? (labels.lessSettings || '⚙ Less') : (labels.moreSettings || '⚙ More')}
+          </button>
         </div>
-        <section className="generation-methods">
-          <div className="section-heading">
-            <h3>{labels.generationMethods || 'Choose generation source'}</h3>
-          </div>
-          <div className="method-grid">
-            <div className="method-panel">
-              <h4>{labels.topicOnlyGeneration || 'Topic-only generation'}</h4>
-              <p>{labels.topicOnlyHint || 'Generate from the topic and selected settings.'}</p>
-              <button type="submit" className="btn-primary" disabled={isLoading}>
-                {isLoading ? labels.generating : labels.submit}
-              </button>
-            </div>
-            <div className="method-panel">
-              <h4>{labels.documentGrounding || 'Document grounding'}</h4>
-              <p>{labels.documentGenerationHint || 'Upload a source file and generate a speech grounded in its content.'}</p>
-              <div className="document-actions">
-                <div className="field">
-                  <label htmlFor="f-document">{labels.documentFile || 'Source document'}</label>
-                  <input
-                    id="f-document"
-                    type="file"
-                    accept=".txt,.docx,.pdf"
-                    onChange={event => {
-                      setDocumentFile(event.target.files?.[0] || null);
-                      setRetrievalResult(null);
-                    }}
-                  />
-                </div>
-                <button type="button" className="secondary-action" onClick={handleRetrieveContext} disabled={isLoading || !documentFile}>
-                  {labels.retrieveContext || 'Preview retrieved context'}
-                </button>
-                <button type="button" className="btn-primary" onClick={handleDocumentGenerate} disabled={isLoading || !documentFile}>
-                  {isLoading ? labels.generating : (labels.generateFromDocument || 'Generate from document')}
-                </button>
+
+        {/* ── Advanced options (collapsible) ── */}
+        {showAdvanced && (
+          <div className="advanced-panel">
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="f-words">{labels.wordCount}</label>
+                <input id="f-words" name="word_count" type="number" value={form.word_count} min="50" max="800" onChange={updateField} />
               </div>
+              <SelectField label={labels.mode} id="f-mode" name="mode" value={form.mode} onChange={updateField}>
+                <option value="consecutive">{labels.optConsecutive || 'Consecutive'}</option>
+                <option value="simultaneous">{labels.optSimultaneous || 'Simultaneous'}</option>
+                <option value="sight_translation">{labels.optSight || 'Sight translation'}</option>
+              </SelectField>
+              <SelectField label={labels.structure} id="f-structure" name="structure" value={form.structure} onChange={updateField}>
+                <option value="well-organized">{labels.optWellOrganized || 'Well organized'}</option>
+                <option value="deliberately disorganized">{labels.optDisorganized || 'Disorganized'}</option>
+              </SelectField>
+              <SelectField label={labels.numbers} id="f-numbers" name="number_density" value={form.number_density} onChange={updateField}>
+                <option value="low">{labels.optLowNumbers || 'Low numbers'}</option>
+                <option value="high">{labels.optHighNumbers || 'High numbers'}</option>
+              </SelectField>
+              <SelectField label={labels.speedPressure || 'Speed pressure'} id="f-speed" name="speed_pressure" value={form.speed_pressure} onChange={updateField}>
+                <option value="normal">{labels.optNormalSpeed || 'Normal speed'}</option>
+                <option value="fast">{labels.optFast || 'Fast'}</option>
+                <option value="very_fast">{labels.optVeryFast || 'Very fast'}</option>
+              </SelectField>
+              <SelectField label={labels.topicShifts || 'Topic shifts'} id="f-shifts" name="topic_shifts" value={form.topic_shifts} onChange={updateField}>
+                <option value="none">{labels.optNoShifts || 'No topic shifts'}</option>
+                <option value="mild">{labels.optShifts || 'Topic shifts'}</option>
+              </SelectField>
             </div>
           </div>
-        </section>
+        )}
+
+        {/* ── Action buttons ── */}
+        <div className="action-row">
+          {documentFile ? (
+            <>
+              <button type="button" className="btn-secondary" onClick={handleRetrieveContext} disabled={isLoading}>
+                Preview context
+              </button>
+              <button type="button" className="btn-primary" onClick={handleDocumentGenerate} disabled={isLoading}>
+                {isLoading ? labels.generating : `▷ ${labels.generateFromDocument || 'Generate from document'}`}
+              </button>
+            </>
+          ) : (
+            <button type="submit" className="btn-primary" disabled={isLoading}>
+              {isLoading ? labels.generating : `▷ ${labels.submit || 'Generate speech'}`}
+            </button>
+          )}
+        </div>
+
       </form>
 
-      {isLoading && <p className="loading">{labels.generating}</p>}
-      {error && <div className="error-msg">{labels.errorPrefix}: {error}</div>}
+      {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{labels.errorPrefix}: {error}</div>}
       {retrievalResult && <RetrievalResult data={retrievalResult} labels={labels} />}
       {result && <SpeechResult data={result} labels={labels} />}
     </div>
@@ -1052,59 +1235,7 @@ function SpeechResult({ data, labels }) {
       <div className={`speech-text ${isArabic ? 'arabic' : ''}`}>
         {data.script}
       </div>
-      {data.summary && (
-        <section className="result-section">
-          <h3>{labels.summary || 'Summary'}</h3>
-          <p>{data.summary}</p>
-        </section>
-      )}
-      {Array.isArray(data.mcqs) && data.mcqs.length > 0 && (
-        <section className="result-section">
-          <h3>{labels.mcq || 'MCQ'}</h3>
-          <div className="mcq-list">
-            {data.mcqs.map((item, index) => (
-              <div className="mcq-item" key={`${item.question || 'question'}-${index}`}>
-                <p className="mcq-question">{index + 1}. {item.question}</p>
-                <ul>
-                  {(item.options || []).map((option, optionIndex) => (
-                    <li key={`${option}-${optionIndex}`}>{option}</li>
-                  ))}
-                </ul>
-                {item.answer && <p className="mcq-answer">Answer: {item.answer}</p>}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-      {Array.isArray(data.glossary) && data.glossary.length > 0 && (
-        <section className="result-section">
-          <h3>{labels.glossary || 'Glossary'}</h3>
-          <div className="glossary-table-wrap">
-            <table className="glossary-table">
-              <thead>
-                <tr>
-                  <th>Term</th>
-                  <th>Arabic</th>
-                  <th>French</th>
-                  <th>English</th>
-                  <th>Definition</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.glossary.map((item, index) => (
-                  <tr key={`${item.term || 'term'}-${index}`}>
-                    <td>{item.term}</td>
-                    <td>{item.arabic}</td>
-                    <td>{item.french}</td>
-                    <td>{item.english}</td>
-                    <td>{item.definition}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+      <p className="speech-next-hint">→ Go to <strong>Audio &amp; materials</strong> to listen, review questions, and download the glossary.</p>
     </div>
   );
 }
@@ -1113,25 +1244,29 @@ function SpeechResult({ data, labels }) {
 
 function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
   const language = lastGeneratedScript?.language || 'ar';
+  const isArabic = language === 'ar';
   const voiceOptions = VOICE_OPTIONS[language] || VOICE_OPTIONS.en;
+  const speechId = lastGeneratedScript?.script?.slice(0, 50) || '';
 
   const [selectedAccent, setSelectedAccent] = useState(voiceOptions[0]?.accent || '');
   const [speechRate, setSpeechRate] = useState(0);
   const [audioUrl, setAudioUrl] = useState(null);
-  const [materials, setMaterials] = useState(null);
   const [audioStatus, setAudioStatus] = useState('idle');
-  const [materialsStatus, setMaterialsStatus] = useState('idle');
   const [audioError, setAudioError] = useState('');
-  const [materialsError, setMaterialsError] = useState('');
+  const [keyTerms, setKeyTerms] = useState(null);
+  const [keyTermsLoading, setKeyTermsLoading] = useState(false);
+  const [keyTermsError, setKeyTermsError] = useState('');
 
   useEffect(() => {
     const opts = VOICE_OPTIONS[language] || VOICE_OPTIONS.en;
     setSelectedAccent(opts[0]?.accent || '');
     setAudioUrl(null);
-    setMaterials(null);
     setAudioStatus('idle');
-    setMaterialsStatus('idle');
-  }, [language]);
+    setAudioError('');
+    setKeyTerms(null);
+    setKeyTermsLoading(false);
+    setKeyTermsError('');
+  }, [speechId]);
 
   if (!lastGeneratedScript) {
     return (
@@ -1142,168 +1277,152 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
     );
   }
 
+  const summary  = lastGeneratedScript.summary  || '';
+  const mcqs     = lastGeneratedScript.mcqs     || [];
+  const glossary = lastGeneratedScript.glossary || [];
+
   async function handleGenerateAudio() {
-    setAudioStatus('loading');
-    setAudioError('');
+    setAudioStatus('loading'); setAudioError('');
     try {
-      const data = await textToSpeech({
-        text: lastGeneratedScript.script,
-        language,
-        accent: selectedAccent,
-        rate_adjustment: speechRate
-      });
+      const data = await textToSpeech({ text: lastGeneratedScript.script, language, accent: selectedAccent, rate_adjustment: speechRate });
       const url = `http://127.0.0.1:5000${data.audio_url}`;
-      setAudioUrl(url);
-      onAudioGenerated?.(url);
-      setAudioStatus('success');
-    } catch (err) {
-      setAudioError(err.message);
-      setAudioStatus('error');
-    }
+      setAudioUrl(url); onAudioGenerated?.(url); setAudioStatus('success');
+    } catch (err) { setAudioError(err.message); setAudioStatus('error'); }
   }
 
-  async function handleGenerateMaterials() {
-    setMaterialsStatus('loading');
-    setMaterialsError('');
+  async function handleGenerateKeyTerms() {
+    setKeyTermsLoading(true); setKeyTermsError('');
     try {
-      const data = await generateMaterials({
-        script: lastGeneratedScript.script,
-        language,
-        domain: lastGeneratedScript.domain
-      });
-      setMaterials(data);
-      setMaterialsStatus('success');
-    } catch (err) {
-      setMaterialsError(err.message);
-      setMaterialsStatus('error');
-    }
+      const data = await generateMaterials({ script: lastGeneratedScript.script, language, domain: lastGeneratedScript.domain });
+      setKeyTerms(data.key_terms || []);
+    } catch (err) { setKeyTermsError(err.message); setKeyTerms([]); }
+    finally { setKeyTermsLoading(false); }
   }
 
   async function handleDownloadGlossary() {
     try {
-      const blob = await downloadGlossary({
-        glossary: materials.glossary,
-        domain: lastGeneratedScript.domain
-      });
+      const mapped = glossary.map(item => ({
+        ar: item.arabic || item.ar || '',
+        fr: item.french || item.fr || '',
+        en: item.english || item.en || '',
+      }));
+      const blob = await downloadGlossary({ glossary: mapped, domain: lastGeneratedScript.domain });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `glossary_${lastGeneratedScript.domain}.docx`;
-      a.click();
+      const a = document.createElement('a'); a.href = url;
+      a.download = `glossary_${lastGeneratedScript.domain}.docx`; a.click();
       URL.revokeObjectURL(url);
-    } catch (err) {
-      alert(`${labels.errorPrefix}: ${err.message}`);
-    }
+    } catch (err) { alert(`${labels.errorPrefix}: ${err.message}`); }
   }
 
   return (
-    <div>
-      {/* TTS Card */}
+    <div className="module-b-layout">
+
+      {/* ── Audio ── */}
       <div className="card">
-        <h2>{labels.moduleBTitle}</h2>
-        <div className="form-grid">
+        <h2 className="b-section-title">🔊 {labels.moduleBTitle}</h2>
+        <div className="form-grid" style={{ marginBottom: '1rem' }}>
           <SelectField label={labels.voiceAccent} id="b-voice" name="voice"
             value={selectedAccent} onChange={e => setSelectedAccent(e.target.value)}>
-            {voiceOptions.map(v => (
-              <option key={v.accent} value={v.accent}>{v.label}</option>
-            ))}
+            {voiceOptions.map(v => <option key={v.accent} value={v.accent}>{v.label}</option>)}
           </SelectField>
           <div className="field">
-            <label htmlFor="b-rate">
-              {labels.speechRate}: {speechRate > 0 ? `+${speechRate}` : speechRate}%
-            </label>
-            <input
-              id="b-rate"
-              type="range"
-              min="-30" max="20" step="5"
-              value={speechRate}
-              onChange={e => setSpeechRate(Number(e.target.value))}
-              className="rate-slider"
-            />
+            <label htmlFor="b-rate">{labels.speechRate}: {speechRate > 0 ? `+${speechRate}` : speechRate}%</label>
+            <input id="b-rate" type="range" min="-30" max="20" step="5"
+              value={speechRate} onChange={e => setSpeechRate(Number(e.target.value))} className="rate-slider" />
           </div>
         </div>
-        <button className="btn-primary" onClick={handleGenerateAudio}
-          disabled={audioStatus === 'loading'}>
-          {audioStatus === 'loading' ? labels.generatingAudio : labels.generateAudio}
+        <button className="btn-primary" onClick={handleGenerateAudio} disabled={audioStatus === 'loading'}>
+          {audioStatus === 'loading' ? labels.generatingAudio : `▷ ${labels.generateAudio}`}
         </button>
-        {audioStatus === 'loading' && <p className="loading">{labels.generatingAudio}</p>}
-        {audioError && <div className="error-msg">{labels.errorPrefix}: {audioError}</div>}
-        {audioUrl && (
-          <div className="audio-player">
-            <audio key={audioUrl} controls src={audioUrl} />
-          </div>
-        )}
+        {audioError && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{labels.errorPrefix}: {audioError}</div>}
+        {audioUrl && <div style={{ marginTop: '1rem' }}><audio key={audioUrl} controls src={audioUrl} style={{ width: '100%' }} /></div>}
       </div>
 
-      {/* Materials Card */}
-      <div className="card">
-        <h2>{labels.materialsTitle}</h2>
-        <button className="btn-primary" onClick={handleGenerateMaterials}
-          disabled={materialsStatus === 'loading'}>
-          {materialsStatus === 'loading' ? labels.generatingMaterials : labels.generateMaterials}
-        </button>
-        {materialsStatus === 'loading' && <p className="loading">{labels.generatingMaterials}</p>}
-        {materialsError && <div className="error-msg">{labels.errorPrefix}: {materialsError}</div>}
+      {/* ── Summary ── */}
+      {summary && (
+        <div className="card">
+          <h2 className="b-section-title">📋 {labels.summaryTitle}</h2>
+          <pre className="mind-map">{summary}</pre>
+        </div>
+      )}
 
-        {materials && (
-          <div className="materials-body">
-
-            <section className="materials-section">
-              <h3>{labels.keyTerms}</h3>
-              <div className="key-terms-list">
-                {(materials.key_terms || []).map((term, i) => (
-                  <span key={i} className="key-term-badge">{term}</span>
+      {/* ── MCQ ── */}
+      {mcqs.length > 0 && (
+        <div className="card">
+          <h2 className="b-section-title">❓ {labels.mcqTitle}</h2>
+          <div className="table-responsive">
+            <table className="mcq-table">
+              <thead>
+                <tr><th style={{width:'2.5rem'}}>#</th><th>Question</th><th>Options</th><th style={{width:'5rem'}}>Answer</th></tr>
+              </thead>
+              <tbody>
+                {mcqs.map((item, i) => (
+                  <tr key={i}>
+                    <td className="mcq-num">{i + 1}</td>
+                    <td className={`mcq-q ${isArabic ? 'arabic' : ''}`}>{item.question}</td>
+                    <td>
+                      <ul className="mcq-opts-inline">
+                        {(item.options || []).map((opt, oi) => (
+                          <li key={oi} className={
+                            item.answer && (opt === item.answer || opt.startsWith(item.answer + '.') || opt.startsWith(item.answer + ' '))
+                              ? 'mcq-correct-opt' : ''
+                          }>{opt}</li>
+                        ))}
+                      </ul>
+                    </td>
+                    <td className="mcq-ans">{item.answer}</td>
+                  </tr>
                 ))}
-              </div>
-            </section>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-            <section className="materials-section">
-              <h3>{labels.summaryTitle}</h3>
-              <pre className="mind-map">{materials.summary}</pre>
-            </section>
+      {/* ── Glossary ── */}
+      {glossary.length > 0 && (
+        <div className="card">
+          <div className="b-section-header">
+            <h2 className="b-section-title">📖 {labels.glossaryTitle}</h2>
+            <button className="btn-secondary btn-sm" onClick={handleDownloadGlossary}>{labels.downloadGlossary}</button>
+          </div>
+          <div className="table-responsive">
+            <table className="glossary-table">
+              <thead>
+                <tr><th>Term</th><th>العربية</th><th>Français</th><th>English</th><th>Definition</th></tr>
+              </thead>
+              <tbody>
+                {glossary.map((item, i) => (
+                  <tr key={i}>
+                    <td><strong>{item.term}</strong></td>
+                    <td className="arabic" dir="rtl">{item.arabic || item.ar || ''}</td>
+                    <td>{item.french || item.fr || ''}</td>
+                    <td>{item.english || item.en || ''}</td>
+                    <td className="gloss-def">{item.definition || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-            <section className="materials-section">
-              <h3>{labels.mcqTitle}</h3>
-              {(materials.mcq || []).map((q, i) => (
-                <div key={i} className="mcq-item">
-                  <p className="mcq-question">{i + 1}. {q.question}</p>
-                  <ul className="mcq-options">
-                    {(q.options || []).map((opt, j) => (
-                      <li key={j} className={opt.startsWith(q.answer + '.') || opt.startsWith(q.answer + ' ') ? 'mcq-correct' : ''}>
-                        {opt}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </section>
-
-            <section className="materials-section">
-              <div className="glossary-header">
-                <h3>{labels.glossaryTitle}</h3>
-                <button className="btn-secondary" onClick={handleDownloadGlossary}>
-                  {labels.downloadGlossary}
-                </button>
-              </div>
-              <table className="glossary-table">
-                <thead>
-                  <tr><th>العربية</th><th>Français</th><th>English</th></tr>
-                </thead>
-                <tbody>
-                  {(materials.glossary || []).map((entry, i) => (
-                    <tr key={i}>
-                      <td className="arabic" dir="rtl">{entry.ar}</td>
-                      <td>{entry.fr}</td>
-                      <td>{entry.en}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-
+      {/* ── Key Terms (on demand) ── */}
+      <div className="card">
+        <h2 className="b-section-title">🔑 {labels.keyTerms}</h2>
+        <button className="btn-secondary" onClick={handleGenerateKeyTerms} disabled={keyTermsLoading}>
+          {keyTermsLoading ? labels.generatingMaterials : labels.generateMaterials}
+        </button>
+        {keyTermsError && <div className="error-msg" style={{ marginTop: '0.5rem' }}>{keyTermsError}</div>}
+        {keyTerms && keyTerms.length > 0 && (
+          <div className="key-terms-list">
+            {keyTerms.map((term, i) => (
+              <span key={i} className={`key-term-badge ${isArabic ? 'arabic' : ''}`}>{term}</span>
+            ))}
           </div>
         )}
       </div>
+
     </div>
   );
 }
@@ -1465,7 +1584,11 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
             <input type="file" accept=".mp3,.wav,.m4a,.ogg,.webm" className="file-input"
               onChange={e => {
                 const f = e.target.files[0];
-                if (f) runTranscription(f);
+                if (f) {
+                  setRecordedBlob(f);
+                  onRecordingComplete?.(f);
+                  runTranscription(f);
+                }
               }} />
           </div>
         </details>
@@ -1514,12 +1637,18 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
 
 function ScoreBar({ score }) {
   const pct = Math.round((score / 10) * 100);
-  const color = score >= 7 ? '#1a6b3c' : score >= 5 ? '#b0772f' : '#c0392b';
+  const color = score >= 7 ? '#2D5A4E' : score >= 5 ? '#C8973A' : '#8B3A2A';
+  const circumference = 188.5;
+  const offset = circumference - (circumference * pct / 100);
   return (
-    <div className="score-bar-wrap">
-      <div className="score-number" style={{ color }}>{score.toFixed(1)}<span>/10</span></div>
-      <div className="score-track">
-        <div className="score-fill" style={{ width: `${pct}%`, background: color }} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div className="prog-ring" style={{ width: 64, height: 64 }}>
+        <svg viewBox="0 0 70 70"><circle className="prog-ring-bg" cx="35" cy="35" r="30"/><circle className="prog-ring-fill" cx="35" cy="35" r="30" stroke={color} strokeDasharray={circumference} strokeDashoffset={offset}/></svg>
+        <div className="prog-pct" style={{ fontSize: '0.85rem' }}>{score.toFixed(1)}</div>
+      </div>
+      <div>
+        <div className="score-bar-wrap"><div className="score-bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
+        <div style={{ fontSize: '0.74rem', color: 'var(--warm-gray)', marginTop: '0.3rem' }}>{pct}% — {score >= 7 ? 'Good' : score >= 5 ? 'Acceptable' : 'Needs work'}</div>
       </div>
     </div>
   );
@@ -1730,20 +1859,14 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           language
         });
       }
-      // If full-evaluation returned word scores, attach to lastTranscript for pronunciation panel
+      // Attach pronunciation report for the pronunciation panel
       if (data.pronunciation) {
-        const wordDisplay = (data.pronunciation.words || []).map(w => ({
-          ...w,
-          word: w.word
-        }));
         data._pronunciationForPanel = {
-          word_display:  wordDisplay,
           overall_score: data.pronunciation.overall_score,
-          errors_found:  data.pronunciation.errors_found,
-          summary:       data.pronunciation.overall_score >= 0.8
-            ? 'Good pronunciation confidence.'
-            : `${data.pronunciation.errors_found} word(s) with low confidence.`,
-          whisperx_used: false
+          uncertain_count: data.pronunciation.uncertain_count,
+          flagged_words: data.pronunciation.flagged_words || [],
+          diff_errors: data.pronunciation.diff_errors || [],
+          summary: data.pronunciation.summary,
         };
       }
       setReport(data);
@@ -1827,15 +1950,60 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 </div>
               ))}
             </div>
+            {/* Detail lists */}
+            {(algo.long_silences || []).length > 0 && (
+              <div className="algo-detail-block">
+                <p className="algo-detail-title">🔇 {labels.longSilences}</p>
+                {algo.long_silences.map((s, i) => (
+                  <div key={i} className="algo-detail-row">
+                    <span className="algo-detail-badge algo-badge-warn">{s.duration_seconds}s</span>
+                    <span className="algo-detail-text">at {s.at_seconds}s{s.after_text ? ` after: "${s.after_text}"` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {(algo.repetitions || []).length > 0 && (
+              <div className="algo-detail-block">
+                <p className="algo-detail-title">🔁 {labels.repetitions}</p>
+                {algo.repetitions.map((r, i) => (
+                  <div key={i} className="algo-detail-row">
+                    <span className="algo-detail-badge algo-badge-gold">"{r.word}"</span>
+                    <span className="algo-detail-text">at {r.at_seconds}s · repeated at {r.second_occurrence}s</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {(algo.hesitation_words || []).length > 0 && (
+              <div className="algo-detail-block">
+                <p className="algo-detail-title">🗣️ {labels.hesitations}</p>
+                <div className="algo-chips">
+                  {algo.hesitation_words.map((h, i) => (
+                    <span key={i} className="algo-chip">
+                      "{h.word}" <small>{h.at_seconds !== undefined ? `${h.at_seconds}s` : ''}</small>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(algo.number_errors || []).length > 0 && (
+              <div className="algo-detail-block">
+                <p className="algo-detail-title">🔢 {labels.numberErrors}</p>
+                <div className="algo-chips">
+                  {algo.number_errors.map((n, i) => (
+                    <span key={i} className="algo-chip algo-chip-err">{n}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Coverage score */}
           {report.coverage_score !== undefined && (
             <div className="card">
-              <h3 className="report-section-title">📊 Content coverage</h3>
+              <h3 className="report-section-title">📊 {labels.coverageTitle}</h3>
               <ScoreBar score={report.coverage_score} />
-              <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
-                How much of the source speech was conveyed in the interpretation
+              <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--warm-gray)' }}>
+                {labels.coverageHint}
               </p>
             </div>
           )}
@@ -1843,13 +2011,13 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           {/* Translation errors */}
           {(report.translation_errors || []).length > 0 && (
             <div className="card">
-              <h3 className="report-section-title">🔄 Translation errors</h3>
+              <h3 className="report-section-title">🔄 {labels.translationErrors}</h3>
               {(report.translation_errors || []).map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid #e53e3e', paddingLeft: '0.75rem', marginBottom: '0.75rem' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Source said:</div>
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.sourceSaid}:</div>
                   <div className="eval-text" style={{ marginBottom: '0.25rem' }}>"{item.source_text}"</div>
-                  <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Student said: <strong style={{ color: '#e53e3e' }}>{item.student_said}</strong></div>
-                  <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Correct: <strong style={{ color: '#38a169' }}>{item.correct_translation}</strong></div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.studentSaid}: <strong style={{ color: 'var(--sienna)' }}>{item.student_said}</strong></div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.correctTranslation}: <strong style={{ color: 'var(--sage)' }}>{item.correct_translation}</strong></div>
                   {item.explanation && <div className="eval-explanation">{item.explanation}</div>}
                 </div>
               ))}
@@ -1859,7 +2027,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           {/* Missing content */}
           {(report.missing_content || []).length > 0 && (
             <div className="card">
-              <h3 className="report-section-title">📉 Missing content</h3>
+              <h3 className="report-section-title">📉 {labels.missingContent}</h3>
               {(report.missing_content || []).map((item, i) => (
                 <div key={i} className="eval-item" style={{ marginBottom: '0.5rem' }}>
                   <span className="eval-text">{item.content}</span>
@@ -1869,17 +2037,65 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
-          {/* Pronunciation flags */}
+          {/* Pronunciation Report (EN/FR: full analysis; AR: confidence only) */}
+          {report.pronunciation && (report.pronunciation.uncertain_count > 0 || (report.pronunciation.diff_errors || []).length > 0) && (
+            <div className="card">
+              <h3 className="report-section-title">🔊 {labels.pronunciationTitle}</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--warm-gray)', marginBottom: '0.3rem' }}>{labels.pronunciationScore}</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'Playfair Display, serif', color: report.pronunciation.overall_score >= 0.8 ? 'var(--sage)' : report.pronunciation.overall_score >= 0.65 ? 'var(--gold)' : 'var(--sienna)' }}>
+                    {Math.round(report.pronunciation.overall_score * 100)}%
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.83rem', color: 'var(--warm-gray)', maxWidth: 340 }}>{report.pronunciation.summary}</p>
+              </div>
+
+              {/* Flagged words with notes */}
+              {(report.pronunciation.flagged_words || []).length > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <p style={{ fontSize: '0.74rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--warm-gray)', marginBottom: '0.5rem' }}>{labels.uncertainWords}</p>
+                  <div className="word-grid">
+                    {(report.pronunciation.flagged_words || []).map((w, i) => (
+                      <span key={i} className="word-chip word-poor" title={w.note || ''} style={{ cursor: w.note ? 'help' : 'default' }}>
+                        {w.word} <small style={{ opacity: 0.7 }}>{Math.round(w.score * 100)}%</small>
+                      </span>
+                    ))}
+                  </div>
+                  {(report.pronunciation.flagged_words || []).filter(w => w.note).slice(0, 3).map((w, i) => (
+                    <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.6rem', marginTop: '0.4rem' }}>
+                      <strong style={{ fontSize: '0.84rem' }}>"{w.word}"</strong>
+                      <div className="eval-explanation">{w.note}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Reference diffing errors (EN/FR) */}
+              {(report.pronunciation.diff_errors || []).length > 0 && (
+                <div>
+                  <p style={{ fontSize: '0.74rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--warm-gray)', marginBottom: '0.5rem' }}>{labels.pronunciationMismatches}</p>
+                  {(report.pronunciation.diff_errors || []).slice(0, 5).map((e, i) => (
+                    <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.6rem', marginBottom: '0.4rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--warm-gray)' }}>{e.type}: </span>
+                      {e.expected && <span style={{ fontSize: '0.84rem' }}>expected <strong style={{ color: 'var(--sage)' }}>"{e.expected}"</strong></span>}
+                      {e.said && <span style={{ fontSize: '0.84rem' }}> · said <strong style={{ color: 'var(--sienna)' }}>"{e.said}"</strong></span>}
+                      {e.note && <div className="eval-explanation">{e.note}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* LLM pronunciation flags (from LLM analysis) */}
           {(report.pronunciation_flags || []).length > 0 && (
             <div className="card">
-              <h3 className="report-section-title">🔊 Pronunciation flags</h3>
-              <p style={{ fontSize: '0.82rem', color: '#666', marginBottom: '0.75rem' }}>
-                Words Whisper was uncertain about — may indicate unclear or incorrect pronunciation
-              </p>
+              <h3 className="report-section-title">🗣 AI pronunciation analysis</h3>
               {(report.pronunciation_flags || []).map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid #ed8936', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
                   <strong>"{item.word}"</strong>
-                  {item.confidence !== undefined && <span style={{ fontSize: '0.78rem', color: '#888', marginLeft: '0.5rem' }}>confidence: {(item.confidence * 100).toFixed(0)}%</span>}
+                  {item.confidence !== undefined && <span style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginLeft: '0.5rem' }}>{Math.round(item.confidence * 100)}% confidence</span>}
                   {item.likely_issue && <div className="eval-explanation">{item.likely_issue}</div>}
                 </div>
               ))}

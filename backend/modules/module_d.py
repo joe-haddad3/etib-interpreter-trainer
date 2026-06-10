@@ -188,62 +188,112 @@ def detect_repetitions_from_text(full_text: str) -> list:
     return repetitions
 
 
-def detect_long_silences(segments: list, threshold_seconds: float = 1.5) -> list:
+def detect_long_silences(segments: list, threshold_seconds: float = 1.0) -> list:
     """
     Detect gaps between segments longer than threshold.
+    Uses 1.0s default — meaningful for interpretation training.
+    Also detects leading silence (student slow to start).
     """
     silences = []
+    if not segments:
+        return silences
+
+    # Leading silence: if first segment starts after threshold
+    if segments[0]['start'] >= threshold_seconds:
+        silences.append({
+            'at_seconds': 0.0,
+            'duration_seconds': round(segments[0]['start'], 1),
+            'after_text': '[start of recording]',
+            'type': 'leading'
+        })
+
     for i in range(len(segments) - 1):
-        gap = segments[i + 1]['start'] - segments[i]['end']
+        gap = round(segments[i + 1]['start'] - segments[i]['end'], 2)
         if gap >= threshold_seconds:
             silences.append({
                 'at_seconds': round(segments[i]['end'], 1),
-                'duration_seconds': round(gap, 1),
-                'after_text': segments[i]['text'][-60:]
+                'duration_seconds': gap,
+                'after_text': segments[i].get('text', '')[-60:].strip(),
+                'type': 'mid'
             })
     return silences
 
 
 def detect_repetitions(segments: list) -> list:
     """
-    Detect immediately repeated words (e.g. 'the the', 'في في').
-    Simple consecutive-duplicate check on all words across all segments.
+    Detect word repetitions:
+    - Immediate repetitions (the the)
+    - Near repetitions: same word within a 6-word window (I think... I think)
+    - Short phrase repetitions (2-3 word sequences)
     """
     all_words = []
     for seg in segments:
         for w in seg.get('words', []):
-            clean = w['word'].strip().lower()
-            if clean:
-                all_words.append({'word': clean, 'start': w['start']})
+            clean = re.sub(r'[^\w]', '', w['word'].strip().lower())
+            if clean and len(clean) > 1:
+                all_words.append({'word': clean, 'start': w.get('start', 0)})
+
+    if not all_words:
+        return []
 
     repetitions = []
-    for i in range(len(all_words) - 1):
-        if all_words[i]['word'] == all_words[i + 1]['word']:
-            repetitions.append({
-                'word': all_words[i]['word'],
-                'at_seconds': round(all_words[i]['start'], 1)
-            })
+    seen_positions = set()
+    WINDOW = 8
+    STOP_WORDS = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'of',
+                  'is', 'was', 'are', 'were', 'i', 'it', 'that', 'this', 'with', 'for',
+                  'les', 'le', 'la', 'des', 'de', 'du', 'et', 'en', 'un', 'une',
+                  'je', 'il', 'elle', 'nous', 'que', 'qui', 'dans'}
+
+    for i in range(len(all_words)):
+        if i in seen_positions:
+            continue
+        word = all_words[i]['word']
+        if word in STOP_WORDS or len(word) < 3:
+            continue
+        # Look ahead in window
+        for j in range(i + 1, min(i + WINDOW, len(all_words))):
+            if j in seen_positions:
+                continue
+            if all_words[j]['word'] == word:
+                repetitions.append({
+                    'word': word,
+                    'at_seconds': round(all_words[i]['start'], 1),
+                    'second_occurrence': round(all_words[j]['start'], 1),
+                    'gap_words': j - i
+                })
+                seen_positions.add(i)
+                seen_positions.add(j)
+                break
+
     return repetitions
 
 
 def detect_hesitation_words(segments: list, language: str = 'ar') -> list:
     """
-    Detect filler / hesitation words in the transcript.
-    Language-specific filler word lists.
+    Detect filler / hesitation words with comprehensive per-language lists.
     """
     fillers = {
-        'ar': ['آ', 'إ', 'أقصد', 'يعني', 'آآ', 'إإ'],
-        'fr': ['euh', 'heu', "c'est-à-dire", 'voilà', 'donc'],
-        'en': ['um', 'uh', 'er', 'like', 'you know', 'i mean']
+        'ar': {'آ', 'إ', 'أقصد', 'يعني', 'آآ', 'إإ', 'أممم', 'ممم', 'اممم'},
+        'fr': {'euh', 'heu', 'hem', 'hm', 'ben', 'beh', 'voilà', 'donc', 'quoi',
+               'enfin', 'genre', 'disons', 'comment', 'bref'},
+        'en': {'um', 'uh', 'er', 'hmm', 'hm', 'like', 'basically', 'literally',
+               'actually', 'right', 'okay', 'so', 'well', 'anyway', 'you know'}
     }
-    filler_list = fillers.get(language, fillers['en'])
+    # Lebanese Arabic students use French and English fillers too
+    if language == 'ar':
+        filler_set = fillers['ar'] | {'euh', 'heu', 'um', 'uh', 'hmm'}
+    else:
+        filler_set = fillers.get(language, fillers['en'])
+
     found = []
     for seg in segments:
         for w in seg.get('words', []):
-            if w['word'].strip().lower() in filler_list:
+            clean = w['word'].strip().lower().rstrip('.,!?')
+            if clean in filler_set:
                 found.append({
                     'word': w['word'].strip(),
-                    'at_seconds': round(w['start'], 1)
+                    'at_seconds': round(w.get('start', 0), 1),
+                    'confidence': round(w.get('probability', 1.0), 3)
                 })
     return found
 
@@ -263,6 +313,83 @@ def detect_low_confidence_words(segments: list, threshold: float = 0.6) -> list:
                     'confidence': w['probability']
                 })
     return low_conf
+
+
+def build_pronunciation_report(all_word_scores: list, language: str, source_script: str = '', transcript_text: str = '') -> dict:
+    """
+    Build a pronunciation report for EN/FR using:
+    1. Whisper word confidence (low confidence = likely mispronounced)
+    2. Reference text diffing against source translation (substitutions/omissions)
+    3. Language-specific common error patterns
+    """
+    import difflib
+
+    uncertain = [w for w in all_word_scores if w['grade'] == 'poor']
+    warn_words = [w for w in all_word_scores if w['grade'] == 'warn']
+    overall = (sum(w['score'] for w in all_word_scores) / len(all_word_scores)) if all_word_scores else 0
+
+    # Reference diffing (if source available — for sight translation or reading tasks)
+    diff_errors = []
+    if source_script and transcript_text and language != 'ar':
+        src_words = re.findall(r'\w+', source_script.lower())
+        trn_words = re.findall(r'\w+', transcript_text.lower())
+        matcher = difflib.SequenceMatcher(None, src_words, trn_words, autojunk=False)
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == 'replace' and (i2 - i1) <= 3:
+                diff_errors.append({
+                    'type': 'substitution',
+                    'expected': ' '.join(src_words[i1:i2]),
+                    'said': ' '.join(trn_words[j1:j2]),
+                    'note': 'Word substitution — possible mispronunciation or wrong term'
+                })
+            elif tag == 'delete' and (i2 - i1) <= 2:
+                diff_errors.append({
+                    'type': 'omission',
+                    'expected': ' '.join(src_words[i1:i2]),
+                    'said': '',
+                    'note': 'Word omitted from interpretation'
+                })
+
+    # Language-specific patterns flagged from uncertain words
+    flagged = []
+    for w in uncertain:
+        note = ''
+        word = w['word'].lower()
+        if language == 'fr':
+            if word.endswith('ent') and len(word) > 5:
+                note = 'Verb ending -ent is silent — check liaison'
+            elif word in ('les', 'des', 'mes', 'ses', 'ces'):
+                note = 'Liaison with next vowel required'
+            elif any(word.endswith(s) for s in ('tion', 'sion')):
+                note = 'French -tion/-sion pronounced /sjɔ̃/ — not like English'
+        elif language == 'en':
+            if len(word) > 7:
+                note = 'Complex word — check stress pattern'
+            elif word.endswith('ed'):
+                note = '-ed suffix: /t/, /d/ or /ɪd/ depending on preceding sound'
+            elif word.endswith('ough'):
+                note = 'Irregular -ough spelling (through/though/thought all differ)'
+        flagged.append({
+            'word': w['word'],
+            'start': w.get('start', 0),
+            'confidence': w['score'],
+            'grade': 'poor',
+            'note': note or f'Low recognition confidence ({int(w["score"]*100)}%) — review pronunciation'
+        })
+
+    return {
+        'overall_score': round(overall, 3),
+        'total_words': len(all_word_scores),
+        'uncertain_count': len(uncertain),
+        'warn_count': len(warn_words),
+        'flagged_words': flagged,
+        'diff_errors': diff_errors[:10],
+        'summary': (
+            f'Good pronunciation confidence ({int(overall*100)}%).'
+            if overall >= 0.8
+            else f'{len(uncertain)} word(s) flagged with low confidence ({int(overall*100)}% average). Review highlighted words.'
+        )
+    }
 
 
 def detect_number_errors(source_script: str, transcript_text: str) -> list:
@@ -395,8 +522,10 @@ def generate_feedback():
         rep_examples  = ', '.join(f'"{r["word"]}"' for r in (algo.get('repetitions', [])[:3]))
         hes_examples  = ', '.join(f'"{h["word"]}"' for h in (algo.get('hesitation_words', [])[:3]))
 
+        lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
         prompt = LLM_ANALYSIS_PROMPT.format(
-            language={'ar': 'Arabic', 'fr': 'French', 'en': 'English'}.get(language, language),
+            source_language=lang_names.get(data.get('source_language', language), language),
+            target_language=lang_names.get(language, language),
             source=source_script or '(source speech not provided)',
             transcript=transcript_text,
             silence_count=s.get('silence_count', 0),
@@ -404,7 +533,8 @@ def generate_feedback():
             repetition_examples=rep_examples or 'none found automatically',
             hesitation_count=s.get('hesitation_count', 0),
             hesitation_examples=hes_examples or 'none found automatically',
-            number_errors=s.get('number_errors', 0)
+            number_errors=s.get('number_errors', 0),
+            uncertain_words='(not available in text-only mode)',
         )
 
         response = client.chat.completions.create(
@@ -480,9 +610,13 @@ def full_evaluation():
             language=language,
             task='transcribe',
             word_timestamps=True,
-            vad_filter=True,
-            vad_parameters={'min_silence_duration_ms': 500},
+            vad_filter=False,               # disabled: preserves silence gaps between segments
+            suppress_tokens=[],             # preserve fillers/repetitions, no normalization
             condition_on_previous_text=False,
+            compression_ratio_threshold=100.0,  # disable repetition fallback — keeps repeated words
+            log_prob_threshold=-100.0,          # disable low-prob fallback — keeps hesitations
+            temperature=0.0,                    # greedy decoding — no randomness
+            beam_size=1,                        # greedy: prevents beam search from collapsing repetitions
         )
 
         full_text = ''
@@ -575,19 +709,14 @@ def full_evaluation():
             'summary':          s
         }
 
-        # Step 4: Pronunciation scores from word data
-        overall_pronun = (
-            sum(w['score'] for w in all_word_scores) / len(all_word_scores)
-            if all_word_scores else 0
+        # Step 4: Pronunciation report (EN/FR: full diffing + patterns; AR: whisper scores only)
+        pronun_report = build_pronunciation_report(
+            all_word_scores,
+            language=language,
+            source_script=source_script if language != 'ar' else '',
+            transcript_text=full_text if language != 'ar' else ''
         )
-        uncertain_words = [w for w in all_word_scores if w['grade'] == 'poor']
-
-        llm_result['pronunciation'] = {
-            'words':         all_word_scores,
-            'uncertain':     uncertain_words,
-            'overall_score': round(overall_pronun, 3),
-            'errors_found':  len(uncertain_words)
-        }
+        llm_result['pronunciation'] = pronun_report
         llm_result['transcript'] = transcript
 
         return jsonify(llm_result)

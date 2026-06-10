@@ -11,9 +11,10 @@ import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
-from config import LLM_PROVIDER, LOCAL_MODEL_ID, REMOTE_AYA_URL
 
-load_dotenv()
+load_dotenv(override=True)
+
+from config import LLM_PROVIDER, LOCAL_MODEL_ID, REMOTE_AYA_URL
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-change-in-prod')

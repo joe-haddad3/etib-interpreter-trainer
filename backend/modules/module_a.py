@@ -97,7 +97,7 @@ Parameters:
 - Source/speech language: {LANGUAGE_NAMES.get(language, 'English')}
 - Interpretation target language: {LANGUAGE_NAMES.get(target_language, 'French')}
 - Domain: {domain}
-- Target length: {word_count} words
+- REQUIRED script length: {word_count} words (STRICTLY enforced — count carefully, do not stop before reaching {word_count} words in the script field)
 - Difficulty: {difficulty}
 - Discourse structure: {structure}
 - Scenario: {scenario}
@@ -119,7 +119,9 @@ Rules:
 - The "arabic" field must contain Arabic script, not transliteration and not an empty string.
 - Write exactly as a speaker would deliver the script at a real {scenario}.
 - Match the rhetorical register of that scenario.
-- Return 3 MCQs and 8 to 12 glossary terms.
+- The "script" field MUST be at least {word_count} words long — expand arguments, add examples, statistics, and elaboration until you reach {word_count} words. A {word_count}-word speech should fill multiple paragraphs.
+- Return 5 MCQs and 8 to 12 glossary terms.
+- MCQ rules: each question MUST test deep comprehension of a SPECIFIC argument, position, number, date, cause-effect, or recommendation stated in the script. NEVER ask surface-level questions like "what is the topic?" or "what language is this speech in?" or "who gave this speech?". Ask about: exact statistics or figures mentioned, specific policy positions or decisions, named organisations or countries, cause-effect relationships stated in the speech, specific proposed solutions or recommendations, chronological or logical order of arguments.
 - Use this exact JSON shape:
 {{
   "script": "string",
@@ -149,10 +151,13 @@ Rules:
 
     if language == 'ar':
         prompt += """
-Arabic requirements:
-- Write entirely in Modern Standard Arabic. Do not use dialect.
-- Do not use English or French terms when Arabic equivalents exist.
+Arabic requirements — STRICTLY ENFORCED:
+- Write the script ENTIRELY in Modern Standard Arabic (فصحى). Absolutely no dialect.
+- FORBIDDEN: Do NOT include any Latin letters (A-Z, a-z), French words, English words, Chinese characters, Vietnamese characters, or ANY non-Arabic script inside the "script" field.
+- Every single word in the script must use only Arabic Unicode characters (Arabic script ا-ي and punctuation).
+- If you need to mention a foreign organisation name, transliterate it into Arabic script (e.g. الأمم المتحدة, الاتحاد الأوروبي).
 - Maintain a formal conference register throughout.
+- If you find yourself writing a Latin letter in the script, stop and replace it with the Arabic equivalent immediately.
 """
 
     if hesitations:
@@ -166,7 +171,29 @@ Arabic requirements:
     return prompt
 
 
-def parse_generation_output(raw_output: str) -> dict:
+def _clean_arabic_script(text: str) -> str:
+    """Remove stray Latin/CJK characters from an Arabic script field."""
+    import unicodedata
+    result = []
+    for char in text:
+        cat = unicodedata.category(char)
+        block = ord(char)
+        # Keep: Arabic (0600-06FF), Arabic supplement/extended, Arabic presentation forms,
+        # spaces, punctuation, digits (Western + Arabic-Indic), newlines
+        is_arabic = 0x0600 <= block <= 0x06FF or 0xFB50 <= block <= 0xFDFF or 0xFE70 <= block <= 0xFEFF
+        is_space = char in ' \n\r\t،؛؟!.,،:()[]«»"\'–—'
+        is_digit = char.isdigit()
+        if is_arabic or is_space or is_digit:
+            result.append(char)
+        else:
+            # Replace stray foreign character with a space to avoid word merging
+            result.append(' ')
+    # Collapse multiple spaces
+    import re as _re
+    return _re.sub(r' {2,}', ' ', ''.join(result)).strip()
+
+
+def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
     """Parse model JSON and fall back to treating the output as script text."""
     text = clean_model_json_text(raw_output)
     data = parse_json_like_object(text)
@@ -174,10 +201,27 @@ def parse_generation_output(raw_output: str) -> dict:
     if not isinstance(data, dict):
         data = {'script': text}
 
+    def clean(s: str) -> str:
+        return _clean_arabic_script(str(s).strip()) if language == 'ar' else str(s).strip()
+
+    script = clean(data.get('script', ''))
+
+    # Clean MCQ text to remove stray foreign characters
+    raw_mcqs = data.get('mcqs') if isinstance(data.get('mcqs'), list) else []
+    mcqs = []
+    for item in raw_mcqs:
+        if not isinstance(item, dict):
+            continue
+        mcqs.append({
+            'question': clean(item.get('question', '')),
+            'options':  [clean(opt) for opt in (item.get('options') or [])],
+            'answer':   clean(item.get('answer', '')),
+        })
+
     return {
-        'script': str(data.get('script', '')).strip(),
-        'summary': str(data.get('summary', '')).strip(),
-        'mcqs': data.get('mcqs') if isinstance(data.get('mcqs'), list) else [],
+        'script':   script,
+        'summary':  clean(data.get('summary', '')),
+        'mcqs':     mcqs,
         'glossary': normalize_glossary(data.get('glossary')),
         'metadata': data.get('metadata') if isinstance(data.get('metadata'), dict) else {},
     }
@@ -469,6 +513,9 @@ def generate_speech():
 
     try:
         prompt = build_prompt(params)
+        word_count_val = params.get('word_count', 250)
+        # Scale max_tokens: speech tokens ≈ 1.5× word count for Arabic, plus ~800 for MCQ+glossary JSON
+        max_tok = min(6000, max(2800, int(word_count_val * 2) + 1200))
         raw_output = generate_text(
             messages=[
                 {
@@ -480,10 +527,10 @@ def generate_speech():
                 },
                 {'role': 'user', 'content': prompt},
             ],
-            max_tokens=2600,
+            max_tokens=max_tok,
             temperature=0.7,
         )
-        generated = parse_generation_output(raw_output)
+        generated = parse_generation_output(raw_output, language=params.get('language', 'ar'))
         return jsonify(build_generation_response(generated, params))
 
     except Exception as exc:
@@ -591,6 +638,8 @@ def generate_from_document():
         params['topic'] = topic
         prompt = build_structured_material_prompt(params, topic=topic, excerpts=selected_chunks)
 
+        word_count_val = params.get('word_count', 250)
+        max_tok = min(6000, max(2800, int(word_count_val * 2) + 1200))
         raw_output = generate_text(
             messages=[
                 {
@@ -602,11 +651,11 @@ def generate_from_document():
                 },
                 {'role': 'user', 'content': prompt},
             ],
-            max_tokens=2600,
+            max_tokens=max_tok,
             temperature=0.7,
         )
 
-        generated = parse_generation_output(raw_output)
+        generated = parse_generation_output(raw_output, language=params.get('language', 'ar'))
         return jsonify(build_generation_response(
             generated,
             params,
