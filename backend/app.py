@@ -35,13 +35,15 @@ from modules.module_a import module_a_bp
 from modules.module_b import module_b_bp
 from modules.module_c import module_c_bp
 from modules.module_d import module_d_bp
+from modules.module_library import module_library_bp
 from modules.auth import auth_bp
 
-app.register_blueprint(module_a_bp, url_prefix='/api/module-a')
-app.register_blueprint(module_b_bp, url_prefix='/api/module-b')
-app.register_blueprint(module_c_bp, url_prefix='/api/module-c')
-app.register_blueprint(module_d_bp, url_prefix='/api/module-d')
-app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(module_a_bp,       url_prefix='/api/module-a')
+app.register_blueprint(module_b_bp,       url_prefix='/api/module-b')
+app.register_blueprint(module_c_bp,       url_prefix='/api/module-c')
+app.register_blueprint(module_d_bp,       url_prefix='/api/module-d')
+app.register_blueprint(module_library_bp, url_prefix='/api/library')
+app.register_blueprint(auth_bp,           url_prefix='/api/auth')
 
 # ── Health check ────────────────────────────────────────────────────────────
 @app.route('/health')

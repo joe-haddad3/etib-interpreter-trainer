@@ -179,6 +179,38 @@ export async function generateFeedback(params) {
   return parseJsonResponse(res);
 }
 
+// ── UN Library ───────────────────────────────────────────────────────────────
+
+export async function searchUNLibrary({ q, language, domain, limit = 10 }) {
+  const params = new URLSearchParams({ language, limit });
+  if (q) params.append('q', q);
+  if (domain) params.append('domain', domain);
+  const res = await fetch(`${BASE}/library/search?${params}`);
+  return parseJsonResponse(res);
+}
+
+export async function fetchUNDocument({ pdf_url, web_url, un_id, title, language }) {
+  const res = await fetch(`${BASE}/library/fetch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdf_url, web_url, un_id, title, language }),
+  });
+  return parseJsonResponse(res);
+}
+
+export async function getSavedSpeeches({ language, domain } = {}) {
+  const params = new URLSearchParams();
+  if (language) params.append('language', language);
+  if (domain)   params.append('domain', domain);
+  const res = await fetch(`${BASE}/library/saved?${params}`);
+  return parseJsonResponse(res);
+}
+
+export async function getSavedSpeech(un_id) {
+  const res = await fetch(`${BASE}/library/saved/${un_id}`);
+  return parseJsonResponse(res);
+}
+
 export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage) {
   const form = new FormData();
   form.append('audio', audioFile, audioFile.name || 'recording.webm');

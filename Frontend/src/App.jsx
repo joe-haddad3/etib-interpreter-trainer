@@ -16,6 +16,10 @@ import {
   tashkeelCompare,
   alignPronunciation,
   getPronunciationReport,
+  searchUNLibrary,
+  fetchUNDocument,
+  getSavedSpeeches,
+  getSavedSpeech,
 } from './api.js';
 
 const UI = {
@@ -978,6 +982,143 @@ function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedSc
   );
 }
 
+// ── UN Library Panel ─────────────────────────────────────────────────────────
+
+function UNLibraryPanel({ language, domain, onSelect, onClose }) {
+  const [query, setQuery]         = useState('');
+  const [results, setResults]     = useState([]);
+  const [saved, setSaved]         = useState([]);
+  const [tab, setTab]             = useState('search'); // 'search' | 'saved'
+  const [status, setStatus]       = useState('idle');   // 'idle'|'searching'|'fetching'
+  const [fetchingId, setFetchingId] = useState(null);
+  const [error, setError]         = useState('');
+
+  useEffect(() => {
+    getSavedSpeeches({ language }).then(d => setSaved(d.saved || [])).catch(() => {});
+  }, [language]);
+
+  async function handleSearch(e) {
+    e.preventDefault();
+    if (!query.trim() && !domain) return;
+    setStatus('searching'); setError(''); setResults([]);
+    try {
+      const data = await searchUNLibrary({ q: query, language, domain, limit: 12 });
+      setResults(data.results || []);
+      if (!data.results?.length) setError('No results found. Try different keywords.');
+    } catch (err) {
+      setError(err.message);
+    } finally { setStatus('idle'); }
+  }
+
+  async function handleFetch(item) {
+    setFetchingId(item.un_id); setError('');
+    try {
+      const data = await fetchUNDocument({
+        pdf_url: item.pdf_url, web_url: item.web_url,
+        un_id: item.un_id, title: item.title, language,
+      });
+      setSaved(prev => [{ ...data }, ...prev.filter(s => s.un_id !== data.un_id)]);
+      onSelect({ text: data.text, title: data.title, un_id: data.un_id, source: 'UN Digital Library' });
+      onClose();
+    } catch (err) {
+      setError(`Could not load: ${err.message}`);
+    } finally { setFetchingId(null); }
+  }
+
+  async function handleUseSaved(item) {
+    setFetchingId(item.un_id); setError('');
+    try {
+      const data = await getSavedSpeech(item.un_id);
+      onSelect({ text: data.text, title: data.title, un_id: data.un_id, source: 'UN Digital Library' });
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally { setFetchingId(null); }
+  }
+
+  return (
+    <div className="library-overlay">
+      <div className="library-panel">
+        <div className="library-header">
+          <h2 className="library-title">🇺🇳 UN Digital Library</h2>
+          <button className="library-close" onClick={onClose}>✕</button>
+        </div>
+        <p className="library-subtitle">Search real UN speeches to use as grounding for speech generation.</p>
+
+        <div className="library-tabs">
+          <button className={`lib-tab ${tab === 'search' ? 'lib-tab-active' : ''}`} onClick={() => setTab('search')}>Search</button>
+          <button className={`lib-tab ${tab === 'saved' ? 'lib-tab-active' : ''}`} onClick={() => setTab('saved')}>
+            Saved ({saved.length})
+          </button>
+        </div>
+
+        {tab === 'search' && (
+          <>
+            <form className="library-search-form" onSubmit={handleSearch}>
+              <input
+                className="library-search-input"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="e.g. climate change, human rights, economic development…"
+              />
+              <button type="submit" className="btn-primary" disabled={status === 'searching'}>
+                {status === 'searching' ? 'Searching…' : 'Search'}
+              </button>
+            </form>
+
+            {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{error}</div>}
+
+            <div className="library-results">
+              {results.map(item => (
+                <div key={item.un_id} className="library-result-card">
+                  <div className="lib-result-title">{item.title}</div>
+                  <div className="lib-result-meta">
+                    {item.date && <span>📅 {item.date}</span>}
+                    {item.web_url && <a href={item.web_url} target="_blank" rel="noreferrer" className="lib-result-link">View on UN site ↗</a>}
+                  </div>
+                  {item.description && <p className="lib-result-desc">{item.description}</p>}
+                  <button
+                    className="btn-primary lib-use-btn"
+                    disabled={fetchingId === item.un_id || !item.pdf_url}
+                    onClick={() => handleFetch(item)}
+                    title={!item.pdf_url ? 'No PDF available for this record' : ''}
+                  >
+                    {fetchingId === item.un_id ? 'Loading…' : item.pdf_url ? '▷ Use this speech' : 'No PDF'}
+                  </button>
+                </div>
+              ))}
+              {status === 'idle' && !results.length && !error && (
+                <p className="lib-empty">Search for a topic above to find UN speeches.</p>
+              )}
+            </div>
+          </>
+        )}
+
+        {tab === 'saved' && (
+          <div className="library-results">
+            {saved.length === 0 && <p className="lib-empty">No speeches saved yet. Search and load one first.</p>}
+            {saved.map(item => (
+              <div key={item.un_id} className="library-result-card">
+                <div className="lib-result-title">{item.title}</div>
+                <div className="lib-result-meta">
+                  {item.word_count && <span>📝 {item.word_count} words</span>}
+                  {item.language && <span>🌐 {item.language.toUpperCase()}</span>}
+                  {item.saved_at && <span>💾 {new Date(item.saved_at).toLocaleDateString()}</span>}
+                </div>
+                <button className="btn-primary lib-use-btn"
+                  disabled={fetchingId === item.un_id}
+                  onClick={() => handleUseSaved(item)}>
+                  {fetchingId === item.un_id ? 'Loading…' : '▷ Use this speech'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ModuleA({ labels, onGenerated, isRtl }) {
   const [form, setForm] = useState(initialSpeechForm);
   const [documentFile, setDocumentFile] = useState(null);
@@ -986,6 +1127,8 @@ function ModuleA({ labels, onGenerated, isRtl }) {
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [librarySource, setLibrarySource] = useState(null); // {text, title, un_id}
   const fileInputRef = useRef(null);
   const isLoading = status === 'loading';
 
@@ -1008,6 +1151,22 @@ function ModuleA({ labels, onGenerated, isRtl }) {
     try {
       if (!documentFile) throw new Error('Choose a TXT, DOCX, or PDF document first.');
       const data = await generateSpeechFromDocument(documentFile, { ...form, word_count: Number(form.word_count) });
+      setResult(data); onGenerated(data); setStatus('success');
+    } catch (err) { setError(err.message); setStatus('error'); }
+  }
+
+  async function handleLibraryGenerate() {
+    if (!librarySource?.text) return;
+    setStatus('loading'); setError(''); setResult(null);
+    try {
+      // Convert the extracted UN speech text into a Blob/File and use from-document endpoint
+      const blob = new Blob([librarySource.text], { type: 'text/plain' });
+      const file = new File([blob], `${librarySource.un_id || 'un-speech'}.txt`, { type: 'text/plain' });
+      const data = await generateSpeechFromDocument(file, {
+        ...form,
+        word_count: Number(form.word_count),
+        topic: form.topic || librarySource.title,
+      });
       setResult(data); onGenerated(data); setStatus('success');
     } catch (err) { setError(err.message); setStatus('error'); }
   }
@@ -1067,6 +1226,14 @@ function ModuleA({ labels, onGenerated, isRtl }) {
           <div className="file-chip">
             <span>📄 {documentFile.name}</span>
             <button type="button" className="file-chip-remove" onClick={() => { setDocumentFile(null); setRetrievalResult(null); }}>×</button>
+          </div>
+        )}
+
+        {/* ── UN Library source chip ── */}
+        {librarySource && (
+          <div className="file-chip file-chip-un">
+            <span>🇺🇳 {librarySource.title.slice(0, 60)}{librarySource.title.length > 60 ? '…' : ''}</span>
+            <button type="button" className="file-chip-remove" onClick={() => setLibrarySource(null)}>×</button>
           </div>
         )}
 
@@ -1145,7 +1312,14 @@ function ModuleA({ labels, onGenerated, isRtl }) {
 
         {/* ── Action buttons ── */}
         <div className="action-row">
-          {documentFile ? (
+          <button type="button" className="btn-un-library" onClick={() => setShowLibrary(true)} disabled={isLoading}>
+            🇺🇳 UN Library
+          </button>
+          {librarySource ? (
+            <button type="button" className="btn-primary" onClick={handleLibraryGenerate} disabled={isLoading}>
+              {isLoading ? labels.generating : '▷ Generate from UN speech'}
+            </button>
+          ) : documentFile ? (
             <>
               <button type="button" className="btn-secondary" onClick={handleRetrieveContext} disabled={isLoading}>
                 Preview context
@@ -1166,6 +1340,15 @@ function ModuleA({ labels, onGenerated, isRtl }) {
       {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{labels.errorPrefix}: {error}</div>}
       {retrievalResult && <RetrievalResult data={retrievalResult} labels={labels} />}
       {result && <SpeechResult data={result} labels={labels} />}
+
+      {showLibrary && (
+        <UNLibraryPanel
+          language={form.language}
+          domain={form.domain}
+          onSelect={src => { setLibrarySource(src); setDocumentFile(null); }}
+          onClose={() => setShowLibrary(false)}
+        />
+      )}
     </div>
   );
 }

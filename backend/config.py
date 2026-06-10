@@ -71,6 +71,10 @@ SILENCE_THRESHOLD_MS = 500        # gaps > 500ms flagged as possible omission
 UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', './uploads')
 AUDIO_OUTPUT_FOLDER = os.getenv('AUDIO_OUTPUT_FOLDER', './audio_outputs')
 
+# ── MongoDB ─────────────────────────────────────────────────────────────────
+MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017')
+MONGODB_DB  = os.getenv('MONGODB_DB',  'etib_interpreter_trainer')
+
 # ── Speech generation defaults ───────────────────────────────────────────────
 DEFAULT_WORD_COUNT = 250
 DEFAULT_WPM = 120           # words per minute delivery rate
