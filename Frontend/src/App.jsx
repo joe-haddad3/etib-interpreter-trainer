@@ -53,6 +53,8 @@ const UI = {
     navC: 'Record & transcribe',
     navD: 'Evaluation',
     moduleATitle: 'Generate training speech',
+    groundedSourceLabel: 'Grounded in real UN document:',
+    ungroundedNote: 'No matching UN document was found — this speech was generated without source grounding.',
     language: 'Speech language',
     targetLanguage: 'Target language',
     topic: 'Topic',
@@ -225,6 +227,8 @@ const UI = {
     navC: 'التسجيل والتفريغ',
     navD: 'التقييم',
     moduleATitle: 'توليد خطاب تدريبي',
+    groundedSourceLabel: 'مستند إلى وثيقة أممية حقيقية:',
+    ungroundedNote: 'لم يتم العثور على وثيقة أممية مطابقة — تم إنشاء هذا الخطاب دون الاستناد إلى مصدر.',
     language: 'لغة الخطاب',
     targetLanguage: 'لغة الترجمة الهدف',
     topic: 'الموضوع',
@@ -397,6 +401,8 @@ const UI = {
     navC: 'Enregistrer et transcrire',
     navD: 'Évaluation',
     moduleATitle: 'Générer un discours d’entraînement',
+    groundedSourceLabel: 'Basé sur un document réel de l’ONU :',
+    ungroundedNote: 'Aucun document de l’ONU correspondant n’a été trouvé — ce discours a été généré sans source.',
     language: 'Langue du discours',
     targetLanguage: 'Langue cible',
     domain: 'Domaine',
@@ -660,16 +666,18 @@ function ThreeBackground() {
 
     const globe = new THREE.Mesh(
       new THREE.SphereGeometry(2.2, 64, 64),
-      new THREE.MeshStandardMaterial({ color: 0xC8973A, wireframe: true, transparent: true, opacity: 0.08 })
+      new THREE.MeshStandardMaterial({ color: 0xC8973A, wireframe: true, transparent: true, opacity: 0.32, wireframeLinewidth: 0.015 })
     );
-    globe.position.set(3, -0.5, -2);
+    globe.position.set(1.8, 0, -2);
+    globe.scale.setScalar(0.6);
     scene.add(globe);
 
     const inner = new THREE.Mesh(
       new THREE.SphereGeometry(1.8, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0x2D5A4E, wireframe: true, transparent: true, opacity: 0.05 })
+      new THREE.MeshStandardMaterial({ color: 0x2D5A4E, wireframe: true, transparent: true, opacity: 0.32, wireframeLinewidth: 0.015 })
     );
-    inner.position.set(3, -0.5, -2);
+    inner.position.set(1.8, 0, -2);
+    inner.scale.setScalar(0.6);
     scene.add(inner);
 
     const pCount = 120;
@@ -688,7 +696,8 @@ function ThreeBackground() {
       new THREE.TorusGeometry(2.8, 0.012, 8, 100),
       new THREE.MeshBasicMaterial({ color: 0xC8973A, transparent: true, opacity: 0.12 })
     );
-    ring.position.set(3, -0.5, -2);
+    ring.position.set(1.8, 0, -2);
+    ring.scale.setScalar(0.6);
     ring.rotation.x = Math.PI / 3;
     scene.add(ring);
 
@@ -866,25 +875,27 @@ function LoginScreen({ labels, onLogin, onSignup }) {
     <section className="hero fade-up delay-1">
       {/* Left: marketing copy */}
       <div className="hero-text">
-        <div className="lang-pills">
-          <span className="pill pill-ar">عربي</span>
-          <span className="pill pill-fr">Français</span>
-          <span className="pill pill-en">English</span>
+        <div className="lang-tabs">
+          <span className="lang-tabs-label">Train in:</span>
+          <span className="lang-tab lang-tab-ar">عربي</span>
+          <span className="lang-tab lang-tab-fr">Français</span>
+          <span className="lang-tab lang-tab-en">English</span>
         </div>
         <h1>Master interpretation with <em>AI-generated</em> speeches</h1>
         <p>An adaptive training platform that generates realistic conference speeches, builds multilingual glossaries, and evaluates your interpretation performance across Arabic, French, and English.</p>
-        <div className="stat-cluster">
-          <div className="stat-card">
-            <div className="stat-icon si-gold">🎙️</div>
-            <div className="stat-info"><label>Sessions available</label><strong>∞</strong><span>AI-generated on demand</span></div>
+        <div className="metric-row">
+          <div className="metric-card">
+            <span className="metric-label">Sessions</span>
+            <strong className="metric-value">∞</strong>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon si-sage">📚</div>
-            <div className="stat-info"><label>Languages</label><strong>3</strong><span>Arabic · French · English</span></div>
+          <div className="metric-card">
+            <span className="metric-label">Languages</span>
+            <strong className="metric-value">3</strong>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon si-sienna">⭐</div>
-            <div className="stat-info"><label>Evaluation</label><strong>AI</strong><span><span className="pulse-dot"></span>Live feedback</span></div>
+          <div className="metric-card">
+            <span className="metric-label">Modes</span>
+            <strong className="metric-value">3</strong>
+            <span className="metric-detail">Consecutive · Simultaneous · Sight</span>
           </div>
         </div>
       </div>
@@ -1415,6 +1426,24 @@ function SpeechResult({ data, labels }) {
         <span>{data.domain}</span>
         <span>{String(data.language || '').toUpperCase()} → {String(data.target_language || '').toUpperCase()}</span>
       </div>
+      {data.mode === 'un_library_grounded' && data.source_speech && (
+        <p className="grounded-source-note">
+          {labels.groundedSourceLabel}{' '}
+          {data.source_speech.web_url ? (
+            <a href={data.source_speech.web_url} target="_blank" rel="noopener noreferrer">
+              {data.source_speech.title || data.source_speech.un_id}
+            </a>
+          ) : (
+            data.source_speech.title || data.source_speech.un_id
+          )}
+          {data.source_speech.date ? ` (${data.source_speech.date})` : ''}
+        </p>
+      )}
+      {data.mode === 'generated' && (
+        <p className="grounded-source-note grounded-source-note--missing">
+          {labels.ungroundedNote}
+        </p>
+      )}
       <div className={`speech-text ${isArabic ? 'arabic' : ''}`}>
         {data.script}
       </div>
