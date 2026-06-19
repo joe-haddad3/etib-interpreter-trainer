@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import * as THREE from 'three';
 import {
   generateSpeech,
   generateSpeechFromDocument,
@@ -20,6 +19,8 @@ import {
   fetchUNDocument,
   getSavedSpeeches,
   getSavedSpeech,
+  getSessionHistory,
+  getAdaptiveParams,
 } from './api.js';
 
 const UI = {
@@ -52,6 +53,26 @@ const UI = {
     navB: 'Audio & materials',
     navC: 'Record & transcribe',
     navD: 'Evaluation',
+    navE: 'Progress',
+    progressTitle: 'My Progress',
+    progressSubtitle: 'Score history and adaptive recommendations',
+    progressNoSessions: 'No sessions yet — complete a full evaluation to start tracking your progress.',
+    progressSessions: 'Session history',
+    progressAdaptive: 'Adaptive recommendations',
+    progressAdaptiveSubtitle: 'Based on your recent sessions, the platform recommends:',
+    progressApply: 'Apply these settings',
+    progressOverall: 'Overall',
+    progressFluency: 'Fluency',
+    progressCoverage: 'Coverage',
+    progressErrors: 'Errors',
+    progressLang: 'Language',
+    progressDate: 'Date',
+    progressScore: 'Score',
+    progressLoading: 'Loading history…',
+    progressAvgOver: 'Avg. overall',
+    progressAvgFluency: 'Avg. fluency',
+    progressAvgNumbers: 'Avg. number errors',
+    progressTrend: 'Score trend (last 10 sessions)',
     moduleATitle: 'Generate training speech',
     groundedSourceLabel: 'Grounded in real UN document:',
     ungroundedNote: 'No matching UN document was found — this speech was generated without source grounding.',
@@ -145,7 +166,15 @@ const UI = {
     studentSaid: 'Student said',
     correctTranslation: 'Correct',
     missingContent: 'Missing content',
-    pronunciationMismatches: 'Word-level mismatches vs source',
+    fluencyScore: 'Fluency score',
+    pauseAnalysisTitle: 'Pauses & flow',
+    repetitionAnalysisTitle: 'Repetitions — analysis',
+    numberAccuracyTitle: 'Numbers & dates',
+    pronunciationAssessmentTitle: 'Pronunciation feedback',
+    numCorrect: 'Correct',
+    numIncorrect: 'Incorrect',
+    expectedLabel: 'Should be',
+    studentSaidShort: 'Said',
     pronunciationTitle: 'Pronunciation Assessment (إعراب)',
     runPronunciation: 'Run pronunciation check',
     runningPronunciation: 'Aligning audio against source — may take 1 min...',
@@ -171,6 +200,8 @@ const UI = {
     recordingLive: 'Recording',
     autoTranscribe: 'Transcribe automatically after recording',
     orUpload: 'Or upload an audio file',
+    deleteAudio: 'Delete audio',
+    redoTranscript: 'Redo transcription',
     copyText: 'Copy',
     copied: 'Copied!',
     topicPlaceholder: 'Enter a topic or paste text to generate a speech…',
@@ -226,6 +257,26 @@ const UI = {
     navB: 'الصوت والمواد',
     navC: 'التسجيل والتفريغ',
     navD: 'التقييم',
+    navE: 'التقدم',
+    progressTitle: 'تقدمي',
+    progressSubtitle: 'سجل الدرجات والتوصيات التكيفية',
+    progressNoSessions: 'لا جلسات بعد — أكمل تقييماً كاملاً لبدء تتبع تقدمك.',
+    progressSessions: 'سجل الجلسات',
+    progressAdaptive: 'التوصيات التكيفية',
+    progressAdaptiveSubtitle: 'بناءً على جلساتك الأخيرة، توصي المنصة بما يلي:',
+    progressApply: 'تطبيق هذه الإعدادات',
+    progressOverall: 'إجمالي',
+    progressFluency: 'الطلاقة',
+    progressCoverage: 'التغطية',
+    progressErrors: 'الأخطاء',
+    progressLang: 'اللغة',
+    progressDate: 'التاريخ',
+    progressScore: 'الدرجة',
+    progressLoading: 'جارٍ تحميل السجل…',
+    progressAvgOver: 'متوسط الإجمالي',
+    progressAvgFluency: 'متوسط الطلاقة',
+    progressAvgNumbers: 'متوسط أخطاء الأرقام',
+    progressTrend: 'منحنى الدرجات (آخر 10 جلسات)',
     moduleATitle: 'توليد خطاب تدريبي',
     groundedSourceLabel: 'مستند إلى وثيقة أممية حقيقية:',
     ungroundedNote: 'لم يتم العثور على وثيقة أممية مطابقة — تم إنشاء هذا الخطاب دون الاستناد إلى مصدر.',
@@ -319,7 +370,15 @@ const UI = {
     studentSaid: 'ما قاله الطالب',
     correctTranslation: 'الترجمة الصحيحة',
     missingContent: 'محتوى مفقود',
-    pronunciationMismatches: 'تباينات على مستوى الكلمات',
+    fluencyScore: 'درجة السلاسة',
+    pauseAnalysisTitle: 'التوقفات والانسيابية',
+    repetitionAnalysisTitle: 'تحليل التكرارات',
+    numberAccuracyTitle: 'الأرقام والتواريخ',
+    pronunciationAssessmentTitle: 'ملاحظات على النطق',
+    numCorrect: 'صحيح',
+    numIncorrect: 'غير صحيح',
+    expectedLabel: 'الصواب',
+    studentSaidShort: 'ما قاله الطالب',
     pronunciationTitle: 'تقييم النطق والإعراب',
     runPronunciation: 'تشغيل فحص النطق',
     runningPronunciation: 'جارٍ المحاذاة الصوتية — قد تستغرق دقيقة...',
@@ -345,6 +404,8 @@ const UI = {
     recordingLive: 'جارٍ التسجيل',
     autoTranscribe: 'تفريغ تلقائي بعد التسجيل',
     orUpload: 'أو ارفع ملف صوتي',
+    deleteAudio: 'حذف التسجيل',
+    redoTranscript: 'إعادة التفريغ',
     copyText: 'نسخ',
     copied: 'تم النسخ!',
     topicPlaceholder: 'أدخل موضوعاً أو الصق نصاً لتوليد خطاب...',
@@ -400,6 +461,26 @@ const UI = {
     navB: 'Audio et supports',
     navC: 'Enregistrer et transcrire',
     navD: 'Évaluation',
+    navE: 'Progression',
+    progressTitle: 'Ma progression',
+    progressSubtitle: 'Historique des scores et recommandations adaptatives',
+    progressNoSessions: 'Aucune session — terminez une évaluation complète pour commencer le suivi.',
+    progressSessions: 'Historique des sessions',
+    progressAdaptive: 'Recommandations adaptatives',
+    progressAdaptiveSubtitle: 'D\’après vos dernières sessions, la plateforme recommande :',
+    progressApply: 'Appliquer ces paramètres',
+    progressOverall: 'Global',
+    progressFluency: 'Fluidité',
+    progressCoverage: 'Couverture',
+    progressErrors: 'Erreurs',
+    progressLang: 'Langue',
+    progressDate: 'Date',
+    progressScore: 'Score',
+    progressLoading: 'Chargement…',
+    progressAvgOver: 'Moy. globale',
+    progressAvgFluency: 'Moy. fluidité',
+    progressAvgNumbers: 'Moy. erreurs numériques',
+    progressTrend: 'Courbe des scores (10 dernières sessions)',
     moduleATitle: 'Générer un discours d’entraînement',
     groundedSourceLabel: 'Basé sur un document réel de l’ONU :',
     ungroundedNote: 'Aucun document de l’ONU correspondant n’a été trouvé — ce discours a été généré sans source.',
@@ -473,7 +554,15 @@ const UI = {
     studentSaid: "L'étudiant a dit",
     correctTranslation: 'Traduction correcte',
     missingContent: 'Contenu manquant',
-    pronunciationMismatches: 'Divergences mot par mot',
+    fluencyScore: 'Score de fluidité',
+    pauseAnalysisTitle: 'Pauses et rythme',
+    repetitionAnalysisTitle: 'Répétitions — analyse',
+    numberAccuracyTitle: 'Chiffres et dates',
+    pronunciationAssessmentTitle: 'Retour sur la prononciation',
+    numCorrect: 'Correct',
+    numIncorrect: 'Incorrect',
+    expectedLabel: 'Attendu',
+    studentSaidShort: 'Dit',
     pronunciationTitle: 'Évaluation de la prononciation (إعراب)',
     runPronunciation: 'Lancer le contrôle de prononciation',
     runningPronunciation: 'Alignement audio en cours — peut prendre 1 min...',
@@ -499,6 +588,8 @@ const UI = {
     recordingLive: 'Enregistrement en cours',
     autoTranscribe: 'Transcrire automatiquement après l\'enregistrement',
     orUpload: 'Ou déposez un fichier audio',
+    deleteAudio: 'Supprimer l\'audio',
+    redoTranscript: 'Refaire la transcription',
     copyText: 'Copier',
     copied: 'Copié !',
     topicPlaceholder: 'Saisissez un sujet ou collez un texte pour générer un discours…',
@@ -531,8 +622,16 @@ const NAV_ITEMS = [
   { id: 'module-a', labelKey: 'navA' },
   { id: 'module-b', labelKey: 'navB' },
   { id: 'module-c', labelKey: 'navC' },
-  { id: 'module-d', labelKey: 'navD' }
+  { id: 'module-d', labelKey: 'navD' },
+  { id: 'module-e', labelKey: 'navE' },
 ];
+
+// MARC 041 language codes -> UI language codes / display labels
+const UN_LANG_TO_UI = { ara: 'ar', fre: 'fr', eng: 'en' };
+const UN_LANG_LABEL = {
+  ara: 'AR', fre: 'FR', eng: 'EN',
+  chi: 'ZH', rus: 'RU', spa: 'ES'
+};
 
 const VOICE_OPTIONS = {
   ar: [
@@ -576,8 +675,15 @@ const IconRefresh = () => (
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
   </svg>
 );
+const IconTrash = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+    <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+  </svg>
+);
 
-function TranscriptBubble({ text, vocalizedText, isArabic, onRetranscribe }) {
+function TranscriptBubble({ text, vocalizedText, isArabic, onRetranscribe, onDelete }) {
   const [copied, setCopied]       = useState(false);
   const [feedback, setFeedback]   = useState(null);
   const [showVocalized, setShowVocalized] = useState(true);
@@ -629,6 +735,11 @@ function TranscriptBubble({ text, vocalizedText, isArabic, onRetranscribe }) {
             <IconRefresh />
           </button>
         )}
+        {onDelete && (
+          <button className="bubble-btn bubble-btn-danger" onClick={onDelete} title="Delete transcript">
+            <IconTrash />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -652,83 +763,182 @@ const initialSpeechForm = {
   cognitive_load: 'medium'
 };
 
-function ThreeBackground() {
-  const canvasRef = useRef(null);
+// ── Module E — Progress & Adaptive Difficulty ─────────────────────────────────
+function ScoreBadge({ score }) {
+  const pct = Math.round((score || 0) * 10);
+  const color = score >= 8 ? 'var(--sage)' : score >= 6.5 ? 'var(--gold)' : 'var(--sienna)';
+  return (
+    <span style={{ fontWeight: 700, color, fontFamily: 'Playfair Display, serif', fontSize: '1rem' }}>
+      {score?.toFixed(1) ?? '—'}
+    </span>
+  );
+}
+
+function MiniBar({ value, max = 10, color }) {
+  const pct = Math.min(100, Math.round((value / max) * 100));
+  return (
+    <div className="mini-bar-track">
+      <div className="mini-bar-fill" style={{ width: `${pct}%`, background: color || 'var(--primary)' }} />
+    </div>
+  );
+}
+
+function ModuleProgress({ labels, refresh, onApplyParams }) {
+  const [sessions, setSessions] = useState([]);
+  const [adaptive, setAdaptive] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null);
+
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 5);
+    setLoading(true);
+    Promise.all([getSessionHistory(20), getAdaptiveParams()])
+      .then(([hist, adap]) => {
+        setSessions(hist.sessions || []);
+        setAdaptive(adap);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [refresh]);
 
-    const globe = new THREE.Mesh(
-      new THREE.SphereGeometry(2.2, 64, 64),
-      new THREE.MeshStandardMaterial({ color: 0xC8973A, wireframe: true, transparent: true, opacity: 0.32, wireframeLinewidth: 0.015 })
-    );
-    globe.position.set(1.8, 0, -2);
-    globe.scale.setScalar(0.6);
-    scene.add(globe);
+  const LANG_FLAG = { ar: '🇱🇧', fr: '🇫🇷', en: '🇬🇧' };
+  const recentTen = sessions.slice(0, 10).reverse();
 
-    const inner = new THREE.Mesh(
-      new THREE.SphereGeometry(1.8, 32, 32),
-      new THREE.MeshStandardMaterial({ color: 0x2D5A4E, wireframe: true, transparent: true, opacity: 0.32, wireframeLinewidth: 0.015 })
-    );
-    inner.position.set(1.8, 0, -2);
-    inner.scale.setScalar(0.6);
-    scene.add(inner);
+  const avgOverall  = sessions.length ? (sessions.reduce((s, x) => s + (x.overall_score || 0), 0) / sessions.length).toFixed(2) : null;
+  const avgFluency  = sessions.length ? (sessions.reduce((s, x) => s + (x.fluency_score || 0), 0) / sessions.length).toFixed(2) : null;
+  const avgNumbers  = sessions.length ? (sessions.reduce((s, x) => s + (x.error_counts?.number_errors || 0), 0) / sessions.length).toFixed(1) : null;
 
-    const pCount = 120;
-    const pGeo = new THREE.BufferGeometry();
-    const pPos = new Float32Array(pCount * 3);
-    for (let i = 0; i < pCount; i++) {
-      pPos[i * 3]     = (Math.random() - 0.5) * 14;
-      pPos[i * 3 + 1] = (Math.random() - 0.5) * 10;
-      pPos[i * 3 + 2] = (Math.random() - 0.5) * 6 - 3;
-    }
-    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-    const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0xC8973A, size: 0.025, transparent: true, opacity: 0.5 }));
-    scene.add(particles);
+  if (loading) {
+    return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" /><p style={{ marginTop: '1rem', color: 'var(--warm-gray)' }}>{labels.progressLoading}</p></div>;
+  }
 
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(2.8, 0.012, 8, 100),
-      new THREE.MeshBasicMaterial({ color: 0xC8973A, transparent: true, opacity: 0.12 })
-    );
-    ring.position.set(1.8, 0, -2);
-    ring.scale.setScalar(0.6);
-    ring.rotation.x = Math.PI / 3;
-    scene.add(ring);
+  return (
+    <div className="module-b-layout">
+      {/* ── Header stat row ── */}
+      <div className="progress-stat-row">
+        <div className="progress-stat-card">
+          <div className="progress-stat-label">{labels.progressAvgOver}</div>
+          <div className="progress-stat-value" style={{ color: avgOverall >= 7 ? 'var(--sage)' : avgOverall >= 5.5 ? 'var(--gold)' : 'var(--sienna)' }}>{avgOverall ?? '—'}</div>
+          <div className="progress-stat-sub">/ 10</div>
+        </div>
+        <div className="progress-stat-card">
+          <div className="progress-stat-label">{labels.progressAvgFluency}</div>
+          <div className="progress-stat-value" style={{ color: avgFluency >= 7 ? 'var(--sage)' : avgFluency >= 5.5 ? 'var(--gold)' : 'var(--sienna)' }}>{avgFluency ?? '—'}</div>
+          <div className="progress-stat-sub">/ 10</div>
+        </div>
+        <div className="progress-stat-card">
+          <div className="progress-stat-label">{labels.progressAvgNumbers}</div>
+          <div className="progress-stat-value" style={{ color: avgNumbers <= 1 ? 'var(--sage)' : avgNumbers <= 3 ? 'var(--gold)' : 'var(--sienna)' }}>{avgNumbers ?? '—'}</div>
+          <div className="progress-stat-sub">avg / session</div>
+        </div>
+        <div className="progress-stat-card">
+          <div className="progress-stat-label">Sessions</div>
+          <div className="progress-stat-value" style={{ color: 'var(--primary)' }}>{sessions.length}</div>
+          <div className="progress-stat-sub">total</div>
+        </div>
+      </div>
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const pointLight = new THREE.PointLight(0xC8973A, 1.5, 20);
-    pointLight.position.set(5, 3, 3);
-    scene.add(pointLight);
+      {sessions.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--warm-gray)' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
+          <p>{labels.progressNoSessions}</p>
+        </div>
+      ) : (
+        <>
+          {/* ── Score trend chart ── */}
+          <div className="card">
+            <h2 className="b-section-title">📈 {labels.progressTrend}</h2>
+            <div className="trend-chart">
+              {recentTen.map((s, i) => {
+                const h = Math.round((s.overall_score / 10) * 100);
+                const color = s.overall_score >= 8 ? 'var(--sage)' : s.overall_score >= 6.5 ? 'var(--gold)' : 'var(--sienna)';
+                return (
+                  <div key={i} className="trend-bar-wrap">
+                    <div className="trend-score-label" style={{ color }}>{s.overall_score?.toFixed(1)}</div>
+                    <div className="trend-bar-outer">
+                      <div className="trend-bar-inner" style={{ height: `${h}%`, background: color }} />
+                    </div>
+                    <div className="trend-lang-label">{LANG_FLAG[s.language] || '🌐'}</div>
+                    <div className="trend-date-label">{new Date(s.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
-    let t = 0, rafId;
-    const animate = () => {
-      rafId = requestAnimationFrame(animate);
-      t += 0.005;
-      globe.rotation.y = t * 0.3;
-      globe.rotation.x = Math.sin(t * 0.2) * 0.15;
-      inner.rotation.y = -t * 0.2;
-      ring.rotation.z = t * 0.15;
-      particles.rotation.y = t * 0.04;
-      camera.position.y = Math.sin(t * 0.15) * 0.2;
-      renderer.render(scene, camera);
-    };
-    animate();
+          {/* ── Adaptive recommendations ── */}
+          {adaptive?.recommended_params && (
+            <div className="card">
+              <h2 className="b-section-title">🎯 {labels.progressAdaptive}</h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--warm-gray)', marginBottom: '1rem' }}>{labels.progressAdaptiveSubtitle}</p>
+              <div className="adaptive-grid">
+                {[
+                  ['Difficulty', adaptive.recommended_params.difficulty],
+                  ['Word count', adaptive.recommended_params.word_count + ' words'],
+                  ['Numbers', adaptive.recommended_params.number_density],
+                  ['Speed', adaptive.recommended_params.speed_pressure],
+                  ['Structure', adaptive.recommended_params.structure],
+                  ['Topic shifts', adaptive.recommended_params.topic_shifts],
+                ].map(([k, v]) => (
+                  <div key={k} className="adaptive-param">
+                    <div className="adaptive-param-label">{k}</div>
+                    <div className="adaptive-param-value">{v}</div>
+                  </div>
+                ))}
+              </div>
+              {(adaptive.tips || []).length > 0 && (
+                <ul className="adaptive-tips">
+                  {adaptive.tips.map((t, i) => <li key={i}>{t}</li>)}
+                </ul>
+              )}
+              {onApplyParams && (
+                <div style={{ marginTop: '1.25rem', textAlign: 'right' }}>
+                  <button className="btn btn-primary" onClick={() => onApplyParams(adaptive.recommended_params)}>
+                    {labels.progressApply}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
-    const onResize = () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-    };
-    window.addEventListener('resize', onResize);
-    return () => { cancelAnimationFrame(rafId); window.removeEventListener('resize', onResize); renderer.dispose(); };
-  }, []);
-  return <canvas ref={canvasRef} id="three-canvas" />;
+          {/* ── Session list ── */}
+          <div className="card">
+            <h2 className="b-section-title">📋 {labels.progressSessions}</h2>
+            <div className="session-list">
+              {sessions.map((s, i) => (
+                <div key={i} className={`session-row ${expanded === i ? 'session-row--open' : ''}`}
+                  onClick={() => setExpanded(expanded === i ? null : i)}>
+                  <div className="session-row-main">
+                    <span className="session-lang">{LANG_FLAG[s.language] || '🌐'} {(s.language || '').toUpperCase()}</span>
+                    <span className="session-date">{new Date(s.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    <div className="session-scores">
+                      <span title="Overall"><ScoreBadge score={s.overall_score} /></span>
+                      <MiniBar value={s.overall_score} color={s.overall_score >= 7 ? 'var(--sage)' : s.overall_score >= 5.5 ? 'var(--gold)' : 'var(--sienna)'} />
+                    </div>
+                    <div className="session-error-chips">
+                      {(s.error_counts?.number_errors > 0) && <span className="err-chip err-chip--num">🔢 {s.error_counts.number_errors}</span>}
+                      {(s.error_counts?.repetitions > 0) && <span className="err-chip err-chip--rep">🔁 {s.error_counts.repetitions}</span>}
+                      {(s.error_counts?.long_silences > 0) && <span className="err-chip err-chip--sil">🔇 {s.error_counts.long_silences}</span>}
+                      {(s.error_counts?.information_loss > 0) && <span className="err-chip err-chip--loss">📉 {s.error_counts.information_loss}</span>}
+                    </div>
+                    <span className="session-chevron">{expanded === i ? '▲' : '▼'}</span>
+                  </div>
+                  {expanded === i && (
+                    <div className="session-detail">
+                      <div className="session-detail-scores">
+                        <div><span className="session-detail-label">{labels.progressOverall}</span><ScoreBadge score={s.overall_score} /></div>
+                        <div><span className="session-detail-label">{labels.progressFluency}</span><ScoreBadge score={s.fluency_score} /></div>
+                        <div><span className="session-detail-label">{labels.progressCoverage}</span><ScoreBadge score={s.coverage_score} /></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function App() {
@@ -782,45 +992,45 @@ export default function App() {
   }
 
   return (
-    <>
-      <ThreeBackground />
-      <div className="shell">
-        <Header
-          isAuthenticated={isAuthenticated}
-          activePanel={activePanel}
-          labels={L}
-          onPanelChange={setActivePanel}
-          uiLang={uiLang}
-          onLanguageChange={setUiLang}
-        />
-        <main>
-          {!isAuthenticated ? (
-            <LoginScreen labels={L} onLogin={handleLogin} onSignup={handleSignup} />
-          ) : (
-            <Workspace
-              labels={L}
-              activePanel={activePanel}
-              onLogout={handleLogout}
-              onGenerated={setLastGeneratedScript}
-              lastGeneratedScript={lastGeneratedScript}
-              currentUser={currentUser}
-              isRtl={uiLang === 'ar'}
-            />
-          )}
-        </main>
-      </div>
-    </>
+    <div className="shell">
+      <Header
+        isAuthenticated={isAuthenticated}
+        activePanel={activePanel}
+        labels={L}
+        onPanelChange={setActivePanel}
+        uiLang={uiLang}
+        onLanguageChange={setUiLang}
+      />
+      <main>
+        {!isAuthenticated ? (
+          <LoginScreen labels={L} onLogin={handleLogin} onSignup={handleSignup} />
+        ) : (
+          <Workspace
+            labels={L}
+            activePanel={activePanel}
+            onPanelChange={setActivePanel}
+            onLogout={handleLogout}
+            onGenerated={setLastGeneratedScript}
+            lastGeneratedScript={lastGeneratedScript}
+            currentUser={currentUser}
+            isRtl={uiLang === 'ar'}
+          />
+        )}
+      </main>
+    </div>
   );
 }
 
 function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, onLanguageChange }) {
   return (
     <header className="fade-up">
-      <div>
-        <div className="logo-main">ETIB <span>Interpreter</span> Trainer</div>
-        <div className="logo-sub">AI Self-Training Platform · USJ Beirut</div>
+      <div className="header-logos">
+        <img src="/usj-etib-logo.png" style={{ height: '44px', objectFit: 'contain' }} alt="USJ - 150 ans - ETIB" />
+        <div className="header-title">
+          <div className="header-title-main">ETIB <span>Interpreter</span> Trainer</div>
+          <div className="header-title-sub">AI Self-Training Platform · USJ Beirut</div>
+        </div>
       </div>
-      <div className="arabic-badge">مُدرِّب المُترجِم</div>
       {isAuthenticated && (
         <nav aria-label="Training modules">
           {NAV_ITEMS.map(item => (
@@ -883,21 +1093,6 @@ function LoginScreen({ labels, onLogin, onSignup }) {
         </div>
         <h1>Master interpretation with <em>AI-generated</em> speeches</h1>
         <p>An adaptive training platform that generates realistic conference speeches, builds multilingual glossaries, and evaluates your interpretation performance across Arabic, French, and English.</p>
-        <div className="metric-row">
-          <div className="metric-card">
-            <span className="metric-label">Sessions</span>
-            <strong className="metric-value">∞</strong>
-          </div>
-          <div className="metric-card">
-            <span className="metric-label">Languages</span>
-            <strong className="metric-value">3</strong>
-          </div>
-          <div className="metric-card">
-            <span className="metric-label">Modes</span>
-            <strong className="metric-value">3</strong>
-            <span className="metric-detail">Consecutive · Simultaneous · Sight</span>
-          </div>
-        </div>
       </div>
 
       {/* Right: auth form */}
@@ -955,10 +1150,11 @@ function LoginScreen({ labels, onLogin, onSignup }) {
   );
 }
 
-function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedScript, currentUser, isRtl }) {
+function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, lastGeneratedScript, currentUser, isRtl }) {
   const [sharedAudioUrl, setSharedAudioUrl] = useState(null);
   const [lastTranscript, setLastTranscript] = useState(null);
   const [lastRecordingBlob, setLastRecordingBlob] = useState(null);
+  const [progressRefresh, setProgressRefresh] = useState(0);
 
   return (
     <section>
@@ -986,7 +1182,12 @@ function Workspace({ labels, activePanel, onLogout, onGenerated, lastGeneratedSc
       <div style={{ display: activePanel === 'module-d' ? 'block' : 'none' }}>
         <ModuleD labels={labels} lastTranscript={lastTranscript}
           lastGeneratedScript={lastGeneratedScript}
-          lastRecordingBlob={lastRecordingBlob} />
+          lastRecordingBlob={lastRecordingBlob}
+          onEvaluationSaved={() => setProgressRefresh(n => n + 1)} />
+      </div>
+      <div style={{ display: activePanel === 'module-e' ? 'block' : 'none' }}>
+        <ModuleProgress labels={labels} refresh={progressRefresh}
+          onApplyParams={(params) => { onGenerated && onGenerated(null); onPanelChange('module-a'); }} />
       </div>
 
     </section>
@@ -1087,6 +1288,18 @@ function UNLibraryPanel({ language, domain, onSelect, onClose }) {
                     {item.date && <span>📅 {item.date}</span>}
                     {item.web_url && <a href={item.web_url} target="_blank" rel="noreferrer" className="lib-result-link">View on UN site ↗</a>}
                   </div>
+                  {item.languages && item.languages.length > 0 && (
+                    <div className="lib-result-langs">
+                      {item.languages.map(lang => (
+                        <span
+                          key={lang}
+                          className={`lib-lang-badge ${UN_LANG_TO_UI[lang] === language ? 'lib-lang-badge--match' : ''}`}
+                        >
+                          {UN_LANG_LABEL[lang] || lang.toUpperCase()}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {item.description && <p className="lib-result-desc">{item.description}</p>}
                   <button
                     className="btn-primary lib-use-btn"
@@ -1134,7 +1347,7 @@ function ModuleA({ labels, onGenerated, isRtl }) {
   const [form, setForm] = useState(initialSpeechForm);
   const [documentFile, setDocumentFile] = useState(null);
   const [retrievalResult, setRetrievalResult] = useState(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(true);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -1375,6 +1588,28 @@ function SelectField({ label, id, name, value, onChange, children }) {
   );
 }
 
+function SummaryBlock({ text, isArabic }) {
+  const lines = (text || '').split('\n');
+  return (
+    <div className={`summary-block ${isArabic ? 'arabic' : ''}`}>
+      {lines.map((line, i) => {
+        const trimmed = line.trim();
+        if (!trimmed) return null;
+        if (/^[IVXLCDM]+[.)]\s/.test(trimmed)) {
+          return <div key={i} className="summary-heading">{trimmed}</div>;
+        }
+        if (/^[-•*]\s/.test(trimmed)) {
+          return <div key={i} className="summary-bullet">{trimmed.replace(/^[-•*]\s/, '')}</div>;
+        }
+        if (/^\d+[.)]\s/.test(trimmed)) {
+          return <div key={i} className="summary-subpoint">{trimmed}</div>;
+        }
+        return <div key={i} className="summary-line">{trimmed}</div>;
+      })}
+    </div>
+  );
+}
+
 function RetrievalResult({ data, labels }) {
   return (
     <section className="retrieval-result">
@@ -1554,7 +1789,7 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
       {summary && (
         <div className="card">
           <h2 className="b-section-title">📋 {labels.summaryTitle}</h2>
-          <pre className="mind-map">{summary}</pre>
+          <SummaryBlock text={summary} isArabic={isArabic} />
         </div>
       )}
 
@@ -1657,6 +1892,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const lowConfWords = useMemo(() =>
     (result?.segments || []).flatMap(seg =>
@@ -1723,6 +1959,21 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
     clearInterval(timerRef.current);
   }
 
+  function clearTranscript() {
+    setResult(null);
+    setError('');
+  }
+
+  function clearAudio() {
+    if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+    setRecordedBlob(null);
+    setRecordedUrl(null);
+    setResult(null);
+    setError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    onRecordingComplete?.(null);
+  }
+
   const isArabic = result?.language_detected === 'ar' || language === 'ar';
 
   return (
@@ -1777,14 +2028,28 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
           {/* Recorded audio playback */}
           {recordedUrl && !isRecording && (
             <div style={{ marginTop: '0.75rem' }}>
-              <audio controls src={recordedUrl} style={{ width: '100%' }} />
-              {!autoTranscribe && (
-                <button className="btn-primary" style={{ marginTop: '0.75rem' }}
-                  onClick={() => runTranscription(recordedBlob)}
-                  disabled={status === 'loading'}>
-                  {status === 'loading' ? labels.transcribing : labels.transcribeBtn}
+              <div className="recorded-audio-row">
+                <audio controls src={recordedUrl} style={{ width: '100%' }} />
+                <button className="btn-icon-danger" onClick={clearAudio} title={labels.deleteAudio}>
+                  <IconTrash />
                 </button>
-              )}
+              </div>
+              <div className="record-controls" style={{ marginTop: '0.75rem' }}>
+                {!autoTranscribe && (
+                  <button className="btn-primary"
+                    onClick={() => runTranscription(recordedBlob)}
+                    disabled={status === 'loading'}>
+                    {status === 'loading' ? labels.transcribing : labels.transcribeBtn}
+                  </button>
+                )}
+                {result && (
+                  <button className="btn-secondary"
+                    onClick={() => runTranscription(recordedBlob)}
+                    disabled={status === 'loading'}>
+                    ↻ {labels.redoTranscript}
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1792,8 +2057,8 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
         {/* Upload fallback */}
         <details className="upload-fallback">
           <summary>{labels.orUpload}</summary>
-          <div style={{ marginTop: '0.75rem' }}>
-            <input type="file" accept=".mp3,.wav,.m4a,.ogg,.webm" className="file-input"
+          <div className="upload-fallback-row" style={{ marginTop: '0.75rem' }}>
+            <input ref={fileInputRef} type="file" accept=".mp3,.wav,.m4a,.ogg,.webm" className="file-input"
               onChange={e => {
                 const f = e.target.files[0];
                 if (f) {
@@ -1802,6 +2067,11 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
                   runTranscription(f);
                 }
               }} />
+            {recordedBlob && (
+              <button className="btn-icon-danger" onClick={clearAudio} title={labels.deleteAudio}>
+                <IconTrash />
+              </button>
+            )}
           </div>
         </details>
       </div>
@@ -1836,6 +2106,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
                 vocalizedText={result.vocalized_text}
                 isArabic={isArabic}
                 onRetranscribe={recordedBlob ? () => runTranscription(recordedBlob) : null}
+                onDelete={clearTranscript}
               />
             </div>
           )}
@@ -1849,7 +2120,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
 
 function ScoreBar({ score }) {
   const pct = Math.round((score / 10) * 100);
-  const color = score >= 7 ? '#2D5A4E' : score >= 5 ? '#C8973A' : '#8B3A2A';
+  const color = score >= 7 ? '#2D5A4E' : score >= 5 ? '#B8962E' : '#8B3A2A';
   const circumference = 188.5;
   const offset = circumference - (circumference * pct / 100);
   return (
@@ -2039,7 +2310,7 @@ function PronunciationPanel({ labels, lastTranscript, lastGeneratedScript }) {
   );
 }
 
-function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlob }) {
+function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlob, onEvaluationSaved }) {
   const [report, setReport] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
@@ -2060,7 +2331,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           audioFile,
           lastGeneratedScript?.script || '',
           language,
-          lastGeneratedScript?.language || language
+          lastGeneratedScript?.language || language,
+          lastGeneratedScript?.domain || ''
         );
       } else {
         // Fallback: use stored Groq transcript (less accurate for hesitations)
@@ -2077,12 +2349,12 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           overall_score: data.pronunciation.overall_score,
           uncertain_count: data.pronunciation.uncertain_count,
           flagged_words: data.pronunciation.flagged_words || [],
-          diff_errors: data.pronunciation.diff_errors || [],
           summary: data.pronunciation.summary,
         };
       }
       setReport(data);
       setStatus('success');
+      onEvaluationSaved?.();
     } catch (err) {
       setError(err.message);
       setStatus('error');
@@ -2130,6 +2402,12 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 <p className="report-label">{labels.overallScore}</p>
                 <ScoreBar score={report.overall_score || 0} />
               </div>
+              {report.fluency_score !== undefined && (
+                <div>
+                  <p className="report-label">{labels.fluencyScore}</p>
+                  <ScoreBar score={report.fluency_score || 0} />
+                </div>
+              )}
               {(report.strengths || []).length > 0 && (
                 <div className="report-strengths">
                   <p className="report-label">✅ {labels.strengths}</p>
@@ -2209,6 +2487,67 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             )}
           </div>
 
+          {/* Pause & flow analysis */}
+          {report.pause_analysis && (
+            <div className="card">
+              <h3 className="report-section-title">⏸️ {labels.pauseAnalysisTitle}</h3>
+              {report.pause_analysis.comment && (
+                <p className={isAr ? 'arabic' : ''} style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>{report.pause_analysis.comment}</p>
+              )}
+              {(report.pause_analysis.problem_pauses || []).map((p, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginTop: '0.5rem' }}>
+                  <strong style={{ fontSize: '0.84rem' }}>{p.duration_seconds}s {labels.longSilences.toLowerCase()} — {p.at_seconds}s</strong>
+                  {p.impact && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{p.impact}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Repetition analysis */}
+          {report.repetition_analysis?.comment && (
+            <div className="card">
+              <h3 className="report-section-title">🔁 {labels.repetitionAnalysisTitle}</h3>
+              <p className={isAr ? 'arabic' : ''} style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>{report.repetition_analysis.comment}</p>
+            </div>
+          )}
+
+          {/* Number & date accuracy */}
+          {(report.number_accuracy || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">🔢 {labels.numberAccuracyTitle}</h3>
+              {report.number_accuracy.map((n, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: `3px solid ${n.correct ? 'var(--sage)' : 'var(--sienna)'}`, paddingLeft: '0.75rem', marginBottom: '0.6rem' }}>
+                  <div style={{ fontSize: '0.84rem' }}>
+                    <strong>{n.source_value}</strong>
+                    <span style={{ color: 'var(--warm-gray)' }}> — {labels.expectedLabel}: </span>
+                    <strong style={{ color: 'var(--sage)' }} className={isAr ? 'arabic' : ''}>{n.expected_in_target}</strong>
+                    <span style={{ color: 'var(--warm-gray)' }}> · {labels.studentSaidShort}: </span>
+                    <strong style={{ color: n.correct ? 'var(--sage)' : 'var(--sienna)' }} className={isAr ? 'arabic' : ''}>{n.student_said || '—'}</strong>
+                    <span className={`importance-badge importance-${n.correct ? 'low' : 'high'}`} style={{ marginLeft: '0.5rem' }}>
+                      {n.correct ? labels.numCorrect : labels.numIncorrect}
+                    </span>
+                  </div>
+                  {n.note && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{n.note}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pronunciation assessment (LLM commentary, all languages) */}
+          {report.pronunciation_assessment?.comment && (
+            <div className="card">
+              <h3 className="report-section-title">🗣️ {labels.pronunciationAssessmentTitle}</h3>
+              <p className={isAr ? 'arabic' : ''} style={{ fontSize: '0.85rem', color: 'var(--ink)', marginBottom: '0.6rem' }}>{report.pronunciation_assessment.comment}</p>
+              {(report.pronunciation_assessment.issues || []).map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                  <strong className={isAr ? 'arabic' : ''}>"{item.word}"</strong>
+                  {item.issue && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{item.issue}</div>}
+                  {item.correction && <div className="eval-correction">✓ {labels.correction}: <strong className={isAr ? 'arabic' : ''}>{item.correction}</strong></div>}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Coverage score */}
           {report.coverage_score !== undefined && (
             <div className="card">
@@ -2250,7 +2589,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           )}
 
           {/* Pronunciation Report (EN/FR: full analysis; AR: confidence only) */}
-          {report.pronunciation && (report.pronunciation.uncertain_count > 0 || (report.pronunciation.diff_errors || []).length > 0) && (
+          {report.pronunciation && report.pronunciation.uncertain_count > 0 && (
             <div className="card">
               <h3 className="report-section-title">🔊 {labels.pronunciationTitle}</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
@@ -2270,7 +2609,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                   <div className="word-grid">
                     {(report.pronunciation.flagged_words || []).map((w, i) => (
                       <span key={i} className="word-chip word-poor" title={w.note || ''} style={{ cursor: w.note ? 'help' : 'default' }}>
-                        {w.word} <small style={{ opacity: 0.7 }}>{Math.round(w.score * 100)}%</small>
+                        {w.word} <small style={{ opacity: 0.7 }}>{Math.round((w.confidence ?? 0) * 100)}%</small>
                       </span>
                     ))}
                   </div>
@@ -2283,20 +2622,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 </div>
               )}
 
-              {/* Reference diffing errors (EN/FR) */}
-              {(report.pronunciation.diff_errors || []).length > 0 && (
-                <div>
-                  <p style={{ fontSize: '0.74rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--warm-gray)', marginBottom: '0.5rem' }}>{labels.pronunciationMismatches}</p>
-                  {(report.pronunciation.diff_errors || []).slice(0, 5).map((e, i) => (
-                    <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.6rem', marginBottom: '0.4rem' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--warm-gray)' }}>{e.type}: </span>
-                      {e.expected && <span style={{ fontSize: '0.84rem' }}>expected <strong style={{ color: 'var(--sage)' }}>"{e.expected}"</strong></span>}
-                      {e.said && <span style={{ fontSize: '0.84rem' }}> · said <strong style={{ color: 'var(--sienna)' }}>"{e.said}"</strong></span>}
-                      {e.note && <div className="eval-explanation">{e.note}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 

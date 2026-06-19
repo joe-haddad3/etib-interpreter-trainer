@@ -211,15 +211,26 @@ export async function getSavedSpeech(un_id) {
   return parseJsonResponse(res);
 }
 
-export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage) {
+export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain) {
   const form = new FormData();
   form.append('audio', audioFile, audioFile.name || 'recording.webm');
   form.append('source_script', sourceScript || '');
   form.append('language', language || 'ar');
   form.append('source_language', sourceLanguage || language || 'ar');
+  if (domain) form.append('domain', domain);
   const res = await fetch(`${BASE}/module-d/full-evaluation`, {
     method: 'POST',
     body: form
   });
+  return parseJsonResponse(res);
+}
+
+export async function getSessionHistory(limit = 20) {
+  const res = await fetch(`${BASE}/module-d/sessions?limit=${limit}`, { credentials: 'include' });
+  return parseJsonResponse(res);
+}
+
+export async function getAdaptiveParams() {
+  const res = await fetch(`${BASE}/module-d/adaptive-params`, { credentials: 'include' });
   return parseJsonResponse(res);
 }

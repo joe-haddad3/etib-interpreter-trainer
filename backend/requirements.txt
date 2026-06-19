@@ -26,7 +26,7 @@ huggingface-hub
 edge-tts>=7.2.8
 
 # --- ASR (Automatic Speech Recognition) ---
-faster-whisper==1.0.3
+faster-whisper>=1.1.1
 whisperx>=3.1.1              # Forced alignment for pronunciation assessment
 torchaudio>=2.0.0            # Audio processing for alignment
 librosa>=0.10.0              # Audio utilities

@@ -19,6 +19,15 @@ module_c_bp = Blueprint('module_c', __name__)
 
 _whisper_model = None
 
+# Priming prompts containing disfluencies — Whisper imitates the style of the
+# initial prompt, making it far more likely to transcribe "euh"/"um"/"يعني"
+# verbatim instead of silently cleaning them out of the transcript.
+DISFLUENCY_PROMPTS = {
+    'ar': 'إممم، آه، يعني، أقصد... طيب، يعني كيف أقول هاد الشي.',
+    'fr': "Euh, alors, ben, c'est-à-dire... voilà, donc, euh, comment dire.",
+    'en': "Um, well, uh, like, you know... so, I mean, er, how do I put this.",
+}
+
 
 # ── Groq hosted Whisper (fast) ───────────────────────────────────────────────
 
@@ -32,7 +41,8 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
             file=(os.path.basename(audio_path), f),
             model='whisper-large-v3',
             language=language,
-            response_format='verbose_json'
+            response_format='verbose_json',
+            prompt=DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en'])
         )
 
     segments = []
@@ -90,13 +100,19 @@ def _transcribe_local(audio_path: str, language: str) -> dict:
         log_prob_threshold=-100.0,          # disable low-confidence fallback (keeps hesitations)
         temperature=0.0,                    # greedy decoding — no temperature sampling
         beam_size=1,                        # greedy: no beam search collapse of repetitions
+        initial_prompt=DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en']),  # primes Whisper to keep "euh/um" fillers
     )
     full_text = ''
     all_segments = []
     for seg in segments_iter:
+        # Skip non-speech annotations Whisper sometimes hallucinates over
+        # noisy/silent audio, e.g. "[Bruit de fond]", "[Music]" — not real words.
+        seg_text = seg.text.strip()
+        if not seg_text or seg_text[0] in '[(':
+            continue
         seg_data = {
             'start': round(seg.start, 2), 'end': round(seg.end, 2),
-            'text': seg.text.strip(), 'words': []
+            'text': seg_text, 'words': []
         }
         for w in (seg.words or []):
             seg_data['words'].append({

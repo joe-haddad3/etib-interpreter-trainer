@@ -145,7 +145,7 @@ Interpretation into: {target_name}
 Domain:              {domain}
 Scenario:            {scenario}
 Difficulty:          {difficulty.upper()} — {diff_profile}
-Required length:     {word_count} words in the "script" field (STRICTLY enforced)
+Required length:     {word_count} words in the "script" field (target — must stay within ±15%, i.e. {int(word_count * 0.85)}–{int(word_count * 1.15)} words)
 Interpretation mode: {mode} — {mode_note}
 Numbers/statistics:  {number_instruction}
 Hesitations:         {'Yes — ' + hesitation_note if hesitations else 'No'}
@@ -173,7 +173,10 @@ SPEECH WRITING RULES
    - At least one acronym (UN, WHO, GDP, IMF, etc.)
    - Country or region names
 
-5. The "script" field MUST reach {word_count} words. Expand with concrete examples, data, and elaboration until the word count is met.
+5. The "script" field MUST be close to {word_count} words (within ±15%). If {word_count} is small,
+   prioritize a brief greeting, ONE main point, and a short conclusion — do not try to cram in every
+   element from rule 4 if it would push the speech over the word count. If the draft is short, expand
+   with elaboration; if it is long, cut elaboration/examples rather than dropping the core message.
 
 6. MCQ rules: Write 5 questions that test SPECIFIC content from the speech — exact numbers, named organisations, specific policy positions, cause-effect relationships. NEVER ask "what is the topic?" or "who gave this speech?".
 
@@ -199,7 +202,7 @@ OUTPUT FORMAT — STRICT JSON ONLY
 Return ONLY valid compact JSON. No markdown, no code fences, no explanation outside the JSON.
 
 {{
-  "script": "Full speech text — {word_count} words minimum",
+  "script": "Full speech text — approximately {word_count} words (±15%)",
   "summary": "Mind-map outline of the speech in the speech language",
   "mcqs": [
     {{
@@ -581,10 +584,53 @@ def _expand_script_to_word_count(script: str, target_word_count: int, language: 
     return script
 
 
+def _trim_script_to_word_count(script: str, target_word_count: int, language: str) -> str:
+    """If the script noticeably overshoots the requested word count, ask
+    the LLM to condense it (preserving key facts/structure) until it gets closer."""
+    actual = len(script.split())
+    if not script or actual <= target_word_count * 1.15:
+        return script
+
+    lang_name = LANGUAGE_NAMES.get(language, 'English')
+    try:
+        condensed = generate_text(
+            messages=[
+                {
+                    'role': 'system',
+                    'content': (
+                        f'You condense conference speech scripts written in {lang_name}. '
+                        'Preserve the opening greeting, the core message, key facts, names, '
+                        'numbers, and the conclusion/call to action. Cut secondary elaboration, '
+                        'redundant examples, and filler until the text reaches the target word count. '
+                        'Return ONLY the condensed speech text — no JSON, no headings, no commentary.'
+                    ),
+                },
+                {
+                    'role': 'user',
+                    'content': (
+                        f'Target length: {target_word_count} words (current: {actual} words).\n\n'
+                        f'Speech:\n{script}'
+                    ),
+                },
+            ],
+            max_tokens=min(6000, max(1500, int(actual * 1.5))),
+            temperature=0.4,
+        )
+        condensed = condensed.strip()
+        if language == 'ar':
+            condensed = _clean_arabic_script(condensed)
+        if 0 < len(condensed.split()) < actual:
+            return condensed
+    except Exception:
+        pass
+    return script
+
+
 def build_generation_response(generated: dict, params: dict, mode: str = 'generated', extra: dict | None = None) -> dict:
     script = generated['script']
     target_word_count = int(params.get('word_count', DEFAULT_WORD_COUNT))
     script = _expand_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
+    script = _trim_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
     generated['script'] = script
     word_count = len(script.split())
     wpm = params.get('wpm', DEFAULT_WPM)

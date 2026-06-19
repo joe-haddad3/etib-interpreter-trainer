@@ -31,8 +31,161 @@ import os
 import re
 import json
 import uuid
-from flask import Blueprint, request, jsonify
+from datetime import datetime, timezone
+from flask import Blueprint, request, jsonify, session as flask_session
 from config import GROQ_API_KEY, PRIMARY_LLM_MODEL, UPLOAD_FOLDER
+
+# ── Session storage (MongoDB when available, in-memory fallback) ──────────────
+_mongo_sessions = None   # pymongo collection once connected
+_mem_sessions: dict = {} # { user_id: [session, ...] }
+
+MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017')
+MONGODB_DB  = os.getenv('MONGODB_DB', 'etib_interpreter_trainer')
+
+
+def _get_sessions_collection():
+    global _mongo_sessions
+    if _mongo_sessions is not None:
+        return _mongo_sessions
+    try:
+        from pymongo import MongoClient, ASCENDING, DESCENDING
+        client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=2000)
+        client.admin.command('ping')
+        col = client[MONGODB_DB]['evaluation_sessions']
+        col.create_index([('user_id', ASCENDING), ('created_at', DESCENDING)])
+        _mongo_sessions = col
+    except Exception:
+        _mongo_sessions = None
+    return _mongo_sessions
+
+
+def _save_session(user_id: str, data: dict):
+    """Persist one evaluation session; falls back to in-memory if no MongoDB."""
+    doc = {
+        'id':             str(uuid.uuid4()),
+        'user_id':        user_id,
+        'created_at':     datetime.now(timezone.utc).isoformat(),
+        'language':       data.get('language', ''),
+        'source_language': data.get('source_language', ''),
+        'domain':         data.get('domain', ''),
+        'overall_score':  data.get('overall_score', 0),
+        'fluency_score':  data.get('fluency_score', 0),
+        'coverage_score': data.get('coverage_score', 0),
+        'error_counts': {
+            'long_silences':    len(data.get('algorithmic', {}).get('long_silences', [])),
+            'repetitions':      len(data.get('algorithmic', {}).get('repetitions', [])),
+            'hesitation_words': len(data.get('algorithmic', {}).get('hesitation_words', [])),
+            'number_errors':    len(data.get('algorithmic', {}).get('number_errors', [])),
+            'information_loss': len(data.get('information_loss', [])),
+            'translation_errors': len(data.get('translation_errors', [])),
+        },
+    }
+    col = _get_sessions_collection()
+    if col is not None:
+        try:
+            col.insert_one(doc)
+            return
+        except Exception:
+            pass
+    # In-memory fallback
+    _mem_sessions.setdefault(user_id, []).append(doc)
+    _mem_sessions[user_id] = _mem_sessions[user_id][-50:]   # keep last 50
+
+
+def _load_sessions(user_id: str, limit: int = 20) -> list:
+    col = _get_sessions_collection()
+    if col is not None:
+        try:
+            docs = list(
+                col.find({'user_id': user_id}, {'_id': 0})
+                   .sort('created_at', -1)
+                   .limit(limit)
+            )
+            return docs
+        except Exception:
+            pass
+    sessions = _mem_sessions.get(user_id, [])
+    return list(reversed(sessions))[:limit]
+
+
+def _compute_adaptive_params(sessions: list) -> dict:
+    """
+    Analyse last sessions and return recommended Module A parameters (D11-D12).
+    """
+    if not sessions:
+        return {'message': 'No sessions yet — complete at least one evaluation to get recommendations.'}
+
+    recent = sessions[:10]
+    avg_overall  = sum(s.get('overall_score', 0) for s in recent) / len(recent)
+    avg_fluency  = sum(s.get('fluency_score', 0) for s in recent) / len(recent)
+    avg_coverage = sum(s.get('coverage_score', 0) for s in recent) / len(recent)
+    avg_numbers  = sum(s.get('error_counts', {}).get('number_errors', 0) for s in recent) / len(recent)
+    avg_reps     = sum(s.get('error_counts', {}).get('repetitions', 0) for s in recent) / len(recent)
+    avg_silences = sum(s.get('error_counts', {}).get('long_silences', 0) for s in recent) / len(recent)
+    avg_info_loss = sum(s.get('error_counts', {}).get('information_loss', 0) for s in recent) / len(recent)
+
+    # Start from reasonable defaults
+    params = {
+        'difficulty':     'intermediate',
+        'word_count':     200,
+        'number_density': 'medium',
+        'speed_pressure': 'normal',
+        'structure':      'well-organized',
+        'topic_shifts':   'none',
+    }
+    tips = []
+
+    # Overall performance → adjust difficulty / length
+    if avg_overall >= 8.0:
+        params['difficulty'] = 'advanced'
+        params['word_count'] = 300
+        tips.append('Excellent performance — raising difficulty to advanced.')
+    elif avg_overall >= 6.5:
+        params['difficulty'] = 'intermediate'
+        params['word_count'] = 200
+        tips.append('Good performance — maintaining intermediate difficulty.')
+    else:
+        params['difficulty'] = 'beginner'
+        params['word_count'] = 120
+        tips.append('Scores below 6.5 — stepping back to beginner level to build confidence.')
+
+    # Number errors → push number density
+    if avg_numbers >= 3:
+        params['number_density'] = 'high'
+        tips.append('Frequent number errors — training with high number density to drill accuracy.')
+    elif avg_numbers <= 0.5 and avg_overall >= 7.0:
+        params['number_density'] = 'medium'
+
+    # Fluency (pauses/repetitions) → slow down
+    if avg_fluency < 6.0 or avg_silences >= 2 or avg_reps >= 5:
+        params['speed_pressure'] = 'slow'
+        tips.append('Fluency needs work — slowing speech pace to reduce cognitive overload.')
+    elif avg_fluency >= 8.0:
+        params['speed_pressure'] = 'fast'
+        tips.append('Strong fluency — increasing speaking pace.')
+
+    # Content coverage / information loss → structure help
+    if avg_info_loss >= 2 or avg_coverage < 6.0:
+        params['structure'] = 'well-organized'
+        tips.append('Missing content regularly — keeping well-organized speeches to aid note-taking.')
+    elif avg_overall >= 7.5 and avg_info_loss <= 0:
+        params['structure'] = 'meandering'
+        params['topic_shifts'] = 'occasional'
+        tips.append('Strong coverage — introducing slight topic shifts to challenge anticipation.')
+
+    return {
+        'recommended_params': params,
+        'based_on_sessions':  len(recent),
+        'averages': {
+            'overall_score':  round(avg_overall, 2),
+            'fluency_score':  round(avg_fluency, 2),
+            'coverage_score': round(avg_coverage, 2),
+            'number_errors':  round(avg_numbers, 2),
+            'repetitions':    round(avg_reps, 2),
+            'long_silences':  round(avg_silences, 2),
+        },
+        'tips': tips,
+    }
 
 
 def _extract_json(text: str) -> dict:
@@ -60,7 +213,7 @@ STUDENT INTERPRETATION TRANSCRIPT (in {target_language}, raw ASR output):
 {transcript}
 
 AUTOMATICALLY DETECTED ISSUES (algorithmic):
-- Long silences (> 1.5s gaps): {silence_count} detected
+- Long silences (> 1.0s gaps): {silence_count} detected → details: {silence_examples}
 - Word repetitions: {repetition_count} detected → examples: {repetition_examples}
 - Hesitation markers: {hesitation_count} detected → examples: {hesitation_examples}
 - Number reproduction errors: {number_errors} detected
@@ -99,6 +252,9 @@ Grammar errors in the INTERPRETATION language (not the source):
 - Arabic: wrong case endings (إعراب), verb agreement, wrong تشكيل
 - French: gender agreement, wrong tense, wrong preposition
 - English: tense, subject-verb agreement
+Do NOT flag number formatting as a language error (e.g. "8,8 milliards" is correct French —
+French uses a comma as the decimal separator, English uses a period). Whether the NUMBER VALUE
+itself is correct is judged separately in TASK 10, not here.
 
 TASK 6 — NUMBERS AND DATES:
 Extract every number, percentage, date, statistic from the SOURCE speech.
@@ -106,6 +262,35 @@ Check each one in the STUDENT interpretation. Flag wrong or missing numbers.
 
 TASK 7 — TERMINOLOGY:
 Key domain-specific terms from the source — were they rendered with the correct equivalent in the target language?
+
+TASK 8 — PAUSES & FLOW:
+{silence_count} pause(s) longer than 1 second were detected: {silence_examples}
+For each pause, judge whether it disrupted the flow of the interpretation (lost the thread, made the listener wait)
+or was a natural processing pause for a consecutive/simultaneous interpreter.
+For disruptive pauses, note what information was likely delayed or lost because of it.
+
+TASK 9 — REPETITIONS:
+{repetition_count} repeated word(s)/phrase(s) were detected: {repetition_examples}
+For each, judge whether it is a meaningless disfluency (stalling while thinking) or a productive
+self-correction (catching and fixing a mistake). Comment on what this reveals about the student's
+processing under pressure.
+
+TASK 10 — NUMBERS, DATES & STATISTICS (cross-language check):
+Extract EVERY number, percentage, date, and statistic from the SOURCE speech.
+For each one, find what the student actually said in {target_language} (numbers may appear as digits
+or spelled out words — both count). Mark each as correct or incorrect.
+A wrong number, date, or statistic is a SERIOUS interpretation error — it can mislead an entire
+negotiation — so flag it clearly even if the rest of the sentence was fine.
+
+TASK 11 — PRONUNCIATION IN {target_language}:
+LOW-CONFIDENCE WORDS the speech recognizer was unsure about (often a sign of unclear or incorrect
+pronunciation): {uncertain_words}
+Give specific, actionable pronunciation feedback for {target_language}:
+- Arabic: تشكيل/إعراب (case endings), emphatic vs plain consonants (ص/س، ض/د، ط/ت، ظ/ذ، ق/ك),
+  hamza ء placement, تاء مربوطة pronunciation, vowel length (مد/قصر)
+- French: nasal vowels, liaison, silent final letters, gender-driven endings affecting sound
+- English: word stress, "th" sounds (θ/ð), vowel reduction in unstressed syllables
+For each low-confidence word above, explain the likely mispronunciation and give the correct way to say it.
 
 Give overall_score 0-10 and coverage_score 0-10:
 - 9-10: Excellent — near-complete, accurate, fluent
@@ -133,6 +318,21 @@ Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
   "lapsus_linguae": [{{"text": "slip", "likely_intended": "intended word"}}],
   "terminology_problems": [{{"source_term": "term in source language", "student_used": "what student said", "correct_equivalent": "correct target language term"}}],
   "information_loss": [{{"lost_content": "what was omitted", "importance": "high"}}],
+  "fluency_score": 7.0,
+  "pause_analysis": {{
+    "comment": "professor's overall comment on pacing and pauses",
+    "problem_pauses": [{{"at_seconds": 12.4, "duration_seconds": 2.1, "impact": "what was likely delayed or lost because of this pause"}}]
+  }},
+  "repetition_analysis": {{
+    "comment": "professor's comment on repetitions found — stalling vs productive self-correction"
+  }},
+  "number_accuracy": [
+    {{"source_value": "50%", "expected_in_target": "what the student should have said", "student_said": "what the student actually said", "correct": false, "note": "explanation of the error"}}
+  ],
+  "pronunciation_assessment": {{
+    "comment": "general pronunciation commentary for this target language",
+    "issues": [{{"word": "uncertain word", "issue": "likely mispronunciation", "correction": "how to pronounce it correctly"}}]
+  }},
   "strengths": ["specific strength observed"],
   "recommendations": ["specific actionable recommendation"],
   "summary": "2-3 sentence overall assessment of interpretation quality."
@@ -154,6 +354,17 @@ HESITATION_PATTERNS = {
     'fr': [r'\beuh+\b', r'\bheu+\b', r'\bhm+\b', r'\bvoilà\b', r'\bdonc\b', r'\bben\b', r'\bquoi\b'],
     'en': [r'\bum+\b', r'\buh+\b', r'\ber+\b', r'\bhmm+\b', r'\bhm+\b', r'\blike\b'],
 }
+
+
+def _is_noise_segment(text: str) -> bool:
+    """
+    True if a Whisper segment is a non-speech annotation (e.g. '[Bruit de fond]',
+    '[Music]', '(applaudissements)') rather than actual student speech.
+    Whisper can get stuck hallucinating these tags repeatedly over noisy/silent
+    audio, which would otherwise be misread as dozens of word repetitions.
+    """
+    t = text.strip()
+    return not t or t[0] in '[('
 
 
 def detect_hesitations_from_text(full_text: str, language: str = 'ar') -> list:
@@ -190,8 +401,12 @@ def detect_repetitions_from_text(full_text: str) -> list:
 
 def detect_long_silences(segments: list, threshold_seconds: float = 1.0) -> list:
     """
-    Detect gaps between segments longer than threshold.
-    Uses 1.0s default — meaningful for interpretation training.
+    Detect gaps longer than threshold — both between segments AND between
+    consecutive words within the same segment.
+
+    Whisper (without VAD) often merges a whole utterance plus a mid-sentence
+    pause into a single segment, so a gap between word timestamps can hide
+    a real pause that a segment-level-only check would miss.
     Also detects leading silence (student slow to start).
     """
     silences = []
@@ -207,6 +422,7 @@ def detect_long_silences(segments: list, threshold_seconds: float = 1.0) -> list
             'type': 'leading'
         })
 
+    # Gaps between segments
     for i in range(len(segments) - 1):
         gap = round(segments[i + 1]['start'] - segments[i]['end'], 2)
         if gap >= threshold_seconds:
@@ -216,6 +432,22 @@ def detect_long_silences(segments: list, threshold_seconds: float = 1.0) -> list
                 'after_text': segments[i].get('text', '')[-60:].strip(),
                 'type': 'mid'
             })
+
+    # Gaps between consecutive words within a segment (catches pauses that
+    # don't get their own segment boundary)
+    for seg in segments:
+        words = seg.get('words', [])
+        for i in range(len(words) - 1):
+            gap = round(words[i + 1]['start'] - words[i]['end'], 2)
+            if gap >= threshold_seconds:
+                silences.append({
+                    'at_seconds': round(words[i]['end'], 1),
+                    'duration_seconds': gap,
+                    'after_text': words[i].get('word', '').strip(),
+                    'type': 'mid'
+                })
+
+    silences.sort(key=lambda s: s['at_seconds'])
     return silences
 
 
@@ -315,40 +547,19 @@ def detect_low_confidence_words(segments: list, threshold: float = 0.6) -> list:
     return low_conf
 
 
-def build_pronunciation_report(all_word_scores: list, language: str, source_script: str = '', transcript_text: str = '') -> dict:
+def build_pronunciation_report(all_word_scores: list, language: str) -> dict:
     """
-    Build a pronunciation report for EN/FR using:
+    Build a pronunciation report using:
     1. Whisper word confidence (low confidence = likely mispronounced)
-    2. Reference text diffing against source translation (substitutions/omissions)
-    3. Language-specific common error patterns
-    """
-    import difflib
+    2. Language-specific common error patterns
 
+    Note: reference diffing against the source script is intentionally NOT done here —
+    this is an interpretation task, so the source and the transcript are in different
+    languages and a word-for-word diff between them is meaningless.
+    """
     uncertain = [w for w in all_word_scores if w['grade'] == 'poor']
     warn_words = [w for w in all_word_scores if w['grade'] == 'warn']
     overall = (sum(w['score'] for w in all_word_scores) / len(all_word_scores)) if all_word_scores else 0
-
-    # Reference diffing (if source available — for sight translation or reading tasks)
-    diff_errors = []
-    if source_script and transcript_text and language != 'ar':
-        src_words = re.findall(r'\w+', source_script.lower())
-        trn_words = re.findall(r'\w+', transcript_text.lower())
-        matcher = difflib.SequenceMatcher(None, src_words, trn_words, autojunk=False)
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            if tag == 'replace' and (i2 - i1) <= 3:
-                diff_errors.append({
-                    'type': 'substitution',
-                    'expected': ' '.join(src_words[i1:i2]),
-                    'said': ' '.join(trn_words[j1:j2]),
-                    'note': 'Word substitution — possible mispronunciation or wrong term'
-                })
-            elif tag == 'delete' and (i2 - i1) <= 2:
-                diff_errors.append({
-                    'type': 'omission',
-                    'expected': ' '.join(src_words[i1:i2]),
-                    'said': '',
-                    'note': 'Word omitted from interpretation'
-                })
 
     # Language-specific patterns flagged from uncertain words
     flagged = []
@@ -369,6 +580,24 @@ def build_pronunciation_report(all_word_scores: list, language: str, source_scri
                 note = '-ed suffix: /t/, /d/ or /ɪd/ depending on preceding sound'
             elif word.endswith('ough'):
                 note = 'Irregular -ough spelling (through/though/thought all differ)'
+        elif language == 'ar':
+            raw = w['word'].strip()
+            if any(ch in raw for ch in ('ً', 'ٌ', 'ٍ')):
+                note = 'تنوين (tanween) detected — make sure the final vowel is pronounced clearly'
+            elif 'ّ' in raw:
+                note = 'شدّة (shadda) — the consonant must be doubled/geminated, not pronounced once'
+            elif 'ة' in raw:
+                note = 'تاء مربوطة — pronounced as /a/ in pause, but as /at/ when followed by another word (إعراب)'
+            elif any(ch in raw for ch in ('ص', 'ض', 'ط', 'ظ')):
+                note = 'Emphatic letter (ص/ض/ط/ظ) — needs a deeper, "heavier" articulation than its plain counterpart (س/د/ت/ذ)'
+            elif 'ق' in raw:
+                note = 'ق (qaf) — uvular sound, do not replace with ك (kaf) or hamza'
+            elif 'ء' in raw or 'أ' in raw or 'إ' in raw:
+                note = 'Hamza (ء) — must be articulated as a clear glottal stop, not dropped'
+            elif any(ch in raw for ch in ('ث', 'ذ', 'ظ')):
+                note = 'Interdental letter (ث/ذ/ظ) — tongue between teeth, do not replace with س/ز/ز'
+            elif any(ch in raw for ch in ('ع', 'غ')):
+                note = 'Pharyngeal/guttural letter (ع/غ) — produced deep in the throat, distinct from ا/خ'
         flagged.append({
             'word': w['word'],
             'start': w.get('start', 0),
@@ -383,7 +612,6 @@ def build_pronunciation_report(all_word_scores: list, language: str, source_scri
         'uncertain_count': len(uncertain),
         'warn_count': len(warn_words),
         'flagged_words': flagged,
-        'diff_errors': diff_errors[:10],
         'summary': (
             f'Good pronunciation confidence ({int(overall*100)}%).'
             if overall >= 0.8
@@ -521,6 +749,10 @@ def generate_feedback():
 
         rep_examples  = ', '.join(f'"{r["word"]}"' for r in (algo.get('repetitions', [])[:3]))
         hes_examples  = ', '.join(f'"{h["word"]}"' for h in (algo.get('hesitation_words', [])[:3]))
+        sil_examples  = '; '.join(
+            f'{sl["duration_seconds"]}s' + (f' after "{sl["after_text"]}"' if sl.get('after_text') else '')
+            for sl in algo.get('long_silences', [])[:5]
+        )
 
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
         prompt = LLM_ANALYSIS_PROMPT.format(
@@ -529,6 +761,7 @@ def generate_feedback():
             source=source_script or '(source speech not provided)',
             transcript=transcript_text,
             silence_count=s.get('silence_count', 0),
+            silence_examples=sil_examples or 'none found automatically',
             repetition_count=s.get('repetition_count', 0),
             repetition_examples=rep_examples or 'none found automatically',
             hesitation_count=s.get('hesitation_count', 0),
@@ -602,7 +835,7 @@ def full_evaluation():
     try:
         # Use local faster-whisper: gives real segment timestamps (silence detection)
         # and word-level probabilities. Groq normalizes silence/repetitions away.
-        from modules.module_c import _get_local_model
+        from modules.module_c import _get_local_model, DISFLUENCY_PROMPTS
         model = _get_local_model()
 
         segments_iter, info = model.transcribe(
@@ -617,6 +850,7 @@ def full_evaluation():
             log_prob_threshold=-100.0,          # disable low-prob fallback — keeps hesitations
             temperature=0.0,                    # greedy decoding — no randomness
             beam_size=1,                        # greedy: prevents beam search from collapsing repetitions
+            initial_prompt=DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en']),  # primes Whisper to keep "euh/um" fillers
         )
 
         full_text = ''
@@ -624,6 +858,8 @@ def full_evaluation():
         all_word_scores = []
 
         for seg in segments_iter:
+            if _is_noise_segment(seg.text):
+                continue
             seg_data = {
                 'start': round(seg.start, 2),
                 'end':   round(seg.end, 2),
@@ -668,6 +904,10 @@ def full_evaluation():
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
         rep_examples     = ', '.join(f'"{r.get("word","")}"' for r in algo.get('repetitions', [])[:3])
         hes_examples     = ', '.join(f'"{h.get("word","")}"' for h in algo.get('hesitation_words', [])[:3])
+        sil_examples     = '; '.join(
+            f'{sl["duration_seconds"]}s' + (f' after "{sl["after_text"]}"' if sl.get('after_text') else '')
+            for sl in algo.get('long_silences', [])[:5]
+        )
         uncertain_words  = [w for w in all_word_scores if w['grade'] == 'poor']
         uncertain_str    = ', '.join(
             f'"{w["word"]}" (confidence {w["score"]})'
@@ -680,6 +920,7 @@ def full_evaluation():
             source=source_script or '(source speech not provided)',
             transcript=full_text,
             silence_count=s.get('silence_count', 0),
+            silence_examples=sil_examples or 'none found automatically',
             repetition_count=s.get('repetition_count', 0),
             repetition_examples=rep_examples or 'none found automatically',
             hesitation_count=s.get('hesitation_count', 0),
@@ -709,15 +950,19 @@ def full_evaluation():
             'summary':          s
         }
 
-        # Step 4: Pronunciation report (EN/FR: full diffing + patterns; AR: whisper scores only)
-        pronun_report = build_pronunciation_report(
-            all_word_scores,
-            language=language,
-            source_script=source_script if language != 'ar' else '',
-            transcript_text=full_text if language != 'ar' else ''
-        )
+        # Step 4: Pronunciation report (whisper confidence + language-specific patterns)
+        pronun_report = build_pronunciation_report(all_word_scores, language=language)
         llm_result['pronunciation'] = pronun_report
         llm_result['transcript'] = transcript
+
+        # Step 5: Persist session for history / adaptive difficulty (D11-D12)
+        user_id = flask_session.get('user_id', 'anonymous')
+        _save_session(user_id, {
+            **llm_result,
+            'language':        language,
+            'source_language': source_language,
+            'domain':          request.form.get('domain', ''),
+        })
 
         return jsonify(llm_result)
 
@@ -905,11 +1150,44 @@ def pronunciation_report():
     })
 
 
+@module_d_bp.route('/sessions', methods=['GET'])
+def list_sessions():
+    """Return the last 20 evaluation sessions for the logged-in user (D11)."""
+    user_id = flask_session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    limit = min(int(request.args.get('limit', 20)), 50)
+    sessions = _load_sessions(user_id, limit=limit)
+    return jsonify({'sessions': sessions, 'count': len(sessions)})
+
+
+@module_d_bp.route('/adaptive-params', methods=['GET'])
+def adaptive_params():
+    """
+    Analyse recent sessions and return recommended Module A parameters (D12).
+    """
+    user_id = flask_session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    sessions = _load_sessions(user_id, limit=10)
+    return jsonify(_compute_adaptive_params(sessions))
+
+
 @module_d_bp.route('/history/<session_id>')
 def get_history(session_id: str):
-    """
-    Retrieve performance history for adaptive difficulty.
-    Requirement D11-D12 from cahier des charges.
-    TODO: Person 5 — implement in Week 5.
-    """
-    return jsonify({'status': 'not yet implemented — planned for Week 5'}), 501
+    """Return a single session by id (D11)."""
+    user_id = flask_session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    col = _get_sessions_collection()
+    if col is not None:
+        try:
+            doc = col.find_one({'id': session_id, 'user_id': user_id}, {'_id': 0})
+            if doc:
+                return jsonify(doc)
+        except Exception:
+            pass
+    for s in _mem_sessions.get(user_id, []):
+        if s.get('id') == session_id:
+            return jsonify(s)
+    return jsonify({'error': 'Session not found'}), 404
