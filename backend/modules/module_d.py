@@ -59,26 +59,58 @@ def _get_sessions_collection():
     return _mongo_sessions
 
 
+def _extract_top_errors(data: dict) -> list:
+    """Pull the most important specific errors from an evaluation result for storage."""
+    errors = []
+    for te in (data.get('translation_errors') or [])[:3]:
+        if isinstance(te, dict):
+            errors.append({
+                'type': 'translation',
+                'source': str(te.get('source_text', ''))[:120],
+                'said':   str(te.get('student_said', ''))[:120],
+            })
+    for na in (data.get('number_accuracy') or []):
+        if isinstance(na, dict) and not na.get('correct'):
+            errors.append({
+                'type':     'number',
+                'expected': str(na.get('expected_in_target', ''))[:80],
+                'said':     str(na.get('student_said', ''))[:80],
+            })
+    for mc in (data.get('missing_content') or [])[:3]:
+        if isinstance(mc, dict) and mc.get('importance') == 'high':
+            errors.append({
+                'type':   'missing',
+                'detail': str(mc.get('content', ''))[:150],
+            })
+    return errors[:6]
+
+
 def _save_session(user_id: str, data: dict):
     """Persist one evaluation session; falls back to in-memory if no MongoDB."""
+    algo = data.get('algorithmic', {}) or {}
     doc = {
-        'id':             str(uuid.uuid4()),
-        'user_id':        user_id,
-        'created_at':     datetime.now(timezone.utc).isoformat(),
-        'language':       data.get('language', ''),
+        'id':              str(uuid.uuid4()),
+        'user_id':         user_id,
+        'created_at':      datetime.now(timezone.utc).isoformat(),
+        'language':        data.get('language', ''),
         'source_language': data.get('source_language', ''),
-        'domain':         data.get('domain', ''),
-        'overall_score':  data.get('overall_score', 0),
-        'fluency_score':  data.get('fluency_score', 0),
-        'coverage_score': data.get('coverage_score', 0),
+        'domain':          data.get('domain', ''),
+        'overall_score':   data.get('overall_score') or 0,
+        'fluency_score':   data.get('fluency_score') or 0,
+        'coverage_score':  data.get('coverage_score') or 0,
         'error_counts': {
-            'long_silences':    len(data.get('algorithmic', {}).get('long_silences', [])),
-            'repetitions':      len(data.get('algorithmic', {}).get('repetitions', [])),
-            'hesitation_words': len(data.get('algorithmic', {}).get('hesitation_words', [])),
-            'number_errors':    len(data.get('algorithmic', {}).get('number_errors', [])),
-            'information_loss': len(data.get('information_loss', [])),
-            'translation_errors': len(data.get('translation_errors', [])),
+            'long_silences':     len(algo.get('long_silences') or []),
+            'repetitions':       len(algo.get('repetitions') or []),
+            'hesitation_words':  len(algo.get('hesitation_words') or []),
+            'number_errors':     len(algo.get('number_errors') or []),
+            'information_loss':  len(data.get('information_loss') or []),
+            'translation_errors':len(data.get('translation_errors') or []),
+            'missing_content':   len(data.get('missing_content') or []),
         },
+        'top_errors':      _extract_top_errors(data),
+        'recommendations': (data.get('recommendations') or [])[:5],
+        'strengths':       (data.get('strengths') or [])[:3],
+        'summary':         str(data.get('summary') or '')[:500],
     }
     col = _get_sessions_collection()
     if col is not None:
@@ -87,9 +119,8 @@ def _save_session(user_id: str, data: dict):
             return
         except Exception:
             pass
-    # In-memory fallback
     _mem_sessions.setdefault(user_id, []).append(doc)
-    _mem_sessions[user_id] = _mem_sessions[user_id][-50:]   # keep last 50
+    _mem_sessions[user_id] = _mem_sessions[user_id][-50:]
 
 
 def _load_sessions(user_id: str, limit: int = 20) -> list:
@@ -109,50 +140,105 @@ def _load_sessions(user_id: str, limit: int = 20) -> list:
 
 
 def _compute_adaptive_params(sessions: list) -> dict:
-    """
-    Analyse last sessions and return recommended Module A parameters (D11-D12).
-    """
+    """Analyse sessions → recommended Module A params + problems to work on + trend."""
     if not sessions:
-        return {'message': 'No sessions yet — complete at least one evaluation to get recommendations.'}
+        return {
+            'message': 'No sessions yet — complete at least one full evaluation to start tracking.',
+            'problems_to_work_on': [],
+            'trend': 'not_enough_data',
+        }
 
-    recent = sessions[:10]
-    avg_overall  = sum(s.get('overall_score', 0) for s in recent) / len(recent)
-    avg_fluency  = sum(s.get('fluency_score', 0) for s in recent) / len(recent)
-    avg_coverage = sum(s.get('coverage_score', 0) for s in recent) / len(recent)
-    avg_numbers  = sum(s.get('error_counts', {}).get('number_errors', 0) for s in recent) / len(recent)
-    avg_reps     = sum(s.get('error_counts', {}).get('repetitions', 0) for s in recent) / len(recent)
-    avg_silences = sum(s.get('error_counts', {}).get('long_silences', 0) for s in recent) / len(recent)
-    avg_info_loss = sum(s.get('error_counts', {}).get('information_loss', 0) for s in recent) / len(recent)
+    recent   = sessions[:10]
+    older    = sessions[10:20]
 
-    # Start from reasonable defaults
-    params = {
-        'difficulty':     'intermediate',
-        'word_count':     200,
-        'number_density': 'medium',
-        'speed_pressure': 'normal',
-        'structure':      'well-organized',
-        'topic_shifts':   'none',
-    }
+    def avg(key, sub=None):
+        vals = []
+        for s in recent:
+            v = s.get('error_counts', {}).get(key, 0) if sub == 'error' else s.get(key, 0)
+            vals.append(v or 0)
+        return sum(vals) / len(vals) if vals else 0
+
+    avg_overall  = avg('overall_score')
+    avg_fluency  = avg('fluency_score')
+    avg_coverage = avg('coverage_score')
+    avg_numbers  = avg('number_errors', 'error')
+    avg_reps     = avg('repetitions', 'error')
+    avg_silences = avg('long_silences', 'error')
+    avg_info_loss = avg('information_loss', 'error')
+    avg_trans    = avg('translation_errors', 'error')
+    avg_missing  = avg('missing_content', 'error')
+
+    # ── Trend detection ──────────────────────────────────────────────────────
+    trend = 'not_enough_data'
+    improvement_pct = None
+    if len(sessions) >= 4:
+        last3  = sessions[:3]
+        prev   = sessions[3:min(8, len(sessions))]
+        r_avg  = sum(s.get('overall_score', 0) for s in last3) / len(last3)
+        p_avg  = sum(s.get('overall_score', 0) for s in prev)  / len(prev)
+        delta  = r_avg - p_avg
+        improvement_pct = round(delta, 2)
+        if delta >= 0.4:
+            trend = 'improving'
+        elif delta <= -0.4:
+            trend = 'declining'
+        else:
+            trend = 'stable'
+
+    # ── Problems to work on ──────────────────────────────────────────────────
+    problems = []
+
+    def severity(ratio):
+        if ratio >= 0.7: return 'high'
+        if ratio >= 0.4: return 'medium'
+        return 'low'
+
+    n = len(recent)
+    sessions_with_trans    = sum(1 for s in recent if s.get('error_counts', {}).get('translation_errors', 0) > 0)
+    sessions_with_numbers  = sum(1 for s in recent if s.get('error_counts', {}).get('number_errors', 0) > 0)
+    sessions_with_silences = sum(1 for s in recent if s.get('error_counts', {}).get('long_silences', 0) >= 2)
+    sessions_with_reps     = sum(1 for s in recent if s.get('error_counts', {}).get('repetitions', 0) >= 3)
+    sessions_with_missing  = sum(1 for s in recent if s.get('error_counts', {}).get('missing_content', 0) >= 2)
+    sessions_with_coverage = sum(1 for s in recent if (s.get('coverage_score') or 10) < 7)
+    sessions_with_fluency  = sum(1 for s in recent if (s.get('fluency_score') or 10) < 6.5)
+
+    if sessions_with_trans / n >= 0.3:
+        problems.append({'key': 'translation', 'label': 'Translation accuracy', 'severity': severity(sessions_with_trans / n), 'detail': f'Wrong equivalents in {sessions_with_trans}/{n} sessions', 'tip': 'Study terminology lists and practice active listening for key concepts.'})
+    if sessions_with_numbers / n >= 0.3:
+        problems.append({'key': 'numbers', 'label': 'Numbers & figures', 'severity': severity(sessions_with_numbers / n), 'detail': f'Number errors in {sessions_with_numbers}/{n} sessions', 'tip': 'Practice shadowing speeches with high number density.'})
+    if sessions_with_missing / n >= 0.3:
+        problems.append({'key': 'missing', 'label': 'Missing content', 'severity': severity(sessions_with_missing / n), 'detail': f'Key ideas omitted in {sessions_with_missing}/{n} sessions', 'tip': 'Improve note-taking and work on shorter speeches first.'})
+    if sessions_with_silences / n >= 0.3:
+        problems.append({'key': 'silences', 'label': 'Long pauses', 'severity': severity(sessions_with_silences / n), 'detail': f'Excessive pauses in {sessions_with_silences}/{n} sessions', 'tip': 'Practice décalage (time-lag) exercises to keep output flowing.'})
+    if sessions_with_reps / n >= 0.3:
+        problems.append({'key': 'repetitions', 'label': 'Repetitions & self-corrections', 'severity': severity(sessions_with_reps / n), 'detail': f'High repetitions in {sessions_with_reps}/{n} sessions', 'tip': 'Work on reformulation — commit to a rendering instead of backtracking.'})
+    if sessions_with_fluency / n >= 0.4:
+        problems.append({'key': 'fluency', 'label': 'Delivery fluency', 'severity': severity(sessions_with_fluency / n), 'detail': f'Low fluency score in {sessions_with_fluency}/{n} sessions', 'tip': 'Shadow native speakers and record yourself daily.'})
+    if sessions_with_coverage / n >= 0.4:
+        problems.append({'key': 'coverage', 'label': 'Content coverage', 'severity': severity(sessions_with_coverage / n), 'detail': f'Low coverage in {sessions_with_coverage}/{n} sessions', 'tip': 'Focus on conveying main ideas before worrying about style.'})
+
+    # Sort: high severity first
+    sev_order = {'high': 0, 'medium': 1, 'low': 2}
+    problems.sort(key=lambda p: sev_order.get(p['severity'], 3))
+
+    # ── Recommended params ───────────────────────────────────────────────────
+    params = {'difficulty': 'intermediate', 'word_count': 200, 'number_density': 'medium',
+              'speed_pressure': 'normal', 'structure': 'well-organized', 'topic_shifts': 'none'}
     tips = []
 
-    # Overall performance → adjust difficulty / length
     if avg_overall >= 8.0:
-        params['difficulty'] = 'advanced'
-        params['word_count'] = 300
+        params['difficulty'] = 'advanced'; params['word_count'] = 300
         tips.append('Excellent performance — raising difficulty to advanced.')
     elif avg_overall >= 6.5:
-        params['difficulty'] = 'intermediate'
-        params['word_count'] = 200
+        params['difficulty'] = 'intermediate'; params['word_count'] = 200
         tips.append('Good performance — maintaining intermediate difficulty.')
     else:
-        params['difficulty'] = 'beginner'
-        params['word_count'] = 120
-        tips.append('Scores below 6.5 — stepping back to beginner level to build confidence.')
+        params['difficulty'] = 'beginner'; params['word_count'] = 120
+        tips.append('Scores below 6.5 — stepping back to beginner to build confidence.')
 
-    # Number errors → push number density
     if avg_numbers >= 3:
         params['number_density'] = 'high'
-        tips.append('Frequent number errors — training with high number density to drill accuracy.')
+        tips.append('Frequent number errors — drilling with high number density.')
     elif avg_numbers <= 0.5 and avg_overall >= 7.0:
         params['number_density'] = 'medium'
 
@@ -174,8 +260,11 @@ def _compute_adaptive_params(sessions: list) -> dict:
         tips.append('Strong coverage — introducing slight topic shifts to challenge anticipation.')
 
     return {
-        'recommended_params': params,
-        'based_on_sessions':  len(recent),
+        'recommended_params':  params,
+        'based_on_sessions':   len(recent),
+        'trend':               trend,
+        'improvement_pct':     improvement_pct,
+        'problems_to_work_on': problems,
         'averages': {
             'overall_score':  round(avg_overall, 2),
             'fluency_score':  round(avg_fluency, 2),
@@ -2112,10 +2201,8 @@ def pronunciation_report():
 
 @module_d_bp.route('/sessions', methods=['GET'])
 def list_sessions():
-    """Return the last 20 evaluation sessions for the logged-in user (D11)."""
-    user_id = flask_session.get('user_id')
-    if not user_id:
-        return jsonify({'error': 'Not authenticated'}), 401
+    """Return the last N evaluation sessions for the current user (D11). Works even when not logged in."""
+    user_id = flask_session.get('user_id', 'anonymous')
     limit = min(int(request.args.get('limit', 20)), 50)
     sessions = _load_sessions(user_id, limit=limit)
     return jsonify({'sessions': sessions, 'count': len(sessions)})
@@ -2123,13 +2210,9 @@ def list_sessions():
 
 @module_d_bp.route('/adaptive-params', methods=['GET'])
 def adaptive_params():
-    """
-    Analyse recent sessions and return recommended Module A parameters (D12).
-    """
-    user_id = flask_session.get('user_id')
-    if not user_id:
-        return jsonify({'error': 'Not authenticated'}), 401
-    sessions = _load_sessions(user_id, limit=10)
+    """Analyse recent sessions and return recommended Module A parameters + trend + problems (D12)."""
+    user_id = flask_session.get('user_id', 'anonymous')
+    sessions = _load_sessions(user_id, limit=20)
     return jsonify(_compute_adaptive_params(sessions))
 
 

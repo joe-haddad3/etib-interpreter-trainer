@@ -89,4 +89,4 @@ def handle_exception(e):
 
 
 if __name__ == '__main__':
-    app.run(debug=os.getenv('FLASK_DEBUG', 'true').lower() == 'true', port=5000)
+    app.run(debug=os.getenv('FLASK_DEBUG', 'true').lower() == 'true', port=5000, use_reloader=False)

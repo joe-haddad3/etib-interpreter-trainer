@@ -72,6 +72,15 @@ const UI = {
     progressAvgFluency: 'Avg. fluency',
     progressAvgNumbers: 'Avg. number errors',
     progressTrend: 'Score trend (last 10 sessions)',
+    progressLatest: 'Latest session',
+    progressProblems: 'Focus areas — what to work on',
+    progressImproving: 'Improving',
+    progressDeclining: 'Declining',
+    progressStable: 'Stable',
+    progressStrengths: 'Strengths',
+    progressRecs: 'Recommendations',
+    progressTopErrors: 'Specific errors',
+    progressNoData: 'Not enough data yet',
     moduleATitle: 'Generate training speech',
     groundedSourceLabel: 'Grounded in real UN document:',
     ungroundedNote: 'No matching UN document was found — this speech was generated without source grounding.',
@@ -288,6 +297,15 @@ const UI = {
     progressAvgFluency: 'متوسط الطلاقة',
     progressAvgNumbers: 'متوسط أخطاء الأرقام',
     progressTrend: 'منحنى الدرجات (آخر 10 جلسات)',
+    progressLatest: 'آخر جلسة',
+    progressProblems: 'نقاط التركيز — ما يجب العمل عليه',
+    progressImproving: 'تحسّن',
+    progressDeclining: 'تراجع',
+    progressStable: 'مستقر',
+    progressStrengths: 'نقاط القوة',
+    progressRecs: 'التوصيات',
+    progressTopErrors: 'أخطاء محددة',
+    progressNoData: 'بيانات غير كافية بعد',
     moduleATitle: 'توليد خطاب تدريبي',
     groundedSourceLabel: 'مستند إلى وثيقة أممية حقيقية:',
     ungroundedNote: 'لم يتم العثور على وثيقة أممية مطابقة — تم إنشاء هذا الخطاب دون الاستناد إلى مصدر.',
@@ -504,6 +522,15 @@ const UI = {
     progressAvgFluency: 'Moy. fluidité',
     progressAvgNumbers: 'Moy. erreurs numériques',
     progressTrend: 'Courbe des scores (10 dernières sessions)',
+    progressLatest: 'Dernière session',
+    progressProblems: 'Points de travail — axes prioritaires',
+    progressImproving: 'En progression',
+    progressDeclining: 'En recul',
+    progressStable: 'Stable',
+    progressStrengths: 'Points forts',
+    progressRecs: 'Recommandations',
+    progressTopErrors: 'Erreurs spécifiques',
+    progressNoData: 'Pas encore assez de données',
     moduleATitle: 'Générer un discours d’entraînement',
     groundedSourceLabel: 'Basé sur un document réel de l’ONU :',
     ungroundedNote: 'Aucun document de l’ONU correspondant n’a été trouvé — ce discours a été généré sans source.',
@@ -840,6 +867,29 @@ function MiniBar({ value, max = 10, color }) {
   );
 }
 
+function TrendBadge({ trend, labels }) {
+  if (!trend || trend === 'not_enough_data') return null;
+  const map = {
+    improving: { icon: '↑', color: 'var(--sage)',   text: labels.progressImproving },
+    declining:  { icon: '↓', color: 'var(--sienna)', text: labels.progressDeclining },
+    stable:     { icon: '→', color: 'var(--gold)',   text: labels.progressStable },
+  };
+  const d = map[trend];
+  if (!d) return null;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem',
+      fontWeight: 700, color: d.color, background: d.color + '18', padding: '0.18rem 0.6rem',
+      borderRadius: '999px', marginLeft: '0.5rem' }}>
+      {d.icon} {d.text}
+    </span>
+  );
+}
+
+function SeverityDot({ severity }) {
+  const c = severity === 'high' ? 'var(--sienna)' : severity === 'medium' ? 'var(--gold)' : 'var(--sage)';
+  return <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: c, marginRight: '0.4rem', flexShrink: 0 }} />;
+}
+
 function ModuleProgress({ labels, refresh, onApplyParams }) {
   const [sessions, setSessions] = useState([]);
   const [adaptive, setAdaptive] = useState(null);
@@ -860,9 +910,14 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
   const LANG_FLAG = { ar: '🇱🇧', fr: '🇫🇷', en: '🇬🇧' };
   const recentTen = sessions.slice(0, 10).reverse();
 
-  const avgOverall  = sessions.length ? (sessions.reduce((s, x) => s + (x.overall_score || 0), 0) / sessions.length).toFixed(2) : null;
-  const avgFluency  = sessions.length ? (sessions.reduce((s, x) => s + (x.fluency_score || 0), 0) / sessions.length).toFixed(2) : null;
-  const avgNumbers  = sessions.length ? (sessions.reduce((s, x) => s + (x.error_counts?.number_errors || 0), 0) / sessions.length).toFixed(1) : null;
+  const n = sessions.length;
+  const avgOverall  = n ? (sessions.reduce((s, x) => s + (x.overall_score || 0), 0) / n).toFixed(2) : null;
+  const avgFluency  = n ? (sessions.reduce((s, x) => s + (x.fluency_score || 0), 0) / n).toFixed(2) : null;
+  const avgNumbers  = n ? (sessions.reduce((s, x) => s + (x.error_counts?.number_errors || 0), 0) / n).toFixed(1) : null;
+
+  const latest   = sessions[0] || null;
+  const trend    = adaptive?.trend;
+  const problems = adaptive?.problems_to_work_on || [];
 
   if (loading) {
     return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" /><p style={{ marginTop: '1rem', color: 'var(--warm-gray)' }}>{labels.progressLoading}</p></div>;
@@ -874,8 +929,15 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
       <div className="progress-stat-row">
         <div className="progress-stat-card">
           <div className="progress-stat-label">{labels.progressAvgOver}</div>
-          <div className="progress-stat-value" style={{ color: avgOverall >= 7 ? 'var(--sage)' : avgOverall >= 5.5 ? 'var(--gold)' : 'var(--sienna)' }}>{avgOverall ?? '—'}</div>
-          <div className="progress-stat-sub">/ 10</div>
+          <div className="progress-stat-value" style={{ color: avgOverall >= 7 ? 'var(--sage)' : avgOverall >= 5.5 ? 'var(--gold)' : 'var(--sienna)' }}>
+            {avgOverall ?? '—'}
+            {trend && trend !== 'not_enough_data' && <TrendBadge trend={trend} labels={labels} />}
+          </div>
+          <div className="progress-stat-sub">/ 10 &nbsp;{adaptive?.improvement_pct != null && trend !== 'not_enough_data' && (
+            <span style={{ color: adaptive.improvement_pct > 0 ? 'var(--sage)' : 'var(--sienna)' }}>
+              ({adaptive.improvement_pct > 0 ? '+' : ''}{adaptive.improvement_pct})
+            </span>
+          )}</div>
         </div>
         <div className="progress-stat-card">
           <div className="progress-stat-label">{labels.progressAvgFluency}</div>
@@ -889,24 +951,87 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
         </div>
         <div className="progress-stat-card">
           <div className="progress-stat-label">Sessions</div>
-          <div className="progress-stat-value" style={{ color: 'var(--primary)' }}>{sessions.length}</div>
+          <div className="progress-stat-value" style={{ color: 'var(--primary)' }}>{n}</div>
           <div className="progress-stat-sub">total</div>
         </div>
       </div>
 
-      {sessions.length === 0 ? (
+      {n === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--warm-gray)' }}>
           <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
           <p>{labels.progressNoSessions}</p>
         </div>
       ) : (
         <>
+          {/* ── Latest session card ── */}
+          {latest && (
+            <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
+              <h2 className="b-section-title">🎓 {labels.progressLatest}</h2>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                  <div className="progress-stat-card" style={{ minWidth: 90 }}>
+                    <div className="progress-stat-label">{labels.progressOverall}</div>
+                    <div className="progress-stat-value" style={{ color: latest.overall_score >= 7 ? 'var(--sage)' : latest.overall_score >= 5.5 ? 'var(--gold)' : 'var(--sienna)' }}>{latest.overall_score?.toFixed(1) ?? '—'}</div>
+                  </div>
+                  <div className="progress-stat-card" style={{ minWidth: 90 }}>
+                    <div className="progress-stat-label">{labels.progressFluency}</div>
+                    <div className="progress-stat-value" style={{ color: latest.fluency_score >= 7 ? 'var(--sage)' : 'var(--gold)' }}>{latest.fluency_score?.toFixed(1) ?? '—'}</div>
+                  </div>
+                  <div className="progress-stat-card" style={{ minWidth: 90 }}>
+                    <div className="progress-stat-label">{labels.progressCoverage}</div>
+                    <div className="progress-stat-value" style={{ color: latest.coverage_score >= 7 ? 'var(--sage)' : 'var(--gold)' }}>{latest.coverage_score?.toFixed(1) ?? '—'}</div>
+                  </div>
+                </div>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  {latest.summary && <p style={{ fontSize: '0.88rem', color: 'var(--warm-gray)', marginBottom: '0.5rem', fontStyle: 'italic' }}>"{latest.summary}"</p>}
+                  {(latest.strengths || []).length > 0 && (
+                    <div style={{ marginBottom: '0.4rem' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--sage)' }}>{labels.progressStrengths}: </span>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--warm-gray)' }}>{latest.strengths.join(' · ')}</span>
+                    </div>
+                  )}
+                  {(latest.recommendations || []).length > 0 && (
+                    <div>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--gold)' }}>{labels.progressRecs}: </span>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--warm-gray)' }}>{latest.recommendations.slice(0, 2).join(' · ')}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Focus areas ── */}
+          {problems.length > 0 && (
+            <div className="card">
+              <h2 className="b-section-title">🔍 {labels.progressProblems}</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {problems.map((p) => (
+                  <div key={p.key} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+                    background: 'var(--bg-secondary, #f8f7f5)', borderRadius: '8px', padding: '0.75rem 1rem' }}>
+                    <SeverityDot severity={p.severity} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary, #1a1a1a)' }}>{p.label}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginTop: '0.1rem' }}>{p.detail}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--primary)', marginTop: '0.25rem' }}>💡 {p.tip}</div>
+                    </div>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                      color: p.severity === 'high' ? 'var(--sienna)' : p.severity === 'medium' ? 'var(--gold)' : 'var(--sage)',
+                      border: `1px solid currentColor`, borderRadius: '4px', padding: '0.15rem 0.4rem', flexShrink: 0 }}>
+                      {p.severity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── Score trend chart ── */}
           <div className="card">
             <h2 className="b-section-title">📈 {labels.progressTrend}</h2>
             <div className="trend-chart">
               {recentTen.map((s, i) => {
-                const h = Math.round((s.overall_score / 10) * 100);
+                const h = Math.round(((s.overall_score || 0) / 10) * 100);
                 const color = s.overall_score >= 8 ? 'var(--sage)' : s.overall_score >= 6.5 ? 'var(--gold)' : 'var(--sienna)';
                 return (
                   <div key={i} className="trend-bar-wrap">
@@ -975,7 +1100,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                       {(s.error_counts?.number_errors > 0) && <span className="err-chip err-chip--num">🔢 {s.error_counts.number_errors}</span>}
                       {(s.error_counts?.repetitions > 0) && <span className="err-chip err-chip--rep">🔁 {s.error_counts.repetitions}</span>}
                       {(s.error_counts?.long_silences > 0) && <span className="err-chip err-chip--sil">🔇 {s.error_counts.long_silences}</span>}
-                      {(s.error_counts?.information_loss > 0) && <span className="err-chip err-chip--loss">📉 {s.error_counts.information_loss}</span>}
+                      {(s.error_counts?.translation_errors > 0) && <span className="err-chip err-chip--loss">🔤 {s.error_counts.translation_errors}</span>}
                     </div>
                     <span className="session-chevron">{expanded === i ? '▲' : '▼'}</span>
                   </div>
@@ -986,6 +1111,37 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                         <div><span className="session-detail-label">{labels.progressFluency}</span><ScoreBadge score={s.fluency_score} /></div>
                         <div><span className="session-detail-label">{labels.progressCoverage}</span><ScoreBadge score={s.coverage_score} /></div>
                       </div>
+                      {s.summary && <p style={{ fontSize: '0.82rem', color: 'var(--warm-gray)', marginTop: '0.6rem', fontStyle: 'italic' }}>"{s.summary}"</p>}
+                      {(s.strengths || []).length > 0 && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--sage)', textTransform: 'uppercase' }}>{labels.progressStrengths}</span>
+                          <ul style={{ margin: '0.25rem 0 0 1rem', fontSize: '0.8rem', color: 'var(--warm-gray)' }}>
+                            {s.strengths.map((r, j) => <li key={j}>{r}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {(s.recommendations || []).length > 0 && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase' }}>{labels.progressRecs}</span>
+                          <ul style={{ margin: '0.25rem 0 0 1rem', fontSize: '0.8rem', color: 'var(--warm-gray)' }}>
+                            {s.recommendations.map((r, j) => <li key={j}>{r}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {(s.top_errors || []).length > 0 && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--sienna)', textTransform: 'uppercase' }}>{labels.progressTopErrors}</span>
+                          <ul style={{ margin: '0.25rem 0 0 1rem', fontSize: '0.78rem', color: 'var(--warm-gray)' }}>
+                            {s.top_errors.map((e, j) => (
+                              <li key={j}>
+                                {e.type === 'translation' && <><strong>{e.source}</strong> → said: <em>{e.said}</em></>}
+                                {e.type === 'number' && <>Expected <strong>{e.expected}</strong>, said: <em>{e.said}</em></>}
+                                {e.type === 'missing' && <>Missing: <em>{e.detail}</em></>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
