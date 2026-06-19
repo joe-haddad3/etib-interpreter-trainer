@@ -161,6 +161,16 @@ Grounding rules:
 - Do not invent unsupported statistics, names, dates, or causal claims.
 - Adapt the content into a realistic conference speech while preserving accuracy.
 """
+    else:
+        # No document found — instruct the model to stay within verifiable facts
+        grounding_block = """
+FACTUAL ACCURACY RULES (no source document available):
+- Only cite statistics and figures you are highly confident are real (from well-known UN, World Bank, WHO, IMF, or government reports).
+- If a number is approximate, say so explicitly in the speech (e.g., "approximately", "according to UN estimates").
+- Do not invent treaty names, resolutions, or dates of agreements.
+- Prefer widely-known named entities (existing organisations, real summits, actual conventions).
+- When in doubt, use ranges rather than precise invented numbers.
+"""
 
     # ── Mode instruction ─────────────────────────────────────────────────────
     mode_note = MODE_INSTRUCTIONS.get(mode, '')
@@ -275,31 +285,38 @@ ARABIC LANGUAGE REQUIREMENTS — STRICTLY ENFORCED
   Examples: الأمم المتحدة، منظمة الصحة العالمية، الاتحاد الأوروبي، صندوق النقد الدولي
 - Maintain a formal MSA register throughout (no colloquial forms).
 - Use proper Arabic punctuation: ، ؛ ؟ — not Latin equivalents.
+- NUMBERS: Write ALL numbers using Eastern Arabic-Indic numerals: ٠١٢٣٤٥٦٧٨٩
+  Example: write ٧٠٠ مليون شخص — NOT 700 مليون شخص
+  Example: write ٨،٢٪ — NOT 8.2%
+  Example: write عام ٢٠٢٠ — NOT عام 2020
 """
 
     return prompt
 
 
+_WESTERN_TO_ARABIC_INDIC = str.maketrans('0123456789', '٠١٢٣٤٥٦٧٨٩')
+
+def _to_arabic_indic(text: str) -> str:
+    """Convert Western digits to Eastern Arabic-Indic numerals (٠١٢٣٤٥٦٧٨٩)."""
+    return text.translate(_WESTERN_TO_ARABIC_INDIC)
+
+
 def _clean_arabic_script(text: str) -> str:
-    """Remove stray Latin/CJK characters from an Arabic script field."""
+    """Remove stray Latin/CJK characters from an Arabic script field, then convert digits."""
     import unicodedata
     result = []
     for char in text:
-        cat = unicodedata.category(char)
         block = ord(char)
-        # Keep: Arabic (0600-06FF), Arabic supplement/extended, Arabic presentation forms,
-        # spaces, punctuation, digits (Western + Arabic-Indic), newlines
         is_arabic = 0x0600 <= block <= 0x06FF or 0xFB50 <= block <= 0xFDFF or 0xFE70 <= block <= 0xFEFF
         is_space = char in ' \n\r\t،؛؟!.,،:()[]«»"\'–—'
         is_digit = char.isdigit()
         if is_arabic or is_space or is_digit:
             result.append(char)
         else:
-            # Replace stray foreign character with a space to avoid word merging
             result.append(' ')
-    # Collapse multiple spaces
     import re as _re
-    return _re.sub(r' {2,}', ' ', ''.join(result)).strip()
+    cleaned = _re.sub(r' {2,}', ' ', ''.join(result)).strip()
+    return _to_arabic_indic(cleaned)
 
 
 def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
@@ -871,9 +888,9 @@ def generate_speech():
         return jsonify(validation_error), status
 
     try:
-        # Normal generation should be fast. UN grounding is opt-in because
-        # searching/downloading PDFs can make the UI feel stuck.
-        source = find_un_grounding_source(params) if should_auto_ground_generation(params) else None
+        # Always attempt UN Library grounding to ensure factual accuracy.
+        # If no matching document is found, falls back to LLM knowledge only.
+        source = find_un_grounding_source(params)
         excerpts = None
         if source:
             normalized_text = normalize_text(source['text'])
