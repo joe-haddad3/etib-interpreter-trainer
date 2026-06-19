@@ -591,6 +591,21 @@ audio { width: 100%; accent-color: var(--gold); }
 }
 .material-card h4 { font-size: 0.8rem; font-weight: 600; color: var(--warm-gray); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.7rem; }
 
+.mind-map {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--pearl);
+  border: 1px solid rgba(200,151,58,0.12);
+  border-radius: 12px;
+  padding: 1rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
 /* glossary table */
 .glos-table { width: 100%; border-collapse: collapse; }
 .glos-table th {

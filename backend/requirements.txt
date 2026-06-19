@@ -37,7 +37,12 @@ ffmpeg-python==0.2.0
 
 # --- File generation and extraction ---
 python-docx==1.1.0
-pypdf==4.2.0
+pypdf==6.13.2
+pdfplumber==0.11.10
+pdfminer.six==20260107
+pypdfium2==5.10.1
+Pillow==12.2.0
+cryptography==49.0.0
 fpdf2==2.7.9
 
 # --- Database ---
