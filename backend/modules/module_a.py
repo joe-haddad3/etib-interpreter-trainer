@@ -8,13 +8,15 @@ import ast
 import json
 import re
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
 from config import DEFAULT_WORD_COUNT, DEFAULT_WPM
 from services.llm_service import generate_text
 from utils.document_grounding import (
     DEFAULT_CHUNK_CHARACTERS,
+    DEFAULT_MAX_EXCERPT_CHARACTERS,
+    DEFAULT_MAX_EXCERPTS,
     DocumentGroundingError,
     chunk_text,
     extract_document_text,
@@ -22,9 +24,11 @@ from utils.document_grounding import (
     get_source_type,
     is_supported_document,
     normalize_text,
-    select_relevant_chunks,
-    select_relevant_chunks_with_metadata,
     validate_extracted_text,
+)
+from utils.embedding_retrieval import (
+    KEYWORD_FALLBACK_RETRIEVAL_METHOD,
+    select_production_relevant_chunks,
 )
 from modules.module_library import (
     DOMAIN_QUERIES,
@@ -49,12 +53,47 @@ MODE_INSTRUCTIONS = {
     'simultaneous': 'Fast, dense delivery. Short sentences. High information density.',
 }
 
+WORD_COUNT_RANGES = {
+    'short': {'label': 'Short', 'min': 120, 'max': 180, 'target': 150},
+    'medium': {'label': 'Medium', 'min': 220, 'max': 320, 'target': 270},
+    'long': {'label': 'Long', 'min': 400, 'max': 550, 'target': 475},
+    'extended': {'label': 'Extended', 'min': 650, 'max': 800, 'target': 725},
+}
+
+DEFAULT_WORD_COUNT_RANGE = 'medium'
+
+
+def get_word_count_settings(params: dict) -> dict:
+    """Return normalized word-count range settings, supporting old numeric requests."""
+    requested_range = params.get('word_count_range')
+    if requested_range in WORD_COUNT_RANGES:
+        return {'key': requested_range, **WORD_COUNT_RANGES[requested_range]}
+
+    try:
+        legacy_word_count = int(params.get('word_count', WORD_COUNT_RANGES[DEFAULT_WORD_COUNT_RANGE]['target']))
+    except (TypeError, ValueError):
+        legacy_word_count = WORD_COUNT_RANGES[DEFAULT_WORD_COUNT_RANGE]['target']
+
+    if legacy_word_count <= WORD_COUNT_RANGES['short']['max']:
+        key = 'short'
+    elif legacy_word_count <= WORD_COUNT_RANGES['medium']['max']:
+        key = 'medium'
+    elif legacy_word_count <= WORD_COUNT_RANGES['long']['max']:
+        key = 'long'
+    else:
+        key = 'extended'
+
+    return {'key': key, **WORD_COUNT_RANGES[key]}
+
 
 def build_structured_material_prompt(params: dict, topic: str, excerpts: list[str] | None = None) -> str:
     language        = params.get('language', 'ar')
     target_language = params.get('target_language', 'fr')
     domain          = params.get('domain', 'politics')
-    word_count      = params.get('word_count', 250)
+    word_count_settings = get_word_count_settings(params)
+    word_count      = word_count_settings['target']
+    word_count_min  = word_count_settings['min']
+    word_count_max  = word_count_settings['max']
     difficulty      = params.get('difficulty', 'intermediate')
     structure       = params.get('structure', 'well-organized')
     scenario        = params.get('scenario', 'UN General Assembly')
@@ -145,7 +184,7 @@ Interpretation into: {target_name}
 Domain:              {domain}
 Scenario:            {scenario}
 Difficulty:          {difficulty.upper()} — {diff_profile}
-Required length:     {word_count} words in the "script" field (target — must stay within ±15%, i.e. {int(word_count * 0.85)}–{int(word_count * 1.15)} words)
+Required length:     between {word_count_min} and {word_count_max} words in the "script" field (target about {word_count} words)
 Interpretation mode: {mode} — {mode_note}
 Numbers/statistics:  {number_instruction}
 Hesitations:         {'Yes — ' + hesitation_note if hesitations else 'No'}
@@ -173,10 +212,7 @@ SPEECH WRITING RULES
    - At least one acronym (UN, WHO, GDP, IMF, etc.)
    - Country or region names
 
-5. The "script" field MUST be close to {word_count} words (within ±15%). If {word_count} is small,
-   prioritize a brief greeting, ONE main point, and a short conclusion — do not try to cram in every
-   element from rule 4 if it would push the speech over the word count. If the draft is short, expand
-   with elaboration; if it is long, cut elaboration/examples rather than dropping the core message.
+5. The "script" field MUST stay between {word_count_min} and {word_count_max} words. Expand with concrete examples, data, and elaboration until it is close to {word_count} words.
 
 6. MCQ rules: Write 5 questions that test SPECIFIC content from the speech — exact numbers, named organisations, specific policy positions, cause-effect relationships. NEVER ask "what is the topic?" or "who gave this speech?".
 
@@ -202,7 +238,7 @@ OUTPUT FORMAT — STRICT JSON ONLY
 Return ONLY valid compact JSON. No markdown, no code fences, no explanation outside the JSON.
 
 {{
-  "script": "Full speech text — approximately {word_count} words (±15%)",
+  "script": "Full speech text — between {word_count_min} and {word_count_max} words",
   "summary": "Mind-map outline of the speech in the speech language",
   "mcqs": [
     {{
@@ -301,6 +337,31 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
         'glossary': normalize_glossary(data.get('glossary')),
         'metadata': data.get('metadata') if isinstance(data.get('metadata'), dict) else {},
     }
+
+
+def script_word_count(script: str) -> int:
+    return len(str(script or '').split())
+
+
+def strict_trim_script_to_max_words(script: str, max_words: int) -> str:
+    words = str(script or '').split()
+    if len(words) <= max_words:
+        return str(script or '').strip()
+    return ' '.join(words[:max_words]).strip().rstrip(' ,;:،؛') + '.'
+
+
+def enforce_generation_word_range(generated: dict, params: dict) -> dict:
+    """Keep generated scripts inside the selected range when the model overshoots."""
+    word_count_settings = get_word_count_settings(params)
+    script = str(generated.get('script', '')).strip()
+    count = script_word_count(script)
+
+    generated.setdefault('metadata', {})
+    if count > word_count_settings['max']:
+        generated['script'] = strict_trim_script_to_max_words(script, word_count_settings['max'])
+        generated['metadata']['word_count_hard_trimmed'] = True
+
+    return generated
 
 
 def clean_model_json_text(raw_output: str) -> str:
@@ -454,13 +515,18 @@ def validate_params(params: dict, require_topic: bool = True) -> tuple[dict, int
     if require_topic and not topic:
         return {'error': 'topic is required'}, 400
 
-    try:
-        word_count = int(params.get('word_count', 250))
-    except (TypeError, ValueError):
-        return {'error': 'word_count must be a number'}, 400
+    requested_range = params.get('word_count_range')
+    if requested_range not in [None, *WORD_COUNT_RANGES.keys()]:
+        return {'error': f"word_count_range must be one of: {', '.join(WORD_COUNT_RANGES.keys())}"}, 400
 
-    if word_count < 50 or word_count > 800:
-        return {'error': 'word_count must be between 50 and 800'}, 400
+    if 'word_count' in params:
+        try:
+            word_count = int(params.get('word_count'))
+        except (TypeError, ValueError):
+            return {'error': 'word_count must be a number'}, 400
+
+        if word_count < 50 or word_count > 800:
+            return {'error': 'word_count must be between 50 and 800'}, 400
 
     return None, None
 
@@ -474,6 +540,7 @@ def parse_document_generation_params(form) -> dict:
         'target_language',
         'domain',
         'word_count',
+        'word_count_range',
         'difficulty',
         'mode',
         'structure',
@@ -540,6 +607,47 @@ def uploaded_document_files(files) -> list:
     """Return files from both retrieval field names, excluding empty inputs."""
     uploaded_files = files.getlist('documents') + files.getlist('document')
     return [file for file in uploaded_files if file and file.filename]
+
+
+def build_chunk_records(
+    chunks: list[str],
+    source_filename: str,
+    source_type: str,
+    source_order: int = 0,
+) -> list[dict]:
+    """Attach source metadata to chunks before production retrieval ranking."""
+    return [
+        {
+            'text': chunk,
+            'source_filename': source_filename,
+            'source_type': source_type,
+            'chunk_index': chunk_index,
+            'source_order': source_order,
+        }
+        for chunk_index, chunk in enumerate(chunks)
+    ]
+
+
+def selected_chunk_texts(selected_chunks: list[dict]) -> list[str]:
+    """Return selected text excerpts for the existing prompt builders."""
+    return [chunk.get('text', '') for chunk in selected_chunks]
+
+
+def dense_fallback_used(selected_chunks: list[dict]) -> bool:
+    """Return True when production dense retrieval had to use hidden fallback."""
+    return any(
+        chunk.get('retrieval_method') == KEYWORD_FALLBACK_RETRIEVAL_METHOD
+        for chunk in selected_chunks
+    )
+
+
+def dense_fallback_response_fields() -> dict:
+    return {
+        'fallback_used': True,
+        'retrieval_warning': (
+            'Dense retrieval was unavailable; keyword metadata fallback was used.'
+        ),
+    }
 
 
 def _expand_script_to_word_count(script: str, target_word_count: int, language: str) -> str:
@@ -628,12 +736,17 @@ def _trim_script_to_word_count(script: str, target_word_count: int, language: st
 
 def build_generation_response(generated: dict, params: dict, mode: str = 'generated', extra: dict | None = None) -> dict:
     script = generated['script']
-    target_word_count = int(params.get('word_count', DEFAULT_WORD_COUNT))
+    word_count_settings = get_word_count_settings(params)
+    target_word_count = word_count_settings['target']
     script = _expand_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
     script = _trim_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
     generated['script'] = script
     word_count = len(script.split())
     wpm = params.get('wpm', DEFAULT_WPM)
+    word_count_range = {
+        **word_count_settings,
+        'within_range': word_count_settings['min'] <= word_count <= word_count_settings['max'],
+    }
 
     response = {
         'script': script,
@@ -652,6 +765,7 @@ def build_generation_response(generated: dict, params: dict, mode: str = 'genera
             },
         },
         'word_count': word_count,
+        'word_count_range': word_count_range,
         'estimated_duration_seconds': round((word_count / wpm) * 60),
         'language': params.get('language', 'ar'),
         'target_language': params.get('target_language', 'fr'),
@@ -740,6 +854,12 @@ def find_un_grounding_source(params: dict) -> dict | None:
     return None
 
 
+def should_auto_ground_generation(params: dict) -> bool:
+    """Automatic UN lookup is useful but slow; keep it opt-in for normal generation."""
+    value = params.get('auto_ground') or params.get('use_un_grounding')
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 @module_a_bp.route('/generate', methods=['POST'])
 def generate_speech():
     params = request.get_json()
@@ -751,19 +871,31 @@ def generate_speech():
         return jsonify(validation_error), status
 
     try:
-        # Always ground generation in a real UN Digital Library document
-        # related to the topic/domain — try progressively broader queries
-        # until one yields usable text.
-        source = find_un_grounding_source(params)
+        # Normal generation should be fast. UN grounding is opt-in because
+        # searching/downloading PDFs can make the UI feel stuck.
+        source = find_un_grounding_source(params) if should_auto_ground_generation(params) else None
         excerpts = None
         if source:
             normalized_text = normalize_text(source['text'])
             chunks = chunk_text(normalized_text)
-            excerpts = select_relevant_chunks(chunks, params)
+            source_filename = source.get('title') or source.get('un_id') or 'un_library_source'
+            chunk_records = build_chunk_records(
+                chunks,
+                source_filename=source_filename,
+                source_type='un_library',
+            )
+            selected_chunk_records = select_production_relevant_chunks(
+                chunk_records,
+                params,
+                max_excerpts=DEFAULT_MAX_EXCERPTS,
+                max_total_characters=DEFAULT_MAX_EXCERPT_CHARACTERS,
+                logger=current_app.logger,
+            )
+            excerpts = selected_chunk_texts(selected_chunk_records)
 
         topic = params.get('topic', '').strip()
         prompt = build_structured_material_prompt(params, topic=topic, excerpts=excerpts)
-        word_count_val = params.get('word_count', 250)
+        word_count_val = get_word_count_settings(params)['max']
         # Scale max_tokens: speech tokens ≈ 1.5× word count for Arabic, plus ~800 for MCQ+glossary JSON
         max_tok = min(6000, max(2800, int(word_count_val * 2) + 1200))
         raw_output = generate_text(
@@ -783,6 +915,7 @@ def generate_speech():
             temperature=0.7,
         )
         generated = parse_generation_output(raw_output, language=params.get('language', 'ar'))
+        generated = enforce_generation_word_range(generated, params)
 
         extra = None
         mode = 'generated'
@@ -854,21 +987,27 @@ def retrieve_document_context():
             'document_errors': document_errors,
         }), 400
 
-    selected_chunks = select_relevant_chunks_with_metadata(
+    selected_chunks = select_production_relevant_chunks(
         chunk_records,
         params,
         max_excerpts=max_chunks,
         max_total_characters=max_chunks * DEFAULT_CHUNK_CHARACTERS,
+        logger=current_app.logger,
     )
+    fallback_used = dense_fallback_used(selected_chunks)
 
-    return jsonify({
+    response_payload = {
         'mode': 'retrieval_only',
         'query_used': params.get('query', ''),
         'selected_chunks': selected_chunks,
         'documents_processed': documents_processed,
         'document_errors': document_errors,
         'selected_chunk_count': len(selected_chunks),
-    })
+    }
+    if fallback_used:
+        response_payload.update(dense_fallback_response_fields())
+
+    return jsonify(response_payload)
 
 
 @module_a_bp.route('/from-document', methods=['POST'])
@@ -899,12 +1038,25 @@ def generate_from_document():
         validate_extracted_text(normalized_text)
 
         chunks = chunk_text(normalized_text)
-        selected_chunks = select_relevant_chunks(chunks, params)
+        chunk_records = build_chunk_records(
+            chunks,
+            source_filename=safe_source_filename,
+            source_type=source_type,
+        )
+        selected_chunk_records = select_production_relevant_chunks(
+            chunk_records,
+            params,
+            max_excerpts=DEFAULT_MAX_EXCERPTS,
+            max_total_characters=DEFAULT_MAX_EXCERPT_CHARACTERS,
+            logger=current_app.logger,
+        )
+        selected_chunks = selected_chunk_texts(selected_chunk_records)
+        fallback_used = dense_fallback_used(selected_chunk_records)
         topic = params.get('topic') or f'Document-grounded speech from {safe_source_filename}'
         params['topic'] = topic
         prompt = build_structured_material_prompt(params, topic=topic, excerpts=selected_chunks)
 
-        word_count_val = params.get('word_count', 250)
+        word_count_val = get_word_count_settings(params)['max']
         max_tok = min(6000, max(2800, int(word_count_val * 2) + 1200))
         raw_output = generate_text(
             messages=[
@@ -924,16 +1076,21 @@ def generate_from_document():
         )
 
         generated = parse_generation_output(raw_output, language=params.get('language', 'ar'))
+        generated = enforce_generation_word_range(generated, params)
+        extra = {
+            'source_filename': safe_source_filename,
+            'source_type': source_type.lstrip('.'),
+            'extracted_characters': len(normalized_text),
+            'selected_excerpt_count': len(selected_chunks),
+        }
+        if fallback_used:
+            extra.update(dense_fallback_response_fields())
+
         return jsonify(build_generation_response(
             generated,
             params,
             mode='document_grounded',
-            extra={
-                'source_filename': safe_source_filename,
-                'source_type': source_type.lstrip('.'),
-                'extracted_characters': len(normalized_text),
-                'selected_excerpt_count': len(selected_chunks),
-            },
+            extra=extra,
         ))
 
     except DocumentGroundingError as exc:

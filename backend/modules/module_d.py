@@ -217,9 +217,24 @@ AUTOMATICALLY DETECTED ISSUES (algorithmic):
 - Word repetitions: {repetition_count} detected → examples: {repetition_examples}
 - Hesitation markers: {hesitation_count} detected → examples: {hesitation_examples}
 - Number reproduction errors: {number_errors} detected
+- Number error details: {number_error_details}
+- Coverage length check: {coverage_diagnostics}
+
+AUDIO-BASED FLUENCY AND RELIABILITY:
+{fluency_summary}
 
 LOW-CONFIDENCE WORDS (Whisper was uncertain about these — possible pronunciation issues):
 {uncertain_words}
+
+Important reliability rule:
+- The transcript is an ASR estimate, not ground truth.
+- Do not over-penalize meaning or terminology in low-confidence regions.
+- Treat low-confidence words primarily as pronunciation/clarity evidence unless the surrounding meaning is clearly wrong.
+- For French and English, use audio fluency metrics and word confidence as stronger evidence for delivery quality than the raw transcript wording.
+- French-specific: do NOT mark a missing/omitted final plural "s" as an error from audio alone.
+  French final plural endings are usually silent, so words like "délégué" and "délégués"
+  are acoustically identical. Only flag singular/plural if surrounding audible grammar clearly proves
+  the number is wrong, such as a wrong article, determiner, verb agreement, or changed meaning.
 
 EVALUATION TASKS — check every category thoroughly:
 
@@ -228,11 +243,19 @@ Go through each key concept, argument, and sentence of the source speech.
 Did the student convey the correct meaning in {target_language}?
 Flag any concept that was mistranslated, distorted, or given the wrong equivalent.
 Example: source says "sustainable development", student said "développement durable" (correct) vs "développement stable" (wrong).
+List every clear translation error you find. Do not stop after the first two errors.
+Before saying a word or phrase is missing, verify it is not already present in the STUDENT transcript.
+Do not mark a phrase as missing if the transcript contains the same phrase or a close equivalent.
+Only put actual wrong renderings in translation_errors.
+Do not include correct translations or items where nothing needs to be fixed.
+If the student did not say anything for a source segment, put that under missing_content, not translation_errors.
 
 TASK 2 — CONTENT COVERAGE:
 List every important idea, fact, number, name, or argument from the source speech.
 For each one, state whether it was COVERED, PARTIALLY COVERED, or MISSING in the student's interpretation.
 Give a coverage_score from 0 to 10.
+Important: if the student interpretation is much shorter than the source, coverage_score must be low.
+Do not give 7/10 coverage for only a few lines of a much longer source speech.
 
 TASK 3 — PRONUNCIATION FLAGS:
 The uncertain words listed above are words Whisper was not confident about.
@@ -250,7 +273,8 @@ TASK 4 — FLUENCY ISSUES IN {target_language}:
 TASK 5 — LANGUAGE QUALITY IN {target_language}:
 Grammar errors in the INTERPRETATION language (not the source):
 - Arabic: wrong case endings (إعراب), verb agreement, wrong تشكيل
-- French: gender agreement, wrong tense, wrong preposition
+- French: gender agreement, wrong tense, wrong preposition. Do not penalize silent final plural "s"
+  inferred only from ASR spelling.
 - English: tense, subject-verb agreement
 Do NOT flag number formatting as a language error (e.g. "8,8 milliards" is correct French —
 French uses a comma as the decimal separator, English uses a period). Whether the NUMBER VALUE
@@ -355,6 +379,30 @@ HESITATION_PATTERNS = {
     'en': [r'\bum+\b', r'\buh+\b', r'\ber+\b', r'\bhmm+\b', r'\bhm+\b', r'\blike\b'],
 }
 
+HESITATION_FILLERS = {
+    'ar': {
+        'آ', 'إ', 'أقصد', 'يعني', 'آآ', 'إإ', 'أممم', 'ممم', 'اممم',
+        'euh', 'heu', 'um', 'uh', 'hmm', 'hm', 'erm', 'er', 'ben', 'bah',
+    },
+    'fr': {
+        'euh', 'heu', 'euuh', 'euhm', 'hum', 'hm', 'hmm', 'ben', 'bah',
+        'quoi', 'enfin', 'disons', 'comment', 'bref',
+    },
+    'en': {
+        'um', 'umm', 'uh', 'uhh', 'er', 'erm', 'hmm', 'hm', 'mm',
+        'like', 'basically', 'actually', 'right', 'okay', 'so', 'well',
+    },
+}
+
+HESITATION_PHRASES = {
+    'fr': ['c est a dire', 'c est-à-dire', 'en fait', 'je veux dire'],
+    'en': ['you know', 'i mean', 'sort of', 'kind of'],
+    'ar': ['you know', 'i mean', 'en fait'],
+}
+
+
+def normalize_hesitation_token(text: str) -> str:
+    return re.sub(r"^[^\w]+|[^\w]+$", '', str(text or '').strip().lower(), flags=re.UNICODE)
 
 def _is_noise_segment(text: str) -> bool:
     """
@@ -368,34 +416,98 @@ def _is_noise_segment(text: str) -> bool:
 
 
 def detect_hesitations_from_text(full_text: str, language: str = 'ar') -> list:
-    """Detect hesitation markers in transcript text using regex — works without word timestamps."""
-    patterns = HESITATION_PATTERNS.get(language, HESITATION_PATTERNS['en'])
-    # Lebanese Arabic: also check French + English fillers
+    """Detect filler words and hesitation phrases in transcript text."""
+    filler_set = HESITATION_FILLERS.get(language, HESITATION_FILLERS['en'])
     if language == 'ar':
-        patterns = HESITATION_PATTERNS['ar']
+        filler_set = HESITATION_FILLERS['ar'] | HESITATION_FILLERS['fr'] | HESITATION_FILLERS['en']
+
     found = []
-    for pat in patterns:
-        for m in re.finditer(pat, full_text, re.IGNORECASE):
-            found.append({'word': m.group(), 'at_char': m.start()})
-    # Remove duplicates
+    for match in re.finditer(r'\w+', full_text or '', flags=re.IGNORECASE | re.UNICODE):
+        token = normalize_hesitation_token(match.group())
+        if token in filler_set or re.fullmatch(r'(u+h+|u+m+|e+u+h+|h+m+|m+m+)', token):
+            found.append({'word': match.group(), 'at_char': match.start(), 'source': 'text'})
+
+    normalized_text = re.sub(r'[^\w]+', ' ', str(full_text or '').lower(), flags=re.UNICODE)
+    phrase_languages = ['ar', 'fr', 'en'] if language == 'ar' else [language]
+    for phrase_language in phrase_languages:
+        for phrase in HESITATION_PHRASES.get(phrase_language, []):
+            search_phrase = re.sub(r'[^\w]+', ' ', phrase.lower(), flags=re.UNICODE).strip()
+            if not search_phrase:
+                continue
+            for match in re.finditer(rf'\b{re.escape(search_phrase)}\b', normalized_text, flags=re.IGNORECASE):
+                found.append({'word': phrase, 'at_char': match.start(), 'source': 'phrase'})
+
     seen = set()
     unique = []
-    for f in found:
-        key = (f['word'].lower(), f['at_char'])
+    for item in found:
+        key = (item['word'].lower(), item.get('at_char'))
         if key not in seen:
             seen.add(key)
-            unique.append(f)
+            unique.append(item)
     return unique
+
+def normalize_repetition_word(text: str) -> str:
+    return re.sub(r'[^\w]', '', str(text or '').strip().casefold(), flags=re.UNICODE)
+
+
+def repetition_compare_key(text: str) -> str:
+    """Normalize a word for repetition comparison without changing display text."""
+    import unicodedata
+
+    token = normalize_repetition_word(text)
+    token = unicodedata.normalize('NFKD', token)
+    token = ''.join(char for char in token if not unicodedata.combining(char))
+
+    # French plural markers are often silent and ASR may spell the two occurrences
+    # differently even when the student repeated the same spoken word.
+    if len(token) > 3 and token.endswith('s'):
+        token = token[:-1]
+    return token
+
+
+def words_are_repetition_equivalent(first: str, second: str) -> bool:
+    first_key = repetition_compare_key(first)
+    second_key = repetition_compare_key(second)
+    return bool(first_key and first_key == second_key)
 
 
 def detect_repetitions_from_text(full_text: str) -> list:
-    """Detect consecutive word repetitions from transcript text — works without word timestamps."""
-    # Strip punctuation for comparison
-    words = re.findall(r'[\w؀-ۿ]+', full_text.lower())
+    """Detect immediate repeated words or repeated adjacent short phrases."""
+    words = []
+    for match in re.finditer(r'\w+', full_text or '', flags=re.UNICODE):
+        word = normalize_repetition_word(match.group(0))
+        if word:
+            words.append({
+                'word': word,
+                'key': repetition_compare_key(word),
+                'position': len(words),
+                'char': match.start(),
+            })
     repetitions = []
+
     for i in range(len(words) - 1):
-        if words[i] == words[i + 1] and len(words[i]) > 1:
-            repetitions.append({'word': words[i], 'position': i})
+        if words_are_repetition_equivalent(words[i]['word'], words[i + 1]['word']):
+            repetitions.append({
+                'word': words[i]['word'],
+                'position': words[i]['position'],
+                'at_char': words[i]['char'],
+                'gap_words': 1,
+                'source': 'text_immediate',
+            })
+
+    for phrase_len in (2, 3):
+        for i in range(len(words) - (phrase_len * 2) + 1):
+            first = [item['key'] for item in words[i:i + phrase_len]]
+            second = [item['key'] for item in words[i + phrase_len:i + (phrase_len * 2)]]
+            if first == second:
+                repetitions.append({
+                    'word': ' '.join(item['word'] for item in words[i:i + phrase_len]),
+                    'position': words[i]['position'],
+                    'at_char': words[i]['char'],
+                    'gap_words': phrase_len,
+                    'source': 'text_phrase_immediate',
+                })
+
     return repetitions
 
 
@@ -413,121 +525,416 @@ def detect_long_silences(segments: list, threshold_seconds: float = 1.0) -> list
     if not segments:
         return silences
 
-    # Leading silence: if first segment starts after threshold
-    if segments[0]['start'] >= threshold_seconds:
+    ordered_segments = sorted(segments, key=lambda seg: seg.get('start', 0))
+
+    if ordered_segments[0].get('start', 0) >= threshold_seconds:
         silences.append({
             'at_seconds': 0.0,
-            'duration_seconds': round(segments[0]['start'], 1),
+            'duration_seconds': round(ordered_segments[0].get('start', 0), 1),
             'after_text': '[start of recording]',
             'type': 'leading'
         })
 
-    # Gaps between segments
-    for i in range(len(segments) - 1):
-        gap = round(segments[i + 1]['start'] - segments[i]['end'], 2)
+    for i in range(len(ordered_segments) - 1):
+        gap = round(ordered_segments[i + 1].get('start', 0) - ordered_segments[i].get('end', 0), 2)
         if gap >= threshold_seconds:
             silences.append({
-                'at_seconds': round(segments[i]['end'], 1),
+                'at_seconds': round(ordered_segments[i].get('end', 0), 1),
                 'duration_seconds': gap,
-                'after_text': segments[i].get('text', '')[-60:].strip(),
-                'type': 'mid'
+                'after_text': ordered_segments[i].get('text', '')[-60:].strip(),
+                'type': 'segment_gap'
             })
 
-    # Gaps between consecutive words within a segment (catches pauses that
-    # don't get their own segment boundary)
-    for seg in segments:
-        words = seg.get('words', [])
-        for i in range(len(words) - 1):
-            gap = round(words[i + 1]['start'] - words[i]['end'], 2)
-            if gap >= threshold_seconds:
-                silences.append({
-                    'at_seconds': round(words[i]['end'], 1),
-                    'duration_seconds': gap,
-                    'after_text': words[i].get('word', '').strip(),
-                    'type': 'mid'
+    words = []
+    for seg in ordered_segments:
+        for word in seg.get('words', []) or []:
+            start = word.get('start')
+            end = word.get('end')
+            if start is None or end is None:
+                continue
+            words.append({
+                'word': str(word.get('word', '')).strip(),
+                'start': float(start),
+                'end': float(end),
+            })
+
+    words.sort(key=lambda item: item['start'])
+    word_gap_threshold = max(threshold_seconds + 0.3, 1.5)
+    for i in range(len(words) - 1):
+        gap = round(words[i + 1]['start'] - words[i]['end'], 2)
+        if gap >= word_gap_threshold:
+            silences.append({
+                'at_seconds': round(words[i]['end'], 1),
+                'duration_seconds': gap,
+                'after_text': words[i]['word'],
+                'type': 'word_gap',
+            })
+
+    deduped = []
+    seen = set()
+    for silence in sorted(silences, key=lambda item: (item['at_seconds'], item['duration_seconds'])):
+        key = (round(silence['at_seconds'], 1), round(silence['duration_seconds'], 1))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(silence)
+    return deduped
+
+
+def decode_audio_mono(audio_path: str, target_rate: int = 16000):
+    """Decode audio to mono float samples using PyAV, already required by faster-whisper."""
+    try:
+        import av
+        import numpy as np
+
+        container = av.open(audio_path)
+        stream = next((s for s in container.streams if s.type == 'audio'), None)
+        if stream is None:
+            return None, target_rate
+
+        resampler = av.AudioResampler(format='s16', layout='mono', rate=target_rate)
+        chunks = []
+        for frame in container.decode(stream):
+            resampled = resampler.resample(frame)
+            if not isinstance(resampled, list):
+                resampled = [resampled]
+            for audio_frame in resampled:
+                array = audio_frame.to_ndarray()
+                if array.size:
+                    chunks.append(array.reshape(-1).astype('float32') / 32768.0)
+        container.close()
+
+        if not chunks:
+            return None, target_rate
+        return np.concatenate(chunks), target_rate
+    except Exception as exc:
+        print(f'[Module D] Audio decode failed: {exc}')
+        return None, target_rate
+
+
+def audio_dbfs(samples) -> float:
+    """Approximate dBFS for float samples in [-1, 1]."""
+    import numpy as np
+    if samples is None or len(samples) == 0:
+        return float('-inf')
+    rms = float(np.sqrt(np.mean(np.square(samples))))
+    if rms <= 0:
+        return float('-inf')
+    return 20.0 * float(np.log10(rms))
+
+
+def detect_audio_silences(audio_path: str, threshold_ms: int = 1200) -> list:
+    """Detect quiet gaps directly from decoded audio energy."""
+    try:
+        import numpy as np
+
+        samples, sample_rate = decode_audio_mono(audio_path)
+        if samples is None or len(samples) == 0:
+            return []
+
+        global_db = audio_dbfs(samples)
+        if global_db == float('-inf'):
+            return []
+
+        silence_thresh = max(global_db - 14, -42)
+        window_ms = 20
+        window_size = max(1, int(sample_rate * window_ms / 1000))
+        min_windows = max(1, int(threshold_ms / window_ms))
+
+        silent_windows = []
+        for start in range(0, len(samples), window_size):
+            chunk = samples[start:start + window_size]
+            silent_windows.append(audio_dbfs(chunk) < silence_thresh)
+
+        ranges = []
+        start_window = None
+        for index, is_silent in enumerate(silent_windows + [False]):
+            if is_silent and start_window is None:
+                start_window = index
+            elif not is_silent and start_window is not None:
+                if index - start_window >= min_windows:
+                    start_ms = start_window * window_ms
+                    end_ms = min(index * window_ms, int(len(samples) / sample_rate * 1000))
+                    ranges.append((start_ms, end_ms))
+                start_window = None
+
+        return [
+            {
+                'at_seconds': round(start / 1000, 1),
+                'duration_seconds': round((end - start) / 1000, 1),
+                'after_text': '[audio silence]',
+                'type': 'audio_silence',
+            }
+            for start, end in ranges
+            if (end - start) >= threshold_ms
+        ]
+    except Exception as exc:
+        print(f'[Module D] Audio silence detection failed: {exc}')
+        return []
+
+
+def get_word_timing_sequence(segments: list) -> list:
+    """Return sorted ASR word timings with empty tokens removed."""
+    words = []
+    for seg in segments or []:
+        for word in seg.get('words', []) or []:
+            token = str(word.get('word', '')).strip()
+            start = word.get('start')
+            end = word.get('end')
+            if not token or start is None or end is None:
+                continue
+            words.append({
+                'word': token,
+                'start': float(start),
+                'end': float(end),
+            })
+    return sorted(words, key=lambda item: item['start'])
+
+
+def build_transcript_from_word_timestamps(segments: list) -> str:
+    """
+    Build a verbatim-ish transcript from ASR word timestamps.
+    faster-whisper segment.text can clean up repeated words, while segment.words
+    often still contains the repeated tokens needed for evaluation.
+    """
+    words = []
+    for item in get_word_timing_sequence(segments):
+        token = str(item.get('word', '')).strip()
+        if token:
+            words.append(token)
+    return re.sub(r'\s+', ' ', ' '.join(words)).strip()
+
+
+def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds: float = 0.18, max_gap_seconds: float = 1.4) -> list:
+    """
+    Detect likely filled pauses from the recording when ASR omits fillers.
+    A short gap between recognized words that still contains voiced audio is
+    usually a filler, false start, or hesitation rather than silence.
+    """
+    try:
+        words = get_word_timing_sequence(segments)
+        if len(words) < 2:
+            return []
+
+        samples, sample_rate = decode_audio_mono(audio_path)
+        if samples is None or len(samples) == 0:
+            return []
+
+        global_db = audio_dbfs(samples)
+        if global_db == float('-inf'):
+            return []
+
+        silence_thresh = max(global_db - 14, -42)
+        candidates = []
+
+        for previous, current in zip(words, words[1:]):
+            gap = current['start'] - previous['end']
+            if gap < min_gap_seconds or gap > max_gap_seconds:
+                continue
+
+            start_index = max(0, int(previous['end'] * sample_rate))
+            end_index = min(len(samples), int(current['start'] * sample_rate))
+            chunk = samples[start_index:end_index]
+            if len(chunk) < int(min_gap_seconds * sample_rate):
+                continue
+
+            # Voiced but unrecognized audio inside a short word gap is a likely filler.
+            if audio_dbfs(chunk) > silence_thresh + 1:
+                candidates.append({
+                    'word': '[filled pause]',
+                    'at_seconds': round(previous['end'], 1),
+                    'duration_seconds': round(gap, 2),
+                    'after_text': previous['word'],
+                    'confidence': None,
+                    'source': 'audio_gap',
                 })
 
-    silences.sort(key=lambda s: s['at_seconds'])
-    return silences
+        return candidates
+    except Exception as exc:
+        print(f'[Module D] Audio filled-pause detection failed: {exc}')
+        return []
+
+
+def merge_silence_reports(*reports: list) -> list:
+    """Merge overlapping/near-duplicate silence detections from ASR and audio."""
+    merged = []
+    for report in reports:
+        for silence in report or []:
+            at_seconds = float(silence.get('at_seconds', 0) or 0)
+            duration = float(silence.get('duration_seconds', 0) or 0)
+            existing = next(
+                (
+                    item for item in merged
+                    if abs(float(item.get('at_seconds', 0) or 0) - at_seconds) <= 0.5
+                ),
+                None,
+            )
+            if existing:
+                if duration > float(existing.get('duration_seconds', 0) or 0):
+                    existing['duration_seconds'] = round(duration, 1)
+                existing['type'] = f"{existing.get('type', 'silence')}+{silence.get('type', 'silence')}"
+                if existing.get('after_text') in ['', '[audio silence]'] and silence.get('after_text'):
+                    existing['after_text'] = silence.get('after_text')
+            else:
+                merged.append(dict(silence))
+
+    return sorted(merged, key=lambda item: item.get('at_seconds', 0))
 
 
 def detect_repetitions(segments: list) -> list:
     """
-    Detect word repetitions:
-    - Immediate repetitions (the the)
-    - Near repetitions: same word within a 6-word window (I think... I think)
-    - Short phrase repetitions (2-3 word sequences)
+    Detect immediate repeated words and adjacent repeated short phrases.
     """
     all_words = []
     for seg in segments:
         for w in seg.get('words', []):
-            clean = re.sub(r'[^\w]', '', w['word'].strip().lower())
-            if clean and len(clean) > 1:
-                all_words.append({'word': clean, 'start': w.get('start', 0)})
+            clean = normalize_repetition_word(w.get('word', ''))
+            if clean:
+                all_words.append({
+                    'word': clean,
+                    'key': repetition_compare_key(clean),
+                    'start': w.get('start', 0),
+                })
 
     if not all_words:
         return []
 
     repetitions = []
-    seen_positions = set()
-    WINDOW = 8
-    STOP_WORDS = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'of',
-                  'is', 'was', 'are', 'were', 'i', 'it', 'that', 'this', 'with', 'for',
-                  'les', 'le', 'la', 'des', 'de', 'du', 'et', 'en', 'un', 'une',
-                  'je', 'il', 'elle', 'nous', 'que', 'qui', 'dans'}
-
-    for i in range(len(all_words)):
-        if i in seen_positions:
-            continue
+    i = 0
+    while i < len(all_words) - 1:
         word = all_words[i]['word']
-        if word in STOP_WORDS or len(word) < 3:
+        if words_are_repetition_equivalent(word, all_words[i + 1]['word']):
+            repetitions.append({
+                'word': word,
+                'at_seconds': round(all_words[i]['start'], 1),
+                'second_occurrence': round(all_words[i + 1]['start'], 1),
+                'gap_words': 1,
+                'source': 'word_immediate'
+            })
+            i += 2
             continue
-        # Look ahead in window
-        for j in range(i + 1, min(i + WINDOW, len(all_words))):
-            if j in seen_positions:
+        i += 1
+
+    phrase_used_positions = set()
+    for phrase_len in (2, 3):
+        for i in range(len(all_words) - (phrase_len * 2) + 1):
+            positions = set(range(i, i + (phrase_len * 2)))
+            if phrase_used_positions & positions:
                 continue
-            if all_words[j]['word'] == word:
+            first = [item['key'] for item in all_words[i:i + phrase_len]]
+            second = [item['key'] for item in all_words[i + phrase_len:i + (phrase_len * 2)]]
+            if first == second:
                 repetitions.append({
-                    'word': word,
+                    'word': ' '.join(item['word'] for item in all_words[i:i + phrase_len]),
                     'at_seconds': round(all_words[i]['start'], 1),
-                    'second_occurrence': round(all_words[j]['start'], 1),
-                    'gap_words': j - i
+                    'second_occurrence': round(all_words[i + phrase_len]['start'], 1),
+                    'gap_words': phrase_len,
+                    'source': 'word_phrase_immediate'
                 })
-                seen_positions.add(i)
-                seen_positions.add(j)
-                break
+                phrase_used_positions.update(positions)
 
     return repetitions
 
 
+def merge_repetition_reports(*reports: list) -> list:
+    """Merge word-timestamp and transcript-text repetitions without hiding either source."""
+    word_level = list(reports[0] or []) if reports else []
+    text_level = []
+    for report in reports[1:]:
+        text_level.extend(report or [])
+
+    merged = []
+    seen = set()
+    word_counts = {}
+
+    for item in word_level:
+        word = str(item.get('word', '')).strip().lower()
+        if not word:
+            continue
+        position_key = round(float(item.get('at_seconds', -1) or -1), 1)
+        key = (word, position_key, item.get('gap_words'))
+        if key in seen:
+            continue
+        seen.add(key)
+        word_counts[word] = word_counts.get(word, 0) + 1
+        merged.append(item)
+
+    skipped_text_counts = {}
+    for item in text_level:
+        word = str(item.get('word', '')).strip().lower()
+        if not word:
+            continue
+        if skipped_text_counts.get(word, 0) < word_counts.get(word, 0):
+            skipped_text_counts[word] = skipped_text_counts.get(word, 0) + 1
+            continue
+        key = (word, item.get('position'), item.get('gap_words'))
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(item)
+    return merged
+
+
 def detect_hesitation_words(segments: list, language: str = 'ar') -> list:
-    """
-    Detect filler / hesitation words with comprehensive per-language lists.
-    """
-    fillers = {
-        'ar': {'آ', 'إ', 'أقصد', 'يعني', 'آآ', 'إإ', 'أممم', 'ممم', 'اممم'},
-        'fr': {'euh', 'heu', 'hem', 'hm', 'ben', 'beh', 'voilà', 'donc', 'quoi',
-               'enfin', 'genre', 'disons', 'comment', 'bref'},
-        'en': {'um', 'uh', 'er', 'hmm', 'hm', 'like', 'basically', 'literally',
-               'actually', 'right', 'okay', 'so', 'well', 'anyway', 'you know'}
-    }
-    # Lebanese Arabic students use French and English fillers too
+    """Detect filler / hesitation words from word-level ASR timestamps."""
+    filler_set = HESITATION_FILLERS.get(language, HESITATION_FILLERS['en'])
     if language == 'ar':
-        filler_set = fillers['ar'] | {'euh', 'heu', 'um', 'uh', 'hmm'}
-    else:
-        filler_set = fillers.get(language, fillers['en'])
+        filler_set = HESITATION_FILLERS['ar'] | HESITATION_FILLERS['fr'] | HESITATION_FILLERS['en']
 
     found = []
     for seg in segments:
-        for w in seg.get('words', []):
-            clean = w['word'].strip().lower().rstrip('.,!?')
-            if clean in filler_set:
+        for w in seg.get('words', []) or []:
+            clean = normalize_hesitation_token(w.get('word', ''))
+            if clean in filler_set or re.fullmatch(r'(u+h+|u+m+|e+u+h+|h+m+|m+m+)', clean):
                 found.append({
-                    'word': w['word'].strip(),
+                    'word': str(w.get('word', '')).strip(),
                     'at_seconds': round(w.get('start', 0), 1),
-                    'confidence': round(w.get('probability', 1.0), 3)
+                    'confidence': round(w.get('probability', 1.0), 3),
+                    'source': 'word'
                 })
     return found
+
+
+def merge_hesitation_reports(*reports: list) -> list:
+    """Merge word-level and transcript-text hesitation detections without double counting."""
+    word_level = list(reports[0] or []) if reports else []
+    text_level = []
+    for report in reports[1:]:
+        text_level.extend(report or [])
+
+    merged = []
+    seen = set()
+    word_counts = {}
+
+    for item in word_level:
+        word = str(item.get('word', '')).strip()
+        if not word:
+            continue
+        normalized = normalize_hesitation_token(word)
+        time_bucket = round(float(item.get('at_seconds', 0) or 0), 1) if item.get('at_seconds') is not None else None
+        key = (normalized, time_bucket)
+        if key in seen:
+            continue
+        seen.add(key)
+        word_counts[normalized] = word_counts.get(normalized, 0) + 1
+        merged.append(item)
+
+    skipped_text_counts = {}
+    for item in text_level:
+        word = str(item.get('word', '')).strip()
+        if not word:
+            continue
+        normalized = normalize_hesitation_token(word)
+        if skipped_text_counts.get(normalized, 0) < word_counts.get(normalized, 0):
+            skipped_text_counts[normalized] = skipped_text_counts.get(normalized, 0) + 1
+            continue
+        char_bucket = item.get('at_char')
+        key = (normalized, char_bucket)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(item)
+    return merged
 
 
 def detect_low_confidence_words(segments: list, threshold: float = 0.6) -> list:
@@ -547,17 +954,178 @@ def detect_low_confidence_words(segments: list, threshold: float = 0.6) -> list:
     return low_conf
 
 
-def build_pronunciation_report(all_word_scores: list, language: str) -> dict:
-    """
-    Build a pronunciation report using:
-    1. Whisper word confidence (low confidence = likely mispronounced)
-    2. Language-specific common error patterns
+def build_audio_fluency_report(transcript: dict, all_word_scores: list, silence_report: list | None = None) -> dict:
+    """Cheap recording-based fluency metrics from local ASR timings."""
+    segments = transcript.get('segments', []) or []
+    duration = float(transcript.get('duration_seconds') or 0)
+    if not duration and segments:
+        duration = max(float(seg.get('end', 0) or 0) for seg in segments)
 
-    Note: reference diffing against the source script is intentionally NOT done here —
-    this is an interpretation task, so the source and the transcript are in different
-    languages and a word-for-word diff between them is meaningless.
+    word_count = len([w for w in all_word_scores if str(w.get('word', '')).strip()])
+    spoken_seconds = sum(
+        max(0.0, float(seg.get('end', 0) or 0) - float(seg.get('start', 0) or 0))
+        for seg in segments
+    )
+    silences = silence_report if silence_report is not None else detect_long_silences(segments)
+    long_pause_seconds = sum(float(s.get('duration_seconds', 0) or 0) for s in silences)
+
+    if duration > 0:
+        speech_rate_wpm = round((word_count / duration) * 60, 1)
+        silence_ratio = round(min(1.0, long_pause_seconds / duration), 3)
+        spoken_ratio = round(min(1.0, spoken_seconds / duration), 3)
+    else:
+        speech_rate_wpm = 0
+        silence_ratio = 0
+        spoken_ratio = 0
+
+    confidence_scores = [
+        float(w.get('score', 0) or 0)
+        for w in all_word_scores
+        if w.get('score') is not None
+    ]
+    average_confidence = (
+        round(sum(confidence_scores) / len(confidence_scores), 3)
+        if confidence_scores else 0
+    )
+    low_confidence_words = [w for w in all_word_scores if float(w.get('score', 1) or 1) < 0.6]
+    low_confidence_ratio = round(len(low_confidence_words) / word_count, 3) if word_count else 0
+
+    rate_score = 1.0
+    if speech_rate_wpm and speech_rate_wpm < 80:
+        rate_score = max(0.35, speech_rate_wpm / 80)
+    elif speech_rate_wpm > 180:
+        rate_score = max(0.35, 1 - ((speech_rate_wpm - 180) / 120))
+
+    pause_score = max(0.0, 1 - (silence_ratio * 2.5))
+    confidence_score = average_confidence or 0.0
+    fluency_score = round((rate_score * 0.35 + pause_score * 0.35 + confidence_score * 0.30) * 10, 1)
+
+    if fluency_score >= 8:
+        summary = 'Fluent delivery with manageable pauses and clear audio recognition.'
+    elif fluency_score >= 6:
+        summary = 'Generally understandable delivery, with some pauses or unclear words to review.'
+    else:
+        summary = 'Delivery needs work: pauses, pacing, or unclear pronunciation affected fluency.'
+
+    return {
+        'duration_seconds': round(duration, 1),
+        'word_count': word_count,
+        'speech_rate_wpm': speech_rate_wpm,
+        'long_pause_count': len(silences),
+        'long_pause_seconds': round(long_pause_seconds, 1),
+        'silence_ratio': silence_ratio,
+        'spoken_ratio': spoken_ratio,
+        'average_word_confidence': average_confidence,
+        'low_confidence_count': len(low_confidence_words),
+        'low_confidence_ratio': low_confidence_ratio,
+        'fluency_score': fluency_score,
+        'summary': summary,
+        'method': 'local_faster_whisper_timestamps_and_confidence',
+    }
+
+
+def format_fluency_for_prompt(fluency: dict) -> str:
+    if not fluency:
+        return 'No audio fluency metrics available.'
+    return (
+        f"- Duration: {fluency.get('duration_seconds', 0)} seconds\n"
+        f"- Speech rate: {fluency.get('speech_rate_wpm', 0)} words per minute\n"
+        f"- Long pauses: {fluency.get('long_pause_count', 0)} "
+        f"({fluency.get('long_pause_seconds', 0)} seconds total)\n"
+        f"- Silence ratio: {int(float(fluency.get('silence_ratio', 0)) * 100)}%\n"
+        f"- Average word confidence: {int(float(fluency.get('average_word_confidence', 0)) * 100)}%\n"
+        f"- Low-confidence word ratio: {int(float(fluency.get('low_confidence_ratio', 0)) * 100)}%\n"
+        f"- Audio fluency score: {fluency.get('fluency_score', 0)}/10\n"
+        f"- Audio-based summary: {fluency.get('summary', '')}"
+    )
+
+
+def estimate_length_coverage(source_script: str, transcript_text: str) -> dict:
+    """Cheap guardrail: very short interpretations cannot receive high coverage."""
+    source_words = re.findall(r'\w+', source_script or '', flags=re.UNICODE)
+    transcript_words = re.findall(r'\w+', transcript_text or '', flags=re.UNICODE)
+    source_count = len(source_words)
+    transcript_count = len(transcript_words)
+
+    if source_count == 0:
+        return {
+            'source_word_count': 0,
+            'transcript_word_count': transcript_count,
+            'length_ratio': 1.0,
+            'score_cap': 10.0,
+        }
+
+    ratio = min(1.0, transcript_count / source_count)
+
+    if ratio < 0.15:
+        cap = 2.0
+    elif ratio < 0.30:
+        cap = 3.5
+    elif ratio < 0.45:
+        cap = 5.0
+    elif ratio < 0.60:
+        cap = 6.5
+    elif ratio < 0.75:
+        cap = 7.5
+    else:
+        cap = 10.0
+
+    return {
+        'source_word_count': source_count,
+        'transcript_word_count': transcript_count,
+        'length_ratio': round(ratio, 3),
+        'score_cap': cap,
+    }
+
+
+def apply_coverage_guardrail(result: dict, source_script: str, transcript_text: str) -> dict:
+    if not isinstance(result, dict):
+        return result
+
+    coverage = estimate_length_coverage(source_script, transcript_text)
+    current = result.get('coverage_score')
+    try:
+        current_score = float(current)
+    except (TypeError, ValueError):
+        current_score = None
+
+    if current_score is not None and current_score > coverage['score_cap']:
+        result['coverage_score'] = coverage['score_cap']
+        missing = result.setdefault('missing_content', [])
+        if isinstance(missing, list):
+            missing.append({
+                'content': (
+                    f"Only about {int(coverage['length_ratio'] * 100)}% of the source length "
+                    f"was present in the student's interpretation."
+                ),
+                'importance': 'high',
+            })
+
+    result['coverage_diagnostics'] = coverage
+    return result
+
+
+def build_pronunciation_report(all_word_scores: list, language: str, source_script: str = '', transcript_text: str = '') -> dict:
     """
-    uncertain = [w for w in all_word_scores if w['grade'] == 'poor']
+    Build an audio clarity / ASR confidence report for EN/FR using:
+    1. Whisper word confidence (low confidence = likely unclear audio, not proof of mispronunciation)
+    2. Reference text diffing against source translation (substitutions/omissions)
+    3. Language-specific common error patterns
+    """
+    import difflib
+
+    low_value_words = {
+        'fr': {'le', 'la', 'les', 'de', 'des', 'du', 'un', 'une', 'et', 'a', 'à', 'en', 'au', 'aux', 'ce', 'se', 'sa', 'son'},
+        'en': {'the', 'a', 'an', 'and', 'or', 'to', 'of', 'in', 'on', 'at', 'it', 'is', 'was'},
+        'ar': set(),
+    }
+
+    def is_low_value_word(word: str) -> bool:
+        token = normalize_repetition_word(word)
+        return len(token) <= 2 or token in low_value_words.get(language, set())
+
+    uncertain_all = [w for w in all_word_scores if w['grade'] == 'poor']
+    uncertain = [w for w in uncertain_all if not is_low_value_word(w.get('word', ''))]
     warn_words = [w for w in all_word_scores if w['grade'] == 'warn']
     overall = (sum(w['score'] for w in all_word_scores) / len(all_word_scores)) if all_word_scores else 0
 
@@ -603,35 +1171,381 @@ def build_pronunciation_report(all_word_scores: list, language: str) -> dict:
             'start': w.get('start', 0),
             'confidence': w['score'],
             'grade': 'poor',
-            'note': note or f'Low recognition confidence ({int(w["score"]*100)}%) — review pronunciation'
+            'note': note or f'Low ASR confidence ({int(w["score"]*100)}%) — review audio clarity for this word'
         })
 
     return {
         'overall_score': round(overall, 3),
         'total_words': len(all_word_scores),
-        'uncertain_count': len(uncertain),
+        'uncertain_count': len(flagged),
+        'filtered_uncertain_count': max(0, len(uncertain_all) - len(flagged)),
         'warn_count': len(warn_words),
         'flagged_words': flagged,
         'summary': (
-            f'Good pronunciation confidence ({int(overall*100)}%).'
+            f'Good audio clarity confidence ({int(overall*100)}%).'
             if overall >= 0.8
-            else f'{len(uncertain)} word(s) flagged with low confidence ({int(overall*100)}% average). Review highlighted words.'
+            else f'{len(flagged)} meaningful word(s) flagged with low ASR confidence ({int(overall*100)}% average).'
         )
     }
 
 
+NUMBER_SCALE_TERMS = {
+    'thousand': 'thousand',
+    'thousands': 'thousand',
+    'mille': 'thousand',
+    'millier': 'thousand',
+    'milliers': 'thousand',
+    'million': 'million',
+    'millions': 'million',
+    'billion': 'billion',
+    'billions': 'billion',
+    'milliard': 'billion',
+    'milliards': 'billion',
+    'trillion': 'trillion',
+    'trillions': 'trillion',
+    'billion_fr': 'trillion',
+    'billions_fr': 'trillion',
+}
+
+
+def normalize_number_scale_word(word: str) -> str:
+    token = normalize_repetition_word(word)
+    if token == 'billion':
+        return 'billion'
+    if token == 'billions':
+        return 'billion'
+    return NUMBER_SCALE_TERMS.get(token, '')
+
+
+def extract_number_scale_terms(text: str) -> list[dict]:
+    terms = []
+    for match in re.finditer(r'\w+', text or '', flags=re.UNICODE):
+        token = normalize_repetition_word(match.group(0))
+        canonical = NUMBER_SCALE_TERMS.get(token)
+        if canonical:
+            terms.append({
+                'word': match.group(0),
+                'canonical': canonical,
+                'position': match.start(),
+            })
+    return terms
+
+
 def detect_number_errors(source_script: str, transcript_text: str) -> list:
     """
-    Extract all numbers from the source speech and check if they appear
-    in the student's transcript. Missing numbers = likely error.
+    Extract numbers from the source and transcript.
+    Flags missing numbers and likely substitutions such as 2030 -> 2025.
     Requirement D7 from cahier des charges.
     """
-    # Match integers and decimals in both Western and Arabic-Indic numerals
-    number_pattern = r'\b[\d٠-٩]+(?:[.,][\d٠-٩]+)?\b'
-    source_numbers = re.findall(number_pattern, source_script)
-    transcript_numbers = re.findall(number_pattern, transcript_text)
-    missing = [n for n in source_numbers if n not in transcript_numbers]
-    return missing
+    # Match integers, decimals, and grouped thousands such as 150 000 / 150,000.
+    digit_chars = r'\d٠-٩'
+    number_pattern = rf'(?<![\w])(?:[{digit_chars}]{{1,3}}(?:[ \u00a0\u202f,][{digit_chars}]{{3}})+|[{digit_chars}]+(?:[.][{digit_chars}]+)?)(?![\w])'
+    source_numbers = [match.group(0) for match in re.finditer(number_pattern, source_script or '')]
+    transcript_numbers = [match.group(0) for match in re.finditer(number_pattern, transcript_text or '')]
+
+    def normalize_number(value: str) -> str:
+        translation = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+        normalized = str(value or '').translate(translation)
+        normalized = re.sub(r'[\s\u00a0\u202f,](?=\d{3}(?:\D|$))', '', normalized)
+        return normalized.replace(',', '.')
+
+    def canonical_number(value: str) -> str:
+        normalized = normalize_number(value)
+        if re.fullmatch(r'\d+\.0+', normalized):
+            normalized = normalized.split('.', 1)[0]
+        if re.fullmatch(r'\d+', normalized):
+            normalized = str(int(normalized))
+        return normalized
+
+    source_norm = [canonical_number(number) for number in source_numbers]
+    transcript_norm = [canonical_number(number) for number in transcript_numbers]
+    errors = []
+    seen = set()
+
+    def add_error(error: dict):
+        key = (error.get('type'), canonical_number(error.get('expected', '')), canonical_number(error.get('heard', '')))
+        if key in seen:
+            return
+        seen.add(key)
+        errors.append(error)
+
+    import difflib
+    matcher = difflib.SequenceMatcher(a=source_norm, b=transcript_norm, autojunk=False)
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'equal':
+            continue
+
+        source_block = source_numbers[i1:i2]
+        transcript_block = transcript_numbers[j1:j2]
+
+        if tag == 'delete':
+            for expected in source_block:
+                add_error({
+                    'type': 'missing',
+                    'expected': expected,
+                    'heard': '',
+                    'message': f'{expected} was missing',
+                })
+            continue
+
+        if tag == 'insert':
+            # Extra numbers in the student's output are handled by the LLM
+            # translation section, not counted as source-number reproduction errors.
+            continue
+
+        pair_count = min(len(source_block), len(transcript_block))
+        for offset in range(pair_count):
+            expected = source_block[offset]
+            heard = transcript_block[offset]
+            if canonical_number(expected) == canonical_number(heard):
+                continue
+            add_error({
+                'type': 'substitution',
+                'expected': expected,
+                'heard': heard,
+                'message': f'{expected} was rendered as {heard}',
+            })
+
+        for expected in source_block[pair_count:]:
+            add_error({
+                'type': 'missing',
+                'expected': expected,
+                'heard': '',
+                'message': f'{expected} was missing',
+            })
+
+    source_scales = extract_number_scale_terms(source_script)
+    transcript_scales = extract_number_scale_terms(transcript_text)
+    source_scale_norm = [item['canonical'] for item in source_scales]
+    transcript_scale_norm = [item['canonical'] for item in transcript_scales]
+    scale_matcher = difflib.SequenceMatcher(a=source_scale_norm, b=transcript_scale_norm, autojunk=False)
+
+    for tag, i1, i2, j1, j2 in scale_matcher.get_opcodes():
+        if tag == 'equal':
+            continue
+
+        source_block = source_scales[i1:i2]
+        transcript_block = transcript_scales[j1:j2]
+
+        if tag == 'insert':
+            continue
+
+        pair_count = min(len(source_block), len(transcript_block))
+        for offset in range(pair_count):
+            expected = source_block[offset]['word']
+            heard = transcript_block[offset]['word']
+            if source_block[offset]['canonical'] == transcript_block[offset]['canonical']:
+                continue
+            add_error({
+                'type': 'scale_substitution',
+                'expected': expected,
+                'heard': heard,
+                'message': f'{expected} was rendered as {heard}',
+            })
+
+        for expected_item in source_block[pair_count:]:
+            add_error({
+                'type': 'scale_missing',
+                'expected': expected_item['word'],
+                'heard': '',
+                'message': f'{expected_item["word"]} was missing',
+            })
+
+    return errors
+
+
+def format_number_errors_for_prompt(number_errors: list) -> str:
+    if not number_errors:
+        return 'none found automatically'
+    details = []
+    for item in number_errors[:10]:
+        if isinstance(item, dict):
+            details.append(item.get('message') or str(item))
+        else:
+            details.append(str(item))
+    return '; '.join(details)
+
+
+def normalize_eval_text(text: str) -> str:
+    import unicodedata
+    normalized = unicodedata.normalize('NFKD', str(text or '').casefold())
+    normalized = ''.join(char for char in normalized if not unicodedata.combining(char))
+    normalized = re.sub(r'[^\w\s]', ' ', normalized, flags=re.UNICODE)
+    return re.sub(r'\s+', ' ', normalized).strip()
+
+
+def content_words(text: str) -> list[str]:
+    stopwords = {
+        'the', 'a', 'an', 'and', 'or', 'of', 'to', 'for', 'in', 'on', 'with', 'by',
+        'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'd', 'et', 'ou', 'a',
+        'au', 'aux', 'pour', 'dans', 'sur', 'avec', 'par', 'du', 'des', 'du',
+        'this', 'that', 'ce', 'cet', 'cette', 'ces',
+    }
+    return [
+        word for word in normalize_eval_text(text).split()
+        if len(word) > 2 and word not in stopwords
+    ]
+
+
+def phrase_is_present(claimed_phrase: str, transcript_text: str) -> bool:
+    phrase = normalize_eval_text(claimed_phrase)
+    transcript = normalize_eval_text(transcript_text)
+    if not phrase or not transcript:
+        return False
+    if phrase in transcript:
+        return True
+
+    words = content_words(claimed_phrase)
+    if len(words) < 2:
+        return False
+    present = sum(1 for word in words if re.search(rf'\b{re.escape(word)}\b', transcript))
+    return present >= max(2, int(len(words) * 0.75))
+
+
+def remove_false_missing_translation_errors(result: dict, transcript_text: str) -> dict:
+    if not isinstance(result, dict):
+        return result
+
+    filtered = []
+    for item in result.get('translation_errors', []) or []:
+        if not isinstance(item, dict):
+            filtered.append(item)
+            continue
+
+        explanation = normalize_eval_text(item.get('explanation', ''))
+        if not any(term in explanation for term in ['missing', 'omitted', 'omit', 'absence', 'manquant']):
+            filtered.append(item)
+            continue
+
+        claimed_parts = [
+            item.get('student_said', ''),
+            item.get('correct_translation', ''),
+        ]
+        if any(phrase_is_present(part, transcript_text) for part in claimed_parts):
+            continue
+
+        # Also inspect quoted phrases in the explanation, e.g. "missing 'pour les communautés...'".
+        quoted = re.findall(r"['\"]([^'\"]{4,})['\"]", str(item.get('explanation', '')))
+        if any(phrase_is_present(part, transcript_text) for part in quoted):
+            continue
+
+        filtered.append(item)
+
+    result['translation_errors'] = filtered
+    return result
+
+
+def clean_translation_error_items(result: dict) -> dict:
+    """Keep only actionable mistranslations in translation_errors."""
+    if not isinstance(result, dict):
+        return result
+
+    cleaned = []
+    missing = result.setdefault('missing_content', [])
+    if not isinstance(missing, list):
+        missing = []
+        result['missing_content'] = missing
+
+    non_actionable_terms = [
+        'nothing needs to be fixed',
+        'nothing to fix',
+        'no correction needed',
+        'no correction is needed',
+        'correct translation',
+        'translation is correct',
+        'accurate translation',
+        'not wrong',
+        'no error',
+        'pas d erreur',
+        'pas de correction',
+        'aucune correction',
+        'traduction correcte',
+    ]
+    omission_terms = ['completely omitted', 'omitted', 'missing', 'not mentioned', 'student said nothing', 'absence', 'manquant']
+    wrong_terms = [
+        'wrong',
+        'incorrect',
+        'mistranslat',
+        'substitution',
+        'wrong number',
+        'number error',
+        'nombre incorrect',
+        'faux nombre',
+        'contresens',
+        'faux sens',
+    ]
+
+    for item in result.get('translation_errors', []) or []:
+        if not isinstance(item, dict):
+            cleaned.append(item)
+            continue
+
+        student_said = normalize_eval_text(item.get('student_said', ''))
+        explanation = normalize_eval_text(item.get('explanation', ''))
+        combined = normalize_eval_text(' '.join(str(item.get(key, '')) for key in ['student_said', 'correct_translation', 'explanation']))
+
+        if any(term in combined for term in non_actionable_terms):
+            continue
+
+        is_empty_student = not student_said or student_said in {'none', 'nothing', 'n/a', 'na', 'null'}
+        has_actionable_error = any(term in explanation for term in wrong_terms)
+        is_omission = (is_empty_student or any(term in explanation for term in omission_terms)) and not has_actionable_error
+        if is_omission:
+            content = item.get('source_text') or item.get('correct_translation') or item.get('explanation')
+            if content:
+                missing.append({'content': content, 'importance': 'high'})
+            continue
+
+        cleaned.append(item)
+
+    result['translation_errors'] = cleaned
+    return result
+
+
+def is_french_silent_plural_s_error(item: dict) -> bool:
+    """French final plural -s is silent; ASR spelling alone cannot prove omission."""
+    text = ' '.join(
+        str(item.get(key, ''))
+        for key in ['text', 'word', 'source_text', 'student_said', 'correct_translation', 'explanation', 'correction', 'likely_issue']
+    ).casefold()
+    if not text:
+        return False
+    mentions_plural_s = (
+        'plural' in text
+        or 'pluriel' in text
+        or 'final s' in text
+        or 's final' in text
+        or 'omitted the s' in text
+        or 'missing s' in text
+        or 'omit s' in text
+        or 'omission du s' in text
+        or 's manquant' in text
+    )
+    mentions_omission = any(term in text for term in ['omit', 'omission', 'missing', 'manquant', 'oubli'])
+    return mentions_plural_s and mentions_omission
+
+
+def filter_french_silent_plural_errors(result: dict, language: str) -> dict:
+    if language != 'fr' or not isinstance(result, dict):
+        return result
+
+    for key in ['language_errors', 'pronunciation_flags', 'translation_errors', 'terminology_problems']:
+        values = result.get(key)
+        if isinstance(values, list):
+            result[key] = [
+                item for item in values
+                if not (isinstance(item, dict) and is_french_silent_plural_s_error(item))
+            ]
+
+    pronunciation = result.get('pronunciation')
+    if isinstance(pronunciation, dict) and isinstance(pronunciation.get('diff_errors'), list):
+        pronunciation['diff_errors'] = [
+            item for item in pronunciation['diff_errors']
+            if not (isinstance(item, dict) and is_french_silent_plural_s_error(item))
+        ]
+
+    return result
 
 
 def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar') -> dict:
@@ -653,9 +1567,10 @@ def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar'
     text_hesitations = detect_hesitations_from_text(full_text, language)
     text_repetitions = detect_repetitions_from_text(full_text)
 
-    # Merge: prefer word-level if available, otherwise use text-based
-    all_hesitations = word_hesitations if word_hesitations else text_hesitations
-    all_repetitions = word_reps if word_reps else text_repetitions
+    # Merge word-level timestamps with transcript-text fillers, because ASR word
+    # timestamps can miss or normalize fillers such as "uhhh".
+    all_hesitations = merge_hesitation_reports(word_hesitations, text_hesitations)
+    all_repetitions = merge_repetition_reports(word_reps, text_repetitions)
 
     return {
         'long_silences':        silences,
@@ -753,6 +1668,7 @@ def generate_feedback():
             f'{sl["duration_seconds"]}s' + (f' after "{sl["after_text"]}"' if sl.get('after_text') else '')
             for sl in algo.get('long_silences', [])[:5]
         )
+        coverage_diagnostics = estimate_length_coverage(source_script, transcript_text)
 
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
         prompt = LLM_ANALYSIS_PROMPT.format(
@@ -767,6 +1683,9 @@ def generate_feedback():
             hesitation_count=s.get('hesitation_count', 0),
             hesitation_examples=hes_examples or 'none found automatically',
             number_errors=s.get('number_errors', 0),
+            number_error_details=format_number_errors_for_prompt(algo.get('number_errors', [])),
+            coverage_diagnostics=coverage_diagnostics,
+            fluency_summary=format_fluency_for_prompt({}),
             uncertain_words='(not available in text-only mode)',
         )
 
@@ -787,6 +1706,10 @@ def generate_feedback():
         )
 
         llm_result = _extract_json(response.choices[0].message.content)
+        llm_result = filter_french_silent_plural_errors(llm_result, language)
+        llm_result = remove_false_missing_translation_errors(llm_result, transcript_text)
+        llm_result = clean_translation_error_items(llm_result)
+        llm_result = apply_coverage_guardrail(llm_result, source_script, transcript_text)
         llm_result['algorithmic'] = {
             'long_silences':    algo.get('long_silences', []),
             'repetitions':      algo.get('repetitions', []),
@@ -845,12 +1768,17 @@ def full_evaluation():
             word_timestamps=True,
             vad_filter=False,               # disabled: preserves silence gaps between segments
             suppress_tokens=[],             # preserve fillers/repetitions, no normalization
+            suppress_blank=False,
             condition_on_previous_text=False,
             compression_ratio_threshold=100.0,  # disable repetition fallback — keeps repeated words
             log_prob_threshold=-100.0,          # disable low-prob fallback — keeps hesitations
+            no_speech_threshold=0.95,
             temperature=0.0,                    # greedy decoding — no randomness
             beam_size=1,                        # greedy: prevents beam search from collapsing repetitions
-            initial_prompt=DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en']),  # primes Whisper to keep "euh/um" fillers
+            repetition_penalty=1.0,
+            no_repeat_ngram_size=0,
+            initial_prompt=DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en']),  # language-specific filler priming
+            hotwords='euh heu um uh repeated repeated word word',
         )
 
         full_text = ''
@@ -881,9 +1809,13 @@ def full_evaluation():
             all_segments.append(seg_data)
             full_text += seg.text + ' '
 
-        full_text = full_text.strip()
+        segment_text = full_text.strip()
+        word_timestamp_text = build_transcript_from_word_timestamps(all_segments)
+        full_text = word_timestamp_text or segment_text
         transcript = {
             'full_text':           full_text,
+            'segment_text':        segment_text,
+            'word_timestamp_text': word_timestamp_text,
             'segments':            all_segments,
             'language_detected':   info.language,
             'language_confidence': round(info.language_probability, 3),
@@ -892,11 +1824,30 @@ def full_evaluation():
 
         # Step 2: Full algorithmic analysis (now WITH word timestamps)
         algo = run_full_analysis(source_script, transcript, language)
+        audio_silences = detect_audio_silences(temp_path)
+        if audio_silences:
+            algo['long_silences'] = merge_silence_reports(algo.get('long_silences', []), audio_silences)
+            algo['audio_silences'] = audio_silences
+            algo.setdefault('summary', {})['silence_count'] = len(algo['long_silences'])
+        audio_hesitations = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
+        if audio_hesitations:
+            algo['audio_hesitations'] = audio_hesitations
+            algo['hesitation_words'] = merge_hesitation_reports(
+                algo.get('hesitation_words', []),
+                audio_hesitations,
+            )
+            algo.setdefault('summary', {})['hesitation_count'] = len(algo['hesitation_words'])
         s    = algo.get('summary', {})
+        fluency = build_audio_fluency_report(transcript, all_word_scores, algo.get('long_silences', []))
 
         # Step 3: LLM analysis with accurate data
         if not GROQ_API_KEY:
-            return jsonify({'error': 'GROQ_API_KEY not configured', 'algorithmic': algo}), 500
+            return jsonify({
+                'error': 'GROQ_API_KEY not configured',
+                'algorithmic': algo,
+                'fluency': fluency,
+                'transcript': transcript,
+            }), 500
 
         from groq import Groq
         client = Groq(api_key=GROQ_API_KEY)
@@ -913,6 +1864,7 @@ def full_evaluation():
             f'"{w["word"]}" (confidence {w["score"]})'
             for w in uncertain_words[:10]
         ) or 'none flagged'
+        coverage_diagnostics = estimate_length_coverage(source_script, full_text)
 
         prompt = LLM_ANALYSIS_PROMPT.format(
             source_language=lang_names.get(source_language, source_language),
@@ -926,6 +1878,9 @@ def full_evaluation():
             hesitation_count=s.get('hesitation_count', 0),
             hesitation_examples=hes_examples or 'none found automatically',
             number_errors=s.get('number_errors', 0),
+            number_error_details=format_number_errors_for_prompt(algo.get('number_errors', [])),
+            coverage_diagnostics=coverage_diagnostics,
+            fluency_summary=format_fluency_for_prompt(fluency),
             uncertain_words=uncertain_str,
         )
 
@@ -942,6 +1897,9 @@ def full_evaluation():
         )
 
         llm_result = _extract_json(response.choices[0].message.content)
+        llm_result = remove_false_missing_translation_errors(llm_result, full_text)
+        llm_result = clean_translation_error_items(llm_result)
+        llm_result = apply_coverage_guardrail(llm_result, source_script, full_text)
         llm_result['algorithmic'] = {
             'long_silences':    algo.get('long_silences', []),
             'repetitions':      algo.get('repetitions', []),
@@ -949,10 +1907,12 @@ def full_evaluation():
             'number_errors':    algo.get('number_errors', []),
             'summary':          s
         }
+        llm_result['fluency'] = fluency
 
         # Step 4: Pronunciation report (whisper confidence + language-specific patterns)
         pronun_report = build_pronunciation_report(all_word_scores, language=language)
         llm_result['pronunciation'] = pronun_report
+        llm_result = filter_french_silent_plural_errors(llm_result, language)
         llm_result['transcript'] = transcript
 
         # Step 5: Persist session for history / adaptive difficulty (D11-D12)

@@ -62,7 +62,7 @@ def get_config():
         'languages': ['ar', 'fr', 'en'],
         'target_languages': ['ar', 'fr', 'en'],
         'domains': [
-            'politics', 'diplomacy', 'economics',
+            'politics', 'economics',
             'climate', 'health', 'human rights', 'education'
         ],
         'difficulties': ['beginner', 'intermediate', 'advanced'],

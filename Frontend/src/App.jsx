@@ -7,7 +7,6 @@ import {
   retrieveDocumentContext,
   signupUser,
   textToSpeech,
-  generateMaterials,
   downloadGlossary,
   transcribeAudio,
   generateFeedback,
@@ -80,7 +79,10 @@ const UI = {
     targetLanguage: 'Target language',
     topic: 'Topic',
     domain: 'Domain',
-    wordCount: 'Word count',
+    wordCount: 'Speech length',
+    wordRangeShort: 'Short',
+    wordRangeMedium: 'Medium',
+    wordRangeLong: 'Long',
     difficulty: 'Difficulty',
     structure: 'Discourse structure',
     mode: 'Interpretation mode',
@@ -127,7 +129,15 @@ const UI = {
     keyTerms: 'Key terms',
     summaryTitle: 'Thematic summary',
     mcqTitle: 'Comprehension questions (MCQ)',
+    mcqQuestionHeader: 'Question',
+    mcqOptionsHeader: 'Options',
+    mcqAnswerHeader: 'Answer',
     glossaryTitle: 'Trilingual glossary (AR – FR – EN)',
+    glossaryTermHeader: 'Term',
+    glossaryArabicHeader: 'Arabic',
+    glossaryFrenchHeader: 'French',
+    glossaryEnglishHeader: 'English',
+    glossaryDefinitionHeader: 'Definition',
     downloadGlossary: 'Download glossary (DOCX)',
     uploadAudio: 'Upload your interpretation (MP3, WAV, M4A)',
     transcribeBtn: 'Transcribe',
@@ -176,19 +186,20 @@ const UI = {
     expectedLabel: 'Should be',
     studentSaidShort: 'Said',
     pronunciationTitle: 'Pronunciation Assessment (إعراب)',
+    pronunciationMismatches: 'Word-level clarity mismatches',
     runPronunciation: 'Run pronunciation check',
     runningPronunciation: 'Aligning audio against source — may take 1 min...',
-    pronunciationScore: 'Pronunciation confidence',
+    pronunciationScore: 'Confidence',
     wordView: 'Word-by-word view',
     legend: 'Legend',
     legendGood: '≥80% confident',
     legendWarn: '65–80%',
     legendPoor: '<65% — likely error',
-    uncertainWords: 'Uncertain words — likely pronunciation errors',
+    uncertainWords: 'Meaningful low-confidence words',
     expectedForm: 'Expected',
     likelyError: 'Likely error',
     grammaticalRole: 'Grammatical role',
-    noUncertain: 'All words pronounced with high confidence',
+    noUncertain: 'No meaningful low-confidence words',
     whisperxBadge: 'WhisperX aligned',
     fallbackBadge: 'Whisper scores',
     needsArabic: 'Pronunciation check is available for Arabic interpretations only.',
@@ -284,7 +295,10 @@ const UI = {
     targetLanguage: 'لغة الترجمة الهدف',
     topic: 'الموضوع',
     domain: 'المجال',
-    wordCount: 'عدد الكلمات',
+    wordCount: 'طول الخطاب',
+    wordRangeShort: 'قصير',
+    wordRangeMedium: 'متوسط',
+    wordRangeLong: 'طويل',
     difficulty: 'مستوى الصعوبة',
     structure: 'بنية الخطاب',
     mode: 'نوع الترجمة الفورية',
@@ -331,7 +345,15 @@ const UI = {
     keyTerms: 'المصطلحات الأساسية',
     summaryTitle: 'الملخص الموضوعي',
     mcqTitle: 'أسئلة الفهم (اختيار متعدد)',
+    mcqQuestionHeader: 'السؤال',
+    mcqOptionsHeader: 'الخيارات',
+    mcqAnswerHeader: 'الإجابة',
     glossaryTitle: 'المسرد الثلاثي (عربي – فرنسي – إنجليزي)',
+    glossaryTermHeader: 'المصطلح',
+    glossaryArabicHeader: 'العربية',
+    glossaryFrenchHeader: 'الفرنسية',
+    glossaryEnglishHeader: 'الإنجليزية',
+    glossaryDefinitionHeader: 'التعريف',
     downloadGlossary: 'تنزيل المسرد (DOCX)',
     uploadAudio: 'ارفع تسجيل ترجمتك (MP3, WAV, M4A)',
     transcribeBtn: 'فرّغ الصوت',
@@ -380,15 +402,16 @@ const UI = {
     expectedLabel: 'الصواب',
     studentSaidShort: 'ما قاله الطالب',
     pronunciationTitle: 'تقييم النطق والإعراب',
+    pronunciationMismatches: 'تباينات وضوح الكلمات',
     runPronunciation: 'تشغيل فحص النطق',
     runningPronunciation: 'جارٍ المحاذاة الصوتية — قد تستغرق دقيقة...',
-    pronunciationScore: 'ثقة النطق',
+    pronunciationScore: 'الثقة',
     wordView: 'عرض كلمة بكلمة',
     legend: 'مفتاح الألوان',
     legendGood: '٪80 أو أكثر — صحيح',
     legendWarn: '٪65–80',
     legendPoor: 'أقل من ٪65 — خطأ محتمل',
-    uncertainWords: 'كلمات غير مؤكدة — أخطاء نطق محتملة',
+    uncertainWords: 'كلمات مهمة منخفضة الثقة',
     expectedForm: 'الشكل الصحيح',
     likelyError: 'الخطأ المحتمل',
     grammaticalRole: 'الدور النحوي',
@@ -487,7 +510,10 @@ const UI = {
     language: 'Langue du discours',
     targetLanguage: 'Langue cible',
     domain: 'Domaine',
-    wordCount: 'Nombre de mots',
+    wordCount: 'Longueur du discours',
+    wordRangeShort: 'Court',
+    wordRangeMedium: 'Moyen',
+    wordRangeLong: 'Long',
     difficulty: 'Difficulté',
     structure: 'Structure du discours',
     mode: 'Mode d’interprétation',
@@ -515,7 +541,15 @@ const UI = {
     keyTerms: 'Termes clés',
     summaryTitle: 'Résumé thématique',
     mcqTitle: 'Questions de compréhension (QCM)',
+    mcqQuestionHeader: 'Question',
+    mcqOptionsHeader: 'Options',
+    mcqAnswerHeader: 'Réponse',
     glossaryTitle: 'Glossaire trilingue (AR – FR – EN)',
+    glossaryTermHeader: 'Terme',
+    glossaryArabicHeader: 'Arabe',
+    glossaryFrenchHeader: 'Français',
+    glossaryEnglishHeader: 'Anglais',
+    glossaryDefinitionHeader: 'Définition',
     downloadGlossary: 'Télécharger le glossaire (DOCX)',
     uploadAudio: 'Déposez votre interprétation (MP3, WAV, M4A)',
     transcribeBtn: 'Transcrire',
@@ -564,15 +598,16 @@ const UI = {
     expectedLabel: 'Attendu',
     studentSaidShort: 'Dit',
     pronunciationTitle: 'Évaluation de la prononciation (إعراب)',
+    pronunciationMismatches: 'Divergences de clarté mot par mot',
     runPronunciation: 'Lancer le contrôle de prononciation',
     runningPronunciation: 'Alignement audio en cours — peut prendre 1 min...',
-    pronunciationScore: 'Confiance en prononciation',
+    pronunciationScore: 'Confiance',
     wordView: 'Vue mot par mot',
     legend: 'Légende',
     legendGood: '≥80% confiant',
     legendWarn: '60–80%',
     legendPoor: '<60% — erreur probable',
-    uncertainWords: 'Mots incertains — erreurs de prononciation probables',
+    uncertainWords: 'Mots significatifs à faible confiance',
     expectedForm: 'Forme attendue',
     likelyError: 'Erreur probable',
     grammaticalRole: 'Rôle grammatical',
@@ -635,25 +670,47 @@ const UN_LANG_LABEL = {
 
 const VOICE_OPTIONS = {
   ar: [
-    { label: 'Lebanese Arabic — Male (ar-LB)',   accent: 'LB' },
-    { label: 'Lebanese Arabic — Female (ar-LB)', accent: 'LB_f' },
-    { label: 'Gulf Arabic — Female (ar-SA)',     accent: 'SA' },
-    { label: 'Egyptian Arabic — Female (ar-EG)', accent: 'EG' },
-    { label: 'Egyptian Arabic — Male (ar-EG)',   accent: 'EG_m' },
+    { label: 'Lebanese Arabic — Male (ar-LB)', labelAr: 'عربية لبنانية - ذكر', accent: 'LB' },
+    { label: 'Lebanese Arabic — Female (ar-LB)', labelAr: 'عربية لبنانية - أنثى', accent: 'LB_f' },
+    { label: 'Gulf Arabic — Female (ar-SA)', labelAr: 'عربية خليجية - أنثى', accent: 'SA' },
+    { label: 'Egyptian Arabic — Female (ar-EG)', labelAr: 'عربية مصرية - أنثى', accent: 'EG' },
+    { label: 'Egyptian Arabic — Male (ar-EG)', labelAr: 'عربية مصرية - ذكر', accent: 'EG_m' },
   ],
   fr: [
-    { label: 'French (Female)',   accent: 'FR' },
-    { label: 'French (Male)',     accent: 'FR_m' },
-    { label: 'Canadian (Female)', accent: 'CA' },
+    { label: 'French (Female)', labelAr: 'فرنسية - أنثى', accent: 'FR' },
+    { label: 'French (Male)', labelAr: 'فرنسية - ذكر', accent: 'FR_m' },
+    { label: 'Canadian (Female)', labelAr: 'كندية فرنسية - أنثى', accent: 'CA' },
   ],
   en: [
-    { label: 'American (Female)', accent: 'US' },
-    { label: 'British (Female)',  accent: 'GB' },
-    { label: 'Australian (Female)', accent: 'AU' },
+    { label: 'American (Female)', labelAr: 'أمريكية - أنثى', accent: 'US' },
+    { label: 'British (Female)', labelAr: 'بريطانية - أنثى', accent: 'GB' },
+    { label: 'Australian (Female)', labelAr: 'أسترالية - أنثى', accent: 'AU' },
   ]
 };
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
+function glossaryValue(item, keys) {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+  return '';
+}
+
+function glossaryArabicValue(item) {
+  const direct = glossaryValue(item, ['arabic', 'Arabic', 'ar', 'AR', 'arabic_term', 'term_ar', 'arabic_translation', 'translation_ar', 'العربية', 'عربي']);
+  if (direct) return direct;
+
+  for (const value of Object.values(item || {})) {
+    if (value === undefined || value === null || typeof value === 'object') continue;
+    const text = String(value).trim();
+    if (/[\u0600-\u06FF]/.test(text)) return text;
+  }
+  return '';
+}
+
 const IconCopy = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -750,7 +807,7 @@ const initialSpeechForm = {
   language: 'en',
   target_language: 'fr',
   domain: 'politics',
-  word_count: 200,
+  word_count_range: 'medium',
   difficulty: 'intermediate',
   mode: 'consecutive',
   structure: 'well-organized',
@@ -1131,7 +1188,6 @@ function LoginScreen({ labels, onLogin, onSignup }) {
             <select id="login-role" name="role">
               <option value="student">{labels.student}</option>
               <option value="instructor">{labels.instructor}</option>
-              <option value="coordinator">{labels.coordinator}</option>
             </select>
           </div>
           {error && <div className="error-msg">{labels.errorPrefix}: {error}</div>}
@@ -1171,7 +1227,7 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
       </div>
       <div style={{ display: activePanel === 'module-b' ? 'block' : 'none' }}>
         <ModuleB labels={labels} lastGeneratedScript={lastGeneratedScript}
-          onAudioGenerated={setSharedAudioUrl} />
+          onAudioGenerated={setSharedAudioUrl} isRtl={isRtl} />
       </div>
       <div style={{ display: activePanel === 'module-c' ? 'block' : 'none' }}>
         <ModuleC labels={labels} referenceAudioUrl={sharedAudioUrl}
@@ -1365,7 +1421,7 @@ function ModuleA({ labels, onGenerated, isRtl }) {
     event.preventDefault();
     setStatus('loading'); setError(''); setResult(null);
     try {
-      const data = await generateSpeech({ ...form, word_count: Number(form.word_count) });
+      const data = await generateSpeech(form);
       setResult(data); onGenerated(data); setStatus('success');
     } catch (err) { setError(err.message); setStatus('error'); }
   }
@@ -1374,7 +1430,7 @@ function ModuleA({ labels, onGenerated, isRtl }) {
     setStatus('loading'); setError(''); setResult(null); setRetrievalResult(null);
     try {
       if (!documentFile) throw new Error('Choose a TXT, DOCX, or PDF document first.');
-      const data = await generateSpeechFromDocument(documentFile, { ...form, word_count: Number(form.word_count) });
+      const data = await generateSpeechFromDocument(documentFile, form);
       setResult(data); onGenerated(data); setStatus('success');
     } catch (err) { setError(err.message); setStatus('error'); }
   }
@@ -1388,7 +1444,6 @@ function ModuleA({ labels, onGenerated, isRtl }) {
       const file = new File([blob], `${librarySource.un_id || 'un-speech'}.txt`, { type: 'text/plain' });
       const data = await generateSpeechFromDocument(file, {
         ...form,
-        word_count: Number(form.word_count),
         topic: form.topic || librarySource.title,
       });
       setResult(data); onGenerated(data); setStatus('success');
@@ -1479,7 +1534,6 @@ function ModuleA({ labels, onGenerated, isRtl }) {
 
           <select name="domain" value={form.domain} onChange={updateField} className="quick-select">
             <option value="politics">{labels.domPolitics || 'Politics'}</option>
-            <option value="diplomacy">{labels.domDiplomacy || 'Diplomacy'}</option>
             <option value="economics">{labels.domEconomics || 'Economics'}</option>
             <option value="health">{labels.domHealth || 'Health'}</option>
             <option value="education">{labels.domEducation || 'Education'}</option>
@@ -1504,18 +1558,15 @@ function ModuleA({ labels, onGenerated, isRtl }) {
         {showAdvanced && (
           <div className="advanced-panel">
             <div className="form-grid">
-              <div className="field">
-                <label htmlFor="f-words">{labels.wordCount}</label>
-                <input id="f-words" name="word_count" type="number" value={form.word_count} min="50" max="800" onChange={updateField} />
-              </div>
+              <SelectField label={labels.wordCount} id="f-words" name="word_count_range" value={form.word_count_range} onChange={updateField}>
+                <option value="short">{labels.wordRangeShort || 'Short'}</option>
+                <option value="medium">{labels.wordRangeMedium || 'Medium'}</option>
+                <option value="long">{labels.wordRangeLong || 'Long'}</option>
+              </SelectField>
               <SelectField label={labels.mode} id="f-mode" name="mode" value={form.mode} onChange={updateField}>
                 <option value="consecutive">{labels.optConsecutive || 'Consecutive'}</option>
                 <option value="simultaneous">{labels.optSimultaneous || 'Simultaneous'}</option>
                 <option value="sight_translation">{labels.optSight || 'Sight translation'}</option>
-              </SelectField>
-              <SelectField label={labels.structure} id="f-structure" name="structure" value={form.structure} onChange={updateField}>
-                <option value="well-organized">{labels.optWellOrganized || 'Well organized'}</option>
-                <option value="deliberately disorganized">{labels.optDisorganized || 'Disorganized'}</option>
               </SelectField>
               <SelectField label={labels.numbers} id="f-numbers" name="number_density" value={form.number_density} onChange={updateField}>
                 <option value="low">{labels.optLowNumbers || 'Low numbers'}</option>
@@ -1537,7 +1588,7 @@ function ModuleA({ labels, onGenerated, isRtl }) {
         {/* ── Action buttons ── */}
         <div className="action-row">
           <button type="button" className="btn-un-library" onClick={() => setShowLibrary(true)} disabled={isLoading}>
-            🇺🇳 UN Library
+            UN Library
           </button>
           {librarySource ? (
             <button type="button" className="btn-primary" onClick={handleLibraryGenerate} disabled={isLoading}>
@@ -1651,11 +1702,17 @@ function SpeechResult({ data, labels }) {
   }, [data.estimated_duration_seconds]);
 
   const isArabic = data.language === 'ar';
+  const requestedRange = data.word_count_range?.label;
+  const rangeMissed = data.word_count_range && data.word_count_range.within_range === false;
 
   return (
     <div className="speech-result">
       <div className="result-meta">
-        <span>{data.word_count} {labels.wordsUnit}</span>
+        <span>
+          {data.word_count} {labels.wordsUnit}
+          {requestedRange ? ` / ${requestedRange}` : ''}
+          {rangeMissed ? ' (outside requested range)' : ''}
+        </span>
         {duration && <span>~{duration}</span>}
         {data.topic && <span>{data.topic}</span>}
         <span>{data.domain}</span>
@@ -1689,7 +1746,7 @@ function SpeechResult({ data, labels }) {
 
 // ── Module B — TTS + Pedagogical Materials ──────────────────────────────────
 
-function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
+function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, isRtl }) {
   const language = lastGeneratedScript?.language || 'ar';
   const isArabic = language === 'ar';
   const voiceOptions = VOICE_OPTIONS[language] || VOICE_OPTIONS.en;
@@ -1700,9 +1757,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
   const [audioUrl, setAudioUrl] = useState(null);
   const [audioStatus, setAudioStatus] = useState('idle');
   const [audioError, setAudioError] = useState('');
-  const [keyTerms, setKeyTerms] = useState(null);
-  const [keyTermsLoading, setKeyTermsLoading] = useState(false);
-  const [keyTermsError, setKeyTermsError] = useState('');
 
   useEffect(() => {
     const opts = VOICE_OPTIONS[language] || VOICE_OPTIONS.en;
@@ -1710,9 +1764,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
     setAudioUrl(null);
     setAudioStatus('idle');
     setAudioError('');
-    setKeyTerms(null);
-    setKeyTermsLoading(false);
-    setKeyTermsError('');
   }, [speechId]);
 
   if (!lastGeneratedScript) {
@@ -1737,21 +1788,12 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
     } catch (err) { setAudioError(err.message); setAudioStatus('error'); }
   }
 
-  async function handleGenerateKeyTerms() {
-    setKeyTermsLoading(true); setKeyTermsError('');
-    try {
-      const data = await generateMaterials({ script: lastGeneratedScript.script, language, domain: lastGeneratedScript.domain });
-      setKeyTerms(data.key_terms || []);
-    } catch (err) { setKeyTermsError(err.message); setKeyTerms([]); }
-    finally { setKeyTermsLoading(false); }
-  }
-
   async function handleDownloadGlossary() {
     try {
       const mapped = glossary.map(item => ({
-        ar: item.arabic || item.ar || '',
-        fr: item.french || item.fr || '',
-        en: item.english || item.en || '',
+        ar: glossaryArabicValue(item),
+        fr: glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais']),
+        en: glossaryValue(item, ['english', 'English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en']),
       }));
       const blob = await downloadGlossary({ glossary: mapped, domain: lastGeneratedScript.domain });
       const url = URL.createObjectURL(blob);
@@ -1770,11 +1812,13 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
         <div className="form-grid" style={{ marginBottom: '1rem' }}>
           <SelectField label={labels.voiceAccent} id="b-voice" name="voice"
             value={selectedAccent} onChange={e => setSelectedAccent(e.target.value)}>
-            {voiceOptions.map(v => <option key={v.accent} value={v.accent}>{v.label}</option>)}
+            {voiceOptions.map(v => (
+              <option key={v.accent} value={v.accent}>{isRtl ? (v.labelAr || v.label) : v.label}</option>
+            ))}
           </SelectField>
           <div className="field">
             <label htmlFor="b-rate">{labels.speechRate}: {speechRate > 0 ? `+${speechRate}` : speechRate}%</label>
-            <input id="b-rate" type="range" min="-30" max="20" step="5"
+            <input id="b-rate" type="range" min="-20" max="20" step="5"
               value={speechRate} onChange={e => setSpeechRate(Number(e.target.value))} className="rate-slider" />
           </div>
         </div>
@@ -1800,7 +1844,12 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
           <div className="table-responsive">
             <table className="mcq-table">
               <thead>
-                <tr><th style={{width:'2.5rem'}}>#</th><th>Question</th><th>Options</th><th style={{width:'5rem'}}>Answer</th></tr>
+                <tr>
+                  <th style={{width:'2.5rem'}}>#</th>
+                  <th>{labels.mcqQuestionHeader || 'Question'}</th>
+                  <th>{labels.mcqOptionsHeader || 'Options'}</th>
+                  <th style={{width:'5rem'}}>{labels.mcqAnswerHeader || 'Answer'}</th>
+                </tr>
               </thead>
               <tbody>
                 {mcqs.map((item, i) => (
@@ -1836,15 +1885,21 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
           <div className="table-responsive">
             <table className="glossary-table">
               <thead>
-                <tr><th>Term</th><th>العربية</th><th>Français</th><th>English</th><th>Definition</th></tr>
+                <tr>
+                  <th>{labels.glossaryTermHeader || 'Term'}</th>
+                  <th>{labels.glossaryArabicHeader || 'Arabic'}</th>
+                  <th>{labels.glossaryFrenchHeader || 'French'}</th>
+                  <th>{labels.glossaryEnglishHeader || 'English'}</th>
+                  <th>{labels.glossaryDefinitionHeader || 'Definition'}</th>
+                </tr>
               </thead>
               <tbody>
                 {glossary.map((item, i) => (
                   <tr key={i}>
                     <td><strong>{item.term}</strong></td>
-                    <td className="arabic" dir="rtl">{item.arabic || item.ar || ''}</td>
-                    <td>{item.french || item.fr || ''}</td>
-                    <td>{item.english || item.en || ''}</td>
+                    <td className="arabic" dir="rtl">{glossaryArabicValue(item)}</td>
+                    <td>{glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])}</td>
+                    <td>{glossaryValue(item, ['english', 'English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])}</td>
                     <td className="gloss-def">{item.definition || ''}</td>
                   </tr>
                 ))}
@@ -1853,22 +1908,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated }) {
           </div>
         </div>
       )}
-
-      {/* ── Key Terms (on demand) ── */}
-      <div className="card">
-        <h2 className="b-section-title">🔑 {labels.keyTerms}</h2>
-        <button className="btn-secondary" onClick={handleGenerateKeyTerms} disabled={keyTermsLoading}>
-          {keyTermsLoading ? labels.generatingMaterials : labels.generateMaterials}
-        </button>
-        {keyTermsError && <div className="error-msg" style={{ marginTop: '0.5rem' }}>{keyTermsError}</div>}
-        {keyTerms && keyTerms.length > 0 && (
-          <div className="key-terms-list">
-            {keyTerms.map((term, i) => (
-              <span key={i} className={`key-term-badge ${isArabic ? 'arabic' : ''}`}>{term}</span>
-            ))}
-          </div>
-        )}
-      </div>
 
     </div>
   );
@@ -2371,6 +2410,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
   }
 
   const algo = report?.algorithmic || {};
+  const fluency = report?.fluency || null;
   const isAr = (lastTranscript.language || lastTranscript.language_detected) === 'ar';
 
   return (
@@ -2458,7 +2498,11 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 {algo.repetitions.map((r, i) => (
                   <div key={i} className="algo-detail-row">
                     <span className="algo-detail-badge algo-badge-gold">"{r.word}"</span>
-                    <span className="algo-detail-text">at {r.at_seconds}s · repeated at {r.second_occurrence}s</span>
+                    <span className="algo-detail-text">
+                      {r.at_seconds !== undefined
+                        ? `at ${r.at_seconds}s · repeated at ${r.second_occurrence}s`
+                        : `repeated near word ${r.position ?? i}`}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -2480,7 +2524,9 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 <p className="algo-detail-title">🔢 {labels.numberErrors}</p>
                 <div className="algo-chips">
                   {algo.number_errors.map((n, i) => (
-                    <span key={i} className="algo-chip algo-chip-err">{n}</span>
+                    <span key={i} className="algo-chip algo-chip-err">
+                      {typeof n === 'string' ? n : (n.message || `${n.expected || ''} → ${n.heard || ''}`)}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -2548,6 +2594,38 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
+          {/* Audio-based fluency */}
+          {fluency && (
+            <div className="card">
+              <h3 className="report-section-title">Audio fluency from recording</h3>
+              <div className="report-score-row">
+                <div>
+                  <p className="report-label">Fluency score</p>
+                  <ScoreBar score={fluency.fluency_score || 0} />
+                </div>
+                <div className="report-summary">
+                  <p>{fluency.summary}</p>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--warm-gray)', marginTop: '0.45rem' }}>
+                    Uses local audio timing and Whisper confidence. Low-confidence transcript regions are treated as clarity evidence, not automatic translation mistakes.
+                  </p>
+                </div>
+              </div>
+              <div className="algo-grid" style={{ marginTop: '1rem' }}>
+                {[
+                  { label: 'Speech rate', value: `${fluency.speech_rate_wpm || 0} wpm` },
+                  { label: 'Long pauses', value: fluency.long_pause_count || 0 },
+                  { label: 'Silence ratio', value: `${Math.round((fluency.silence_ratio || 0) * 100)}%` },
+                  { label: 'Word confidence', value: `${Math.round((fluency.average_word_confidence || 0) * 100)}%` },
+                ].map(({ label, value }) => (
+                  <div key={label} className="algo-card">
+                    <span className="algo-count">{value}</span>
+                    <span className="algo-label">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Coverage score */}
           {report.coverage_score !== undefined && (
             <div className="card">
@@ -2588,8 +2666,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
-          {/* Pronunciation Report (EN/FR: full analysis; AR: confidence only) */}
-          {report.pronunciation && report.pronunciation.uncertain_count > 0 && (
+          {/* Audio clarity / ASR confidence report */}
+          {report.pronunciation && (report.pronunciation.uncertain_count > 0 || (report.pronunciation.diff_errors || []).length > 0) && (
             <div className="card">
               <h3 className="report-section-title">🔊 {labels.pronunciationTitle}</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
@@ -2609,7 +2687,12 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                   <div className="word-grid">
                     {(report.pronunciation.flagged_words || []).map((w, i) => (
                       <span key={i} className="word-chip word-poor" title={w.note || ''} style={{ cursor: w.note ? 'help' : 'default' }}>
-                        {w.word} <small style={{ opacity: 0.7 }}>{Math.round((w.confidence ?? 0) * 100)}%</small>
+                        {w.word}
+                        {Number.isFinite(Number(w.confidence ?? w.score)) && (
+                          <small style={{ opacity: 0.7 }}>
+                            {Math.round(Number(w.confidence ?? w.score) * 100)}%
+                          </small>
+                        )}
                       </span>
                     ))}
                   </div>
@@ -2625,64 +2708,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
-          {/* LLM pronunciation flags (from LLM analysis) */}
-          {(report.pronunciation_flags || []).length > 0 && (
-            <div className="card">
-              <h3 className="report-section-title">🗣 AI pronunciation analysis</h3>
-              {(report.pronunciation_flags || []).map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
-                  <strong>"{item.word}"</strong>
-                  {item.confidence !== undefined && <span style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginLeft: '0.5rem' }}>{Math.round(item.confidence * 100)}% confidence</span>}
-                  {item.likely_issue && <div className="eval-explanation">{item.likely_issue}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* LLM analysis sections */}
-          <div className="card">
-            <h3 className="report-section-title">🤖 {labels.llmTitle}</h3>
-            <EvalSection title={labels.languageErrors} icon="⚠️"
-              items={report.language_errors || []} emptyLabel={labels.noIssues}
-              renderItem={item => (
-                <div>
-                  <span className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</span>
-                  <span className="eval-explanation"> — {item.explanation}</span>
-                  {item.correction && <div className="eval-correction">✓ {labels.correction}: <strong>{item.correction}</strong></div>}
-                </div>
-              )} />
-            <EvalSection title={labels.autoCorrections} icon="✏️"
-              items={report.auto_corrections || []} emptyLabel={labels.noIssues}
-              renderItem={item => <span className={isAr ? 'arabic' : ''}>{item.text}</span>} />
-            <EvalSection title={labels.falseStarts} icon="🚦"
-              items={report.false_starts || []} emptyLabel={labels.noIssues}
-              renderItem={item => <span className={isAr ? 'arabic' : ''}>{item.text}</span>} />
-            <EvalSection title={labels.lapsusLinguae} icon="👅"
-              items={report.lapsus_linguae || []} emptyLabel={labels.noIssues}
-              renderItem={item => (
-                <div>
-                  <span className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</span>
-                  {item.likely_intended && <span className="eval-explanation"> → {item.likely_intended}</span>}
-                </div>
-              )} />
-            <EvalSection title={labels.terminologyProblems} icon="📚"
-              items={report.terminology_problems || []} emptyLabel={labels.noIssues}
-              renderItem={item => (
-                <div className="term-row">
-                  <span className="term-cell"><small>{labels.source}:</small> {item.source_term}</span>
-                  <span className="term-cell"><small>{labels.used}:</small> <strong className="term-wrong">{item.student_used}</strong></span>
-                  <span className="term-cell"><small>{labels.correct}:</small> <strong className="term-right">{item.correct_equivalent}</strong></span>
-                </div>
-              )} />
-            <EvalSection title={labels.informationLoss} icon="📉"
-              items={report.information_loss || []} emptyLabel={labels.noIssues}
-              renderItem={item => (
-                <div>
-                  <span className="eval-text">{item.lost_content}</span>
-                  {item.importance && <span className={`importance-badge importance-${item.importance}`}>{item.importance}</span>}
-                </div>
-              )} />
-          </div>
 
           {/* Recommendations */}
           {(report.recommendations || []).length > 0 && (
@@ -2696,7 +2721,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
         </div>
       )}
 
-      {/* Pronunciation Assessment — Arabic only */}
+      {/* Audio clarity panel — Arabic only */}
       {lastTranscript && (lastTranscript.language || lastTranscript.language_detected) === 'ar' && (
         <div className="card" style={{ marginTop: '1rem' }}>
           <h3 className="report-section-title">🔤 {labels.pronunciationTitle}</h3>
