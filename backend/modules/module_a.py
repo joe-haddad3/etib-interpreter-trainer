@@ -218,7 +218,20 @@ SPEECH WRITING RULES
 
 7. Glossary: 8–12 key terms, each with Arabic, French, English, and a brief definition.
 
-8. Summary: A concise mind-map style outline of the speech (10 lines max), in the speech language.
+   - Arabic equivalents must be correct, complete Modern Standard Arabic terms.
+   - Do not output malformed Arabic words or split one Arabic term across unrelated lines.
+   - For GIEC/IPCC, use Arabic: "الهيئة الحكومية الدولية المعنية بتغير المناخ".
+
+8. Summary: A polished thematic summary in the speech language:
+   - 3 to 5 short bullet points, each a complete sentence.
+   - Include only relevant content-bearing points from the speech.
+   - Prefer facts, figures, named organisations, concrete arguments, or specific policy actions.
+   - Do not add generic closing bullets such as "we must act now" unless the sentence contains a specific action from the speech.
+   - Do not copy protocol greetings such as "Monsieur le Président" or "Mesdames et Messieurs".
+   - Do not output isolated fragments like "Le climat" or "FMI et OMC".
+   - For French, write natural French sentences such as:
+     "- Le discours présente la crise climatique comme une urgence économique et sociale."
+     "- Les chiffres clés soulignent la nécessité d'investir rapidement dans la transition."
 
 ═══════════════════════════════════════════════
 SELF-EVALUATION (internal — do not output)
@@ -239,7 +252,7 @@ Return ONLY valid compact JSON. No markdown, no code fences, no explanation outs
 
 {{
   "script": "Full speech text — between {word_count_min} and {word_count_max} words",
-  "summary": "Mind-map outline of the speech in the speech language",
+  "summary": "3-5 relevant complete-sentence thematic bullet points in the speech language",
   "mcqs": [
     {{
       "question": "Specific comprehension question about the speech content",
@@ -330,13 +343,122 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
             'answer':   str(item.get('answer', '')).strip(),
         })
 
+    summary = clean(data.get('summary', ''))
+    if language == 'fr':
+        summary = normalize_french_summary(summary, script)
+
     return {
         'script':   script,
-        'summary':  clean(data.get('summary', '')),
+        'summary':  summary,
         'mcqs':     mcqs,
         'glossary': normalize_glossary(data.get('glossary')),
         'metadata': data.get('metadata') if isinstance(data.get('metadata'), dict) else {},
     }
+
+
+def normalize_french_summary(summary: str, script: str = '') -> str:
+    """Make French summaries readable and remove protocol-greeting fragments."""
+    lines = [
+        re.sub(r'^\s*[-•*]\s*', '', line).strip()
+        for line in str(summary or '').splitlines()
+        if line.strip()
+    ]
+    if not lines:
+        return ''
+
+    skip_patterns = (
+        'monsieur le président',
+        'monsieur le president',
+        'mesdames et messieurs',
+        'distingués',
+        'distingues',
+    )
+    verb_markers = re.compile(
+        r"\b(est|sont|doit|doivent|peut|peuvent|pourrait|pourraient|présente|souligne|appelle|"
+        r"met|montre|insiste|rappelle|exige|nécessite|vise|affirme|explique|"
+        r"estime|prévoit|génère|générer|crée|créer|réduit|réduire|représente|"
+        r"concerne|affecte|devient|reste|sera|seront|a|ont)\b",
+        flags=re.IGNORECASE,
+    )
+    cleaned = []
+    for line in lines:
+        normalized = line.casefold()
+        if any(pattern in normalized for pattern in skip_patterns):
+            continue
+        if is_generic_summary_bullet(line):
+            continue
+        if len(line.split()) < 5 or not verb_markers.search(line):
+            continue
+        if not line.endswith(('.', '!', '?')):
+            line = f'{line}.'
+        cleaned.append(f'- {line}')
+
+    if len(cleaned) >= 2:
+        return '\n'.join(cleaned[:5])
+
+    script_points = summarize_french_script_extractively(script)
+    return script_points or '\n'.join(cleaned[:5]) or str(summary or '').strip()
+
+
+def is_generic_summary_bullet(line: str) -> bool:
+    """Drop motivational filler bullets that do not summarize a concrete point."""
+    text = str(line or '').strip()
+    normalized = re.sub(r'\s+', ' ', text.casefold())
+    if not normalized:
+        return True
+
+    generic_patterns = (
+        r'\bnous devons agir maintenant\b',
+        r'\bil faut agir maintenant\b',
+        r'\bagir maintenant\b',
+        r'\bprotéger notre planète\b',
+        r'\bproteger notre planete\b',
+        r'\bwe must act now\b',
+        r'\bwe need to act now\b',
+        r'\bprotect our planet\b',
+        r'\bمطلوب منا أن نتحرك الآن\b',
+    )
+    if not any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in generic_patterns):
+        return False
+
+    has_number = bool(re.search(r'\d|[%$€£]', text))
+    has_acronym = bool(re.search(r'\b[A-Z]{2,}\b', text))
+    concrete_terms = (
+        'invest', 'investment', 'policy', 'emissions', 'climate finance', 'renewable',
+        'investir', 'investissement', 'politique', 'émissions', 'emissions', 'financement',
+        'renouvelable', 'transition', 'accord', 'banque mondiale', 'giec', 'onu', 'ue',
+    )
+    has_concrete_term = any(term in normalized for term in concrete_terms)
+    return not (has_number or has_acronym or has_concrete_term)
+
+
+def summarize_french_script_extractively(script: str) -> str:
+    """Fallback summary from the generated French script when model summary is fragmentary."""
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r'(?<=[.!?])\s+', str(script or '').replace('\n', ' '))
+        if sentence.strip()
+    ]
+    skip_patterns = (
+        'monsieur le président',
+        'monsieur le president',
+        'mesdames et messieurs',
+        'distingués',
+        'distingues',
+    )
+    selected = []
+    for sentence in sentences:
+        normalized = sentence.casefold()
+        if any(pattern in normalized for pattern in skip_patterns):
+            continue
+        if is_generic_summary_bullet(sentence):
+            continue
+        if len(sentence.split()) < 8:
+            continue
+        selected.append(f'- {sentence}')
+        if len(selected) >= 5:
+            break
+    return '\n'.join(selected)
 
 
 def script_word_count(script: str) -> int:
@@ -489,11 +611,23 @@ def normalize_glossary(raw_glossary) -> list[dict]:
             'english': first_present(item, ['english', 'English', 'en', 'english_translation', 'translation_en']),
             'definition': first_present(item, ['definition', 'meaning', 'explanation']),
         }
+        row = fix_known_glossary_terms(row)
 
         if any(row.values()):
             normalized.append(row)
 
     return normalized
+
+
+def fix_known_glossary_terms(row: dict) -> dict:
+    """Correct common institutional terms the LLM sometimes mangles."""
+    combined = ' '.join(str(row.get(key, '')) for key in ['term', 'arabic', 'french', 'english']).casefold()
+    if 'giec' in combined or 'ipcc' in combined or 'groupe d experts intergouvernemental' in combined:
+        row['term'] = row.get('term') or 'GIEC'
+        row['arabic'] = 'الهيئة الحكومية الدولية المعنية بتغير المناخ'
+        row['french'] = row.get('french') or "Groupe d'experts intergouvernemental sur l'évolution du climat"
+        row['english'] = row.get('english') or 'Intergovernmental Panel on Climate Change'
+    return row
 
 
 def first_present(item: dict, keys: list[str]) -> str:

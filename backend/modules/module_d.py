@@ -450,6 +450,57 @@ def normalize_repetition_word(text: str) -> str:
     return re.sub(r'[^\w]', '', str(text or '').strip().casefold(), flags=re.UNICODE)
 
 
+def build_verbatim_asr_prompt(language: str) -> str:
+    """Prime Whisper to keep disfluencies and consecutive repeated words."""
+    examples = {
+        'en': "If the speaker says 'climate climate action', transcribe exactly: climate climate action.",
+        'fr': "If the speaker says 'climat climat action', transcribe exactly: climat climat action.",
+        'ar': "Keep repeated spoken words exactly as spoken.",
+    }
+    return (
+        "Transcribe verbatim. Do not clean up the student's speech. "
+        "Keep consecutive repeated words, repeated phrases, false starts, hesitations, fillers, and self-corrections. "
+        f"{examples.get(language, examples['en'])}"
+    )
+
+
+def build_repetition_hotwords(source_script: str, language: str = 'en') -> str:
+    """
+    Bias faster-whisper toward words that appear in the source speech.
+    English ASR tends to collapse accidental repeats, so repeating source terms
+    in the hotword list helps preserve cases like "climate climate".
+    """
+    common_words = {
+        'en': {
+            'the', 'a', 'an', 'and', 'or', 'but', 'to', 'of', 'in', 'on', 'for', 'from',
+            'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'it', 'this', 'that',
+            'these', 'those', 'as', 'at', 'we', 'they', 'he', 'she', 'you', 'i',
+        },
+        'fr': {
+            'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'd', 'et', 'ou', 'mais',
+            'a', 'au', 'aux', 'en', 'dans', 'pour', 'par', 'avec', 'est', 'sont', 'ce',
+            'cette', 'ces', 'nous', 'vous', 'ils', 'elles',
+        },
+        'ar': set(),
+    }
+    base = [
+        'um', 'uh', 'er', 'erm', 'hmm', 'euh', 'heu',
+        'repeated', 'repeated', 'word', 'word',
+    ]
+    stopwords = common_words.get(language, common_words['en'])
+    seen = set()
+    source_terms = []
+    for match in re.finditer(r'\w+', source_script or '', flags=re.UNICODE):
+        token = normalize_repetition_word(match.group(0))
+        if len(token) < 4 or token in stopwords or token in seen:
+            continue
+        seen.add(token)
+        source_terms.extend([token, token])
+        if len(source_terms) >= 80:
+            break
+    return ' '.join(base + source_terms)
+
+
 def repetition_compare_key(text: str) -> str:
     """Normalize a word for repetition comparison without changing display text."""
     import unicodedata
@@ -1760,6 +1811,9 @@ def full_evaluation():
         # and word-level probabilities. Groq normalizes silence/repetitions away.
         from modules.module_c import _get_local_model, DISFLUENCY_PROMPTS
         model = _get_local_model()
+        disfluency_prompt = DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en'])
+        verbatim_prompt = f"{disfluency_prompt} {build_verbatim_asr_prompt(language)}"
+        repetition_hotwords = build_repetition_hotwords(source_script, language)
 
         segments_iter, info = model.transcribe(
             temp_path,
@@ -1777,8 +1831,8 @@ def full_evaluation():
             beam_size=1,                        # greedy: prevents beam search from collapsing repetitions
             repetition_penalty=1.0,
             no_repeat_ngram_size=0,
-            initial_prompt=DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en']),  # language-specific filler priming
-            hotwords='euh heu um uh repeated repeated word word',
+            initial_prompt=verbatim_prompt,      # language-specific filler + repetition priming
+            hotwords=repetition_hotwords,
         )
 
         full_text = ''

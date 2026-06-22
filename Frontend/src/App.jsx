@@ -186,7 +186,7 @@ const UI = {
     numIncorrect: 'Incorrect',
     expectedLabel: 'Should be',
     studentSaidShort: 'Said',
-    pronunciationTitle: 'Pronunciation Assessment (إعراب)',
+    pronunciationTitle: 'Pronunciation Assessment',
     pronunciationMismatches: 'Word-level clarity mismatches',
     runPronunciation: 'Run pronunciation check',
     runningPronunciation: 'Aligning audio against source — may take 1 min...',
@@ -402,7 +402,7 @@ const UI = {
     numIncorrect: 'غير صحيح',
     expectedLabel: 'الصواب',
     studentSaidShort: 'ما قاله الطالب',
-    pronunciationTitle: 'تقييم النطق والإعراب',
+    pronunciationTitle: 'تقييم النطق',
     pronunciationMismatches: 'تباينات وضوح الكلمات',
     runPronunciation: 'تشغيل فحص النطق',
     runningPronunciation: 'جارٍ المحاذاة الصوتية — قد تستغرق دقيقة...',
@@ -598,7 +598,7 @@ const UI = {
     numIncorrect: 'Incorrect',
     expectedLabel: 'Attendu',
     studentSaidShort: 'Dit',
-    pronunciationTitle: 'Évaluation de la prononciation (إعراب)',
+    pronunciationTitle: 'Évaluation de la prononciation',
     pronunciationMismatches: 'Divergences de clarté mot par mot',
     runPronunciation: 'Lancer le contrôle de prononciation',
     runningPronunciation: 'Alignement audio en cours — peut prendre 1 min...',
@@ -701,6 +701,14 @@ function glossaryValue(item, keys) {
 }
 
 function glossaryArabicValue(item) {
+  const combined = Object.values(item || {})
+    .filter(value => value !== undefined && value !== null && typeof value !== 'object')
+    .map(value => String(value).toLowerCase())
+    .join(' ');
+  if (combined.includes('giec') || combined.includes('ipcc') || combined.includes('groupe d')) {
+    return 'الهيئة الحكومية الدولية المعنية بتغير المناخ';
+  }
+
   const direct = glossaryValue(item, ['arabic', 'Arabic', 'ar', 'AR', 'arabic_term', 'term_ar', 'arabic_translation', 'translation_ar', 'العربية', 'عربي']);
   if (direct) return direct;
 
@@ -2606,7 +2614,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           )}
 
           {/* Pronunciation assessment (LLM commentary, all languages) */}
-          {report.pronunciation_assessment?.comment && (
+          {false && report.pronunciation_assessment?.comment && (
             <div className="card">
               <h3 className="report-section-title">🗣️ {labels.pronunciationAssessmentTitle}</h3>
               <p className={isAr ? 'arabic' : ''} style={{ fontSize: '0.85rem', color: 'var(--ink)', marginBottom: '0.6rem' }}>{report.pronunciation_assessment.comment}</p>

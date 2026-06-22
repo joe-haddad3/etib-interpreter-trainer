@@ -1390,7 +1390,7 @@ body.rtl .upload-fallback[open] summary::before { transform: rotate(270deg); }
 }
 .summary-bullet {
   position: relative;
-  color: var(--warm-gray);
+  color: var(--ink);
   font-size: 0.88rem;
   line-height: 1.7;
   margin: 0.2rem 0 0.2rem 1.4rem;
@@ -1402,7 +1402,7 @@ body.rtl .upload-fallback[open] summary::before { transform: rotate(270deg); }
   left: 0; top: 0.6em;
   width: 6px; height: 6px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--primary);
 }
 .summary-line {
   color: var(--ink);
