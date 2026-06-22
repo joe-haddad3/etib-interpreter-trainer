@@ -221,7 +221,8 @@ def transcribe():
 
     try:
         # Try Groq first (fast), fall back to local Whisper
-        if GROQ_API_KEY:
+        from utils.groq_client import get_groq_key
+        if get_groq_key():
             try:
                 result = _transcribe_groq(temp_path, language)
             except Exception as groq_err:
@@ -307,9 +308,11 @@ def align_pronunciation():
 
 @module_c_bp.route('/status')
 def model_status():
+    from utils.groq_client import get_groq_key
+    has_key = bool(get_groq_key())
     return jsonify({
-        'groq_available':  bool(GROQ_API_KEY),
+        'groq_available':  has_key,
         'local_loaded':    _whisper_model is not None,
         'model_size':      WHISPER_MODEL_SIZE,
-        'primary_method':  'groq' if GROQ_API_KEY else 'local'
+        'primary_method':  'groq' if has_key else 'local'
     })

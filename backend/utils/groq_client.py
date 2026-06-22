@@ -1,42 +1,38 @@
 """
-Groq client factory.
+Groq client factory — per-student key mode.
 
-Returns a Groq client using the per-request key sent by the frontend
-(X-Groq-Api-Key header, stored in flask.g), falling back to the
-server-level GROQ_API_KEY from .env.
+Each student supplies their own Groq API key via the Settings modal.
+The key is stored in their browser (localStorage) and sent with every
+request as the X-Groq-Api-Key header.  There is NO server-level
+fallback key; if no student key is present the call raises RuntimeError.
 """
-from config import GROQ_API_KEY
 
-_server_client = None  # cached only for the server key
+_client_cache: dict = {}  # key -> Groq client
 
 
 def get_groq_key() -> str | None:
-    """Active Groq API key: per-request (user) key → server key → None."""
+    """Return the per-request user key, or None if not set."""
     try:
         from flask import g
-        if getattr(g, 'groq_api_key', None):
-            return g.groq_api_key
+        return getattr(g, 'groq_api_key', None)
     except RuntimeError:
-        pass
-    return GROQ_API_KEY
+        return None
 
 
 def get_groq_client():
-    """Return a ready Groq client. Raises RuntimeError if no key is available."""
-    global _server_client
+    """Return a Groq client for the current request's key.
+
+    Raises RuntimeError if the student hasn't saved their key yet.
+    """
     from groq import Groq
 
     key = get_groq_key()
     if not key:
         raise RuntimeError(
-            'No Groq API key found. Add your personal key in Settings '
-            'or ask the administrator to configure GROQ_API_KEY on the server.'
+            'No Groq API key found. Please open Settings and add your '
+            'personal Groq API key (free at console.groq.com).'
         )
 
-    # Cache only when using the server key — user keys must create a fresh client
-    if key == GROQ_API_KEY:
-        if _server_client is None:
-            _server_client = Groq(api_key=key)
-        return _server_client
-
-    return Groq(api_key=key)
+    if key not in _client_cache:
+        _client_cache[key] = Groq(api_key=key)
+    return _client_cache[key]
