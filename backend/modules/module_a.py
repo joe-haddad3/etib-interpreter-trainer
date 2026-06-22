@@ -343,7 +343,7 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
             'answer':   str(item.get('answer', '')).strip(),
         })
 
-    summary = clean(data.get('summary', ''))
+    summary = normalize_summary_value(data.get('summary', ''), clean)
     if language == 'fr':
         summary = normalize_french_summary(summary, script)
 
@@ -354,6 +354,43 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
         'glossary': normalize_glossary(data.get('glossary')),
         'metadata': data.get('metadata') if isinstance(data.get('metadata'), dict) else {},
     }
+
+
+def normalize_summary_value(value, clean_func=str) -> str:
+    """Convert model summary variants into newline bullet text for the UI."""
+    if isinstance(value, list):
+        items = [clean_func(item) for item in value]
+        return bulletize_summary_items(items)
+
+    text = clean_func(value)
+    parsed_list = parse_stringified_summary_list(text)
+    if parsed_list:
+        return bulletize_summary_items(clean_func(item) for item in parsed_list)
+    return text
+
+
+def parse_stringified_summary_list(text: str) -> list:
+    """Handle summaries returned as "['point one', 'point two']" strings."""
+    stripped = str(text or '').strip()
+    if not (stripped.startswith('[') and stripped.endswith(']')):
+        return []
+    try:
+        parsed = ast.literal_eval(stripped)
+    except (SyntaxError, ValueError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [str(item).strip() for item in parsed if str(item).strip()]
+
+
+def bulletize_summary_items(items) -> str:
+    bullets = []
+    for item in items:
+        line = re.sub(r'^\s*[-•*]\s*', '', str(item or '').strip())
+        if not line:
+            continue
+        bullets.append(f'- {line}')
+    return '\n'.join(bullets)
 
 
 def normalize_french_summary(summary: str, script: str = '') -> str:

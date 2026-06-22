@@ -2446,6 +2446,13 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
   const algo = report?.algorithmic || {};
   const fluency = report?.fluency || null;
   const isAr = (lastTranscript.language || lastTranscript.language_detected) === 'ar';
+  const llmNumberErrors = (report?.number_accuracy || [])
+    .filter(item => item && item.correct === false)
+    .map(item => ({
+      ...item,
+      message: `${item.source_value || ''} was rendered as ${item.student_said || 'missing'}`.trim(),
+    }));
+  const displayNumberErrors = llmNumberErrors.length > 0 ? llmNumberErrors : (algo.number_errors || []);
 
   return (
     <div>
@@ -2505,7 +2512,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 { label: labels.longSilences,  icon: '🔇', items: algo.long_silences || [] },
                 { label: labels.repetitions,   icon: '🔁', items: algo.repetitions || [] },
                 { label: labels.hesitations,   icon: '🗣️', items: algo.hesitation_words || [] },
-                { label: labels.numberErrors,  icon: '🔢', items: algo.number_errors || [] },
+                { label: labels.numberErrors,  icon: '🔢', items: displayNumberErrors },
               ].map(({ label, icon, items }) => (
                 <div key={label} className={`algo-card ${items.length > 0 ? 'algo-card-warn' : ''}`}>
                   <span className="algo-icon">{icon}</span>
@@ -2553,11 +2560,11 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 </div>
               </div>
             )}
-            {(algo.number_errors || []).length > 0 && (
+            {displayNumberErrors.length > 0 && (
               <div className="algo-detail-block">
                 <p className="algo-detail-title">🔢 {labels.numberErrors}</p>
                 <div className="algo-chips">
-                  {algo.number_errors.map((n, i) => (
+                  {displayNumberErrors.map((n, i) => (
                     <span key={i} className="algo-chip algo-chip-err">
                       {typeof n === 'string' ? n : (n.message || `${n.expected || ''} → ${n.heard || ''}`)}
                     </span>
@@ -2574,12 +2581,22 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               {report.pause_analysis.comment && (
                 <p className={isAr ? 'arabic' : ''} style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>{report.pause_analysis.comment}</p>
               )}
-              {(report.pause_analysis.problem_pauses || []).map((p, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginTop: '0.5rem' }}>
-                  <strong style={{ fontSize: '0.84rem' }}>{p.duration_seconds}s {labels.longSilences.toLowerCase()} — {p.at_seconds}s</strong>
-                  {p.impact && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{p.impact}</div>}
-                </div>
-              ))}
+              {(report.pause_analysis.problem_pauses || []).map((p, i) => {
+                const detectedPause = (algo.long_silences || [])[i] || {};
+                const duration = detectedPause.duration_seconds ?? p.duration_seconds;
+                const atSeconds = detectedPause.at_seconds ?? p.at_seconds;
+                return (
+                  <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginTop: '0.5rem' }}>
+                    <strong style={{ fontSize: '0.84rem' }}>
+                      {duration}s {labels.longSilences.toLowerCase()}
+                      {Number.isFinite(Number(atSeconds)) && (
+                        Number(atSeconds) === 0 ? ' — at start' : ` — at ${atSeconds}s`
+                      )}
+                    </strong>
+                    {p.impact && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{p.impact}</div>}
+                  </div>
+                );
+              })}
             </div>
           )}
 
