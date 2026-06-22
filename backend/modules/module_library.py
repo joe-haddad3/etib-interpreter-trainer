@@ -393,12 +393,29 @@ def _resolve_pdf_url(web_url: str, un_id: str, language: str = 'ar') -> str:
     return ''
 
 
-def _download_and_extract(pdf_url: str) -> str:
-    """Download a PDF (via curl, to avoid the AWS WAF block on python-requests) and extract its text."""
+_BROWSER_UA = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) '
+    'Chrome/124.0.0.0 Safari/537.36'
+)
+
+
+def _download_and_extract(pdf_url: str, timeout: int = PDF_TIMEOUT) -> str:
+    """Download a PDF (via curl, bypassing AWS WAF) and extract its text."""
     try:
         result = subprocess.run(
-            ['curl', '-sL', '--max-time', str(PDF_TIMEOUT), '-H', 'Accept: application/pdf', pdf_url],
-            capture_output=True, timeout=PDF_TIMEOUT + 5,
+            [
+                'curl', '-sL',
+                '--max-time', str(timeout),
+                '--retry', '2',
+                '--retry-delay', '1',
+                '-H', f'User-Agent: {_BROWSER_UA}',
+                '-H', 'Accept: application/pdf,*/*',
+                '-H', 'Accept-Language: en-US,en;q=0.9',
+                '-H', 'Referer: https://digitallibrary.un.org/',
+                pdf_url,
+            ],
+            capture_output=True, timeout=timeout + 10,
         )
     except (subprocess.SubprocessError, OSError) as exc:
         raise ValueError(f'Failed to download PDF: {exc}')
@@ -407,8 +424,14 @@ def _download_and_extract(pdf_url: str) -> str:
         raise ValueError(f'curl error downloading PDF (exit {result.returncode})')
 
     pdf_bytes = result.stdout[:10 * 1024 * 1024]
-    if not pdf_bytes.startswith(b'%PDF'):
+    # Accept both %PDF header and BOM-prefixed PDFs
+    if b'%PDF' not in pdf_bytes[:1024]:
         raise ValueError('URL did not return a valid PDF file.')
+
+    # Slice to actual %PDF start in case of HTTP preamble
+    pdf_start = pdf_bytes.find(b'%PDF')
+    if pdf_start > 0:
+        pdf_bytes = pdf_bytes[pdf_start:]
 
     return _extract_text_from_pdf(pdf_bytes)
 

@@ -828,36 +828,40 @@ def _build_un_search_queries(params: dict) -> list[str]:
 
 def find_un_grounding_source(params: dict) -> dict | None:
     """
-    Automatically search the UN Digital Library for a real document related to
-    the requested topic/domain, trying progressively broader queries until a
-    document with extractable text is found.
-
-    English-language documents are searched first because they extract far
-    more reliably from PDF (older Arabic UN PDFs often use custom CID fonts
-    that decode to mojibake) — the LLM uses the extracted facts/figures as
-    grounding regardless of the speech's output language.
+    Search the UN Digital Library for a grounding document.
+    Tries English → French → Spanish (most text-extractable formats).
+    Each PDF download uses a short 20s timeout so generation doesn't hang long.
     """
+    import logging
+    log = logging.getLogger(__name__)
+
     queries = _build_un_search_queries(params)
 
     for query in queries:
-        for un_lang in ('eng', 'fre'):
+        for un_lang in ('eng', 'fre', 'spa'):
             try:
-                results = _search_un_api(query, un_lang, 5)
-            except Exception:
+                results = _search_un_api(query, un_lang, 8)
+            except Exception as exc:
+                log.debug('[Grounding] UN search error (%s, %s): %s', query, un_lang, exc)
                 results = []
 
-            for result in results[:3]:
+            for result in results[:5]:
                 pdf_url = result.get('pdf_url')
                 if not pdf_url:
                     continue
                 try:
-                    text = _clean_extracted_text(_download_and_extract(pdf_url))
-                except Exception:
+                    # Short timeout so one slow PDF doesn't block generation
+                    text = _clean_extracted_text(_download_and_extract(pdf_url, timeout=20))
+                except Exception as exc:
+                    log.debug('[Grounding] PDF failed (%s): %s', pdf_url, exc)
                     continue
 
-                if len(text.split()) < 80:
+                words = len(text.split())
+                if words < 40:
+                    log.debug('[Grounding] Too short (%d words): %s', words, pdf_url)
                     continue
 
+                log.info('[Grounding] Found source: "%s" (%d words)', result.get('title', ''), words)
                 return {
                     'text':    text,
                     'title':   result.get('title', ''),
@@ -868,6 +872,7 @@ def find_un_grounding_source(params: dict) -> dict | None:
                     'query':   query,
                 }
 
+    log.info('[Grounding] No usable document found for queries: %s', queries)
     return None
 
 
