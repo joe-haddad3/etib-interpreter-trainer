@@ -147,9 +147,11 @@ def compare_against_source(
     overall   = round(sum(w['score'] for w in graded) / len(graded), 3)
 
     llm_analysis = []
-    if uncertain and groq_api_key and source_text and language == 'ar':
+    from utils.groq_client import get_groq_key
+    active_key = groq_api_key or get_groq_key()
+    if uncertain and active_key and source_text and language == 'ar':
         llm_analysis = _llm_pronounce_analysis(
-            uncertain, source_text, groq_api_key, llm_model
+            uncertain, source_text, active_key, llm_model
         )
 
     return {

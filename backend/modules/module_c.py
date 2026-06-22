@@ -33,8 +33,8 @@ DISFLUENCY_PROMPTS = {
 
 def _transcribe_groq(audio_path: str, language: str) -> dict:
     """Transcribe via Groq's hosted whisper-large-v3. Returns in seconds."""
-    from groq import Groq
-    client = Groq(api_key=GROQ_API_KEY)
+    from utils.groq_client import get_groq_client
+    client = get_groq_client()
 
     with open(audio_path, 'rb') as f:
         result = client.audio.transcriptions.create(
@@ -140,12 +140,14 @@ def _add_tashkeel(student_text: str, source_text: str = '') -> str:
     and mark the student's actual pronunciation (wrong case endings, wrong vowels, etc.)
     Returns original text if tashkeel fails (never raises).
     """
-    if not GROQ_API_KEY or not student_text.strip():
+    if not student_text.strip():
         return student_text
     try:
-        from groq import Groq
+        from utils.groq_client import get_groq_client, get_groq_key
         from config import PRIMARY_LLM_MODEL
-        client = Groq(api_key=GROQ_API_KEY)
+        if not get_groq_key():
+            return student_text
+        client = get_groq_client()
 
         if source_text.strip():
             user_prompt = f"""You are an Arabic phonetics expert for interpreter training at ETIB Beirut.

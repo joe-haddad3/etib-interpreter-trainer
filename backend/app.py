@@ -8,7 +8,7 @@ Run with:
     python app.py
 """
 import os
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, g
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -44,6 +44,14 @@ app.register_blueprint(module_c_bp,       url_prefix='/api/module-c')
 app.register_blueprint(module_d_bp,       url_prefix='/api/module-d')
 app.register_blueprint(module_library_bp, url_prefix='/api/library')
 app.register_blueprint(auth_bp,           url_prefix='/api/auth')
+
+# ── Per-request Groq key from frontend ──────────────────────────────────────
+@app.before_request
+def extract_groq_key():
+    """If the client sends X-Groq-Api-Key, make it available to all modules via flask.g."""
+    key = request.headers.get('X-Groq-Api-Key', '').strip()
+    g.groq_api_key = key if key.startswith('gsk_') else None
+
 
 # ── Health check ────────────────────────────────────────────────────────────
 @app.route('/health')

@@ -219,3 +219,30 @@ def me():
 def logout():
     session.clear()
     return jsonify({'message': 'Logout successful'})
+
+
+@auth_bp.route('/validate-groq-key', methods=['POST'])
+def validate_groq_key():
+    """Test a Groq API key by making a minimal chat completion call."""
+    payload = request.get_json(silent=True) or {}
+    key = (payload.get('api_key') or '').strip()
+
+    if not key:
+        return jsonify({'valid': False, 'error': 'No key provided'}), 400
+    if not key.startswith('gsk_'):
+        return jsonify({'valid': False, 'error': 'Groq keys must start with gsk_'}), 400
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=key)
+        client.chat.completions.create(
+            model='llama-3.1-8b-instant',
+            messages=[{'role': 'user', 'content': 'Hi'}],
+            max_tokens=1,
+        )
+        return jsonify({'valid': True})
+    except Exception as exc:
+        msg = str(exc)
+        if 'invalid_api_key' in msg.lower() or '401' in msg:
+            return jsonify({'valid': False, 'error': 'Invalid API key'}), 200
+        return jsonify({'valid': False, 'error': f'Could not verify: {msg[:120]}'}), 200

@@ -21,6 +21,9 @@ import {
   deleteSavedSpeech,
   getSessionHistory,
   getAdaptiveParams,
+  getStoredGroqKey,
+  saveGroqKey,
+  validateGroqKey,
 } from './api.js';
 
 const UI = {
@@ -54,6 +57,22 @@ const UI = {
     navC: 'Record & transcribe',
     navD: 'Evaluation',
     navE: 'Progress',
+    navSettings: 'Settings',
+    settingsTitle: 'Settings',
+    settingsGroqTitle: 'Your Groq API Key',
+    settingsGroqDesc: 'Paste your personal Groq API key here. It is stored only in your browser and sent securely with each request.',
+    settingsGroqPlaceholder: 'gsk_...',
+    settingsGroqGetKey: 'Get a free key at console.groq.com',
+    settingsGroqTest: 'Test key',
+    settingsGroqTesting: 'Testing...',
+    settingsGroqSave: 'Save key',
+    settingsGroqClear: 'Remove key',
+    settingsGroqValid: 'Key is valid and working.',
+    settingsGroqInvalid: 'Invalid key — check and try again.',
+    settingsGroqNotSet: 'No personal key saved.',
+    settingsGroqSaved: 'Key saved.',
+    settingsClose: 'Close',
+    bannerNoKey: 'No Groq API key configured. Go to Settings to add your personal key, or ask the admin to configure a server key.',
     progressTitle: 'My Progress',
     progressSubtitle: 'Score history and adaptive recommendations',
     progressNoSessions: 'No sessions yet — complete a full evaluation to start tracking your progress.',
@@ -279,6 +298,22 @@ const UI = {
     navC: 'التسجيل والتفريغ',
     navD: 'التقييم',
     navE: 'التقدم',
+    navSettings: 'الإعدادات',
+    settingsTitle: 'الإعدادات',
+    settingsGroqTitle: 'مفتاح Groq API الشخصي',
+    settingsGroqDesc: 'الصق مفتاح Groq API الخاص بك. يُحفظ في متصفحك فقط ويُرسل بشكل آمن مع كل طلب.',
+    settingsGroqPlaceholder: 'gsk_...',
+    settingsGroqGetKey: 'احصل على مفتاح مجاني من console.groq.com',
+    settingsGroqTest: 'اختبار المفتاح',
+    settingsGroqTesting: 'جارٍ الاختبار...',
+    settingsGroqSave: 'حفظ المفتاح',
+    settingsGroqClear: 'حذف المفتاح',
+    settingsGroqValid: 'المفتاح صالح ويعمل.',
+    settingsGroqInvalid: 'مفتاح غير صالح — تحقق وأعد المحاولة.',
+    settingsGroqNotSet: 'لم يتم حفظ أي مفتاح شخصي.',
+    settingsGroqSaved: 'تم حفظ المفتاح.',
+    settingsClose: 'إغلاق',
+    bannerNoKey: 'لم يتم تهيئة مفتاح Groq API. انتقل إلى الإعدادات لإضافة مفتاحك الشخصي.',
     progressTitle: 'تقدمي',
     progressSubtitle: 'سجل الدرجات والتوصيات التكيفية',
     progressNoSessions: 'لا جلسات بعد — أكمل تقييماً كاملاً لبدء تتبع تقدمك.',
@@ -504,6 +539,22 @@ const UI = {
     navC: 'Enregistrer et transcrire',
     navD: 'Évaluation',
     navE: 'Progression',
+    navSettings: 'Paramètres',
+    settingsTitle: 'Paramètres',
+    settingsGroqTitle: 'Votre clé API Groq',
+    settingsGroqDesc: 'Collez votre clé API Groq personnelle. Elle est stockée uniquement dans votre navigateur et envoyée de manière sécurisée.',
+    settingsGroqPlaceholder: 'gsk_...',
+    settingsGroqGetKey: 'Obtenez une clé gratuite sur console.groq.com',
+    settingsGroqTest: 'Tester la clé',
+    settingsGroqTesting: 'Test en cours...',
+    settingsGroqSave: 'Enregistrer',
+    settingsGroqClear: 'Supprimer la clé',
+    settingsGroqValid: 'Clé valide et fonctionnelle.',
+    settingsGroqInvalid: 'Clé invalide — vérifiez et réessayez.',
+    settingsGroqNotSet: 'Aucune clé personnelle enregistrée.',
+    settingsGroqSaved: 'Clé enregistrée.',
+    settingsClose: 'Fermer',
+    bannerNoKey: 'Aucune clé API Groq configurée. Allez dans Paramètres pour ajouter votre clé personnelle.',
     progressTitle: 'Ma progression',
     progressSubtitle: 'Historique des scores et recommandations adaptatives',
     progressNoSessions: 'Aucune session — terminez une évaluation complète pour commencer le suivi.',
@@ -1169,6 +1220,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activePanel, setActivePanel] = useState('module-a');
   const [lastGeneratedScript, setLastGeneratedScript] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
   const L = UI[uiLang];
 
   useEffect(() => {
@@ -1222,6 +1274,7 @@ export default function App() {
         onPanelChange={setActivePanel}
         uiLang={uiLang}
         onLanguageChange={setUiLang}
+        onOpenSettings={() => setShowSettings(true)}
       />
       <main>
         {!isAuthenticated ? (
@@ -1239,11 +1292,107 @@ export default function App() {
           />
         )}
       </main>
+      {showSettings && (
+        <SettingsModal labels={L} onClose={() => setShowSettings(false)} />
+      )}
     </div>
   );
 }
 
-function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, onLanguageChange }) {
+function SettingsModal({ labels, onClose }) {
+  const [keyInput, setKeyInput] = useState(getStoredGroqKey());
+  const [status, setStatus] = useState('');  // 'valid' | 'invalid' | 'saved' | ''
+  const [testing, setTesting] = useState(false);
+  const hasKey = Boolean(getStoredGroqKey());
+
+  async function handleTest() {
+    setTesting(true);
+    setStatus('');
+    try {
+      const res = await validateGroqKey(keyInput.trim());
+      setStatus(res.valid ? 'valid' : 'invalid');
+    } catch {
+      setStatus('invalid');
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  function handleSave() {
+    saveGroqKey(keyInput.trim());
+    setStatus('saved');
+  }
+
+  function handleClear() {
+    saveGroqKey('');
+    setKeyInput('');
+    setStatus('');
+  }
+
+  return (
+    <div className="settings-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="settings-modal">
+        <div className="settings-modal-header">
+          <h2>{labels.settingsTitle}</h2>
+          <button type="button" className="settings-close-btn" onClick={onClose}>{labels.settingsClose}</button>
+        </div>
+        <div className="settings-section">
+          <h3>{labels.settingsGroqTitle}</h3>
+          <p className="settings-desc">{labels.settingsGroqDesc}</p>
+          <a
+            href="https://console.groq.com/keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="settings-link"
+          >
+            {labels.settingsGroqGetKey}
+          </a>
+          <div className="settings-key-row">
+            <input
+              type="password"
+              className="settings-key-input"
+              placeholder={labels.settingsGroqPlaceholder}
+              value={keyInput}
+              onChange={e => { setKeyInput(e.target.value); setStatus(''); }}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleTest}
+              disabled={testing || !keyInput.trim()}
+            >
+              {testing ? labels.settingsGroqTesting : labels.settingsGroqTest}
+            </button>
+          </div>
+          {status === 'valid'   && <p className="settings-status ok">{labels.settingsGroqValid}</p>}
+          {status === 'invalid' && <p className="settings-status err">{labels.settingsGroqInvalid}</p>}
+          {status === 'saved'   && <p className="settings-status ok">{labels.settingsGroqSaved}</p>}
+          {!status && !hasKey   && <p className="settings-status warn">{labels.settingsGroqNotSet}</p>}
+          <div className="settings-btn-row">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleSave}
+              disabled={!keyInput.trim()}
+            >
+              {labels.settingsGroqSave}
+            </button>
+            {hasKey && (
+              <button type="button" className="btn-danger" onClick={handleClear}>
+                {labels.settingsGroqClear}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, onLanguageChange, onOpenSettings }) {
+  const hasKey = Boolean(getStoredGroqKey());
   return (
     <header className="fade-up">
       <div className="header-logos">
@@ -1265,6 +1414,14 @@ function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, o
               {labels[item.labelKey]}
             </button>
           ))}
+          <button
+            type="button"
+            className="nav-btn settings-btn"
+            onClick={onOpenSettings}
+            title={labels.navSettings}
+          >
+            ⚙ {!hasKey && <span className="key-missing-dot" title={labels.bannerNoKey} />}
+          </button>
         </nav>
       )}
       <label className="lang-picker">

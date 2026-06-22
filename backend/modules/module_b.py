@@ -186,12 +186,9 @@ def generate_materials():
 
     lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
 
-    if not GROQ_API_KEY:
-        return jsonify({'error': 'GROQ_API_KEY not configured'}), 500
-
     try:
-        from groq import Groq
-        client = Groq(api_key=GROQ_API_KEY)
+        from utils.groq_client import get_groq_client
+        client = get_groq_client()
 
         prompt = MATERIALS_PROMPT.format(
             lang_name=lang_names.get(language, 'English'),

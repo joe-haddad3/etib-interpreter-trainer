@@ -1795,12 +1795,9 @@ def generate_feedback():
     }
     s = algo.get('summary', {})
 
-    if not GROQ_API_KEY:
-        return jsonify({'error': 'GROQ_API_KEY not configured', 'algorithmic': algo}), 500
-
     try:
-        from groq import Groq
-        client = Groq(api_key=GROQ_API_KEY)
+        from utils.groq_client import get_groq_client
+        client = get_groq_client()
 
         rep_examples  = ', '.join(f'"{r["word"]}"' for r in (algo.get('repetitions', [])[:3]))
         hes_examples  = ', '.join(f'"{h["word"]}"' for h in (algo.get('hesitation_words', [])[:3]))
@@ -1984,16 +1981,8 @@ def full_evaluation():
         fluency = build_audio_fluency_report(transcript, all_word_scores, algo.get('long_silences', []))
 
         # Step 3: LLM analysis with accurate data
-        if not GROQ_API_KEY:
-            return jsonify({
-                'error': 'GROQ_API_KEY not configured',
-                'algorithmic': algo,
-                'fluency': fluency,
-                'transcript': transcript,
-            }), 500
-
-        from groq import Groq
-        client = Groq(api_key=GROQ_API_KEY)
+        from utils.groq_client import get_groq_client
+        client = get_groq_client()
 
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
         rep_examples     = ', '.join(f'"{r.get("word","")}"' for r in algo.get('repetitions', [])[:3])
@@ -2152,12 +2141,9 @@ def tashkeel_compare():
     if language != 'ar':
         return jsonify({'error': 'Tashkeel comparison is for Arabic only'}), 400
 
-    if not GROQ_API_KEY:
-        return jsonify({'error': 'GROQ_API_KEY not configured'}), 500
-
     try:
-        from groq import Groq
-        client = Groq(api_key=GROQ_API_KEY)
+        from utils.groq_client import get_groq_client
+        client = get_groq_client()
 
         response = client.chat.completions.create(
             model=PRIMARY_LLM_MODEL,

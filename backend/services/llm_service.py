@@ -26,9 +26,20 @@ from config import (
 )
 
 # All clients are lazy — nothing is imported or created until first call.
-_groq_client: Any | None = None
+_groq_client: Any | None = None          # cached client for the server-side key only
 _local_pipeline: Any | None = None
 _local_tokenizer: Any | None = None
+
+
+def _active_groq_key() -> str | None:
+    """Return the per-request key (from frontend) if present, else the server key."""
+    try:
+        from flask import g
+        if getattr(g, 'groq_api_key', None):
+            return g.groq_api_key
+    except RuntimeError:
+        pass  # called outside a request context (e.g. tests)
+    return GROQ_API_KEY
 
 GEMINI_MODEL = 'gemini-1.5-flash-latest'
 
@@ -124,14 +135,24 @@ def _generate_with_groq(
 ) -> str:
     global _groq_client
 
-    if not GROQ_API_KEY:
-        raise RuntimeError('GROQ_API_KEY is not configured')
+    key = _active_groq_key()
+    if not key:
+        raise RuntimeError(
+            'No Groq API key configured. '
+            'Add your key in Settings or set GROQ_API_KEY in the server .env file.'
+        )
 
-    if _groq_client is None:
-        from groq import Groq  # lazy import — avoids httpx version conflicts at startup
-        _groq_client = Groq(api_key=GROQ_API_KEY)
+    from groq import Groq
 
-    response = _groq_client.chat.completions.create(
+    # Use cached client only for the server key; create a fresh one for user keys
+    if key == GROQ_API_KEY:
+        if _groq_client is None:
+            _groq_client = Groq(api_key=key)
+        client = _groq_client
+    else:
+        client = Groq(api_key=key)
+
+    response = client.chat.completions.create(
         model=PRIMARY_LLM_MODEL,
         messages=messages,
         max_tokens=max_tokens,
