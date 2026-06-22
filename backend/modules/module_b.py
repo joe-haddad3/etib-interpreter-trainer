@@ -31,7 +31,7 @@ import json
 import re
 import io
 from flask import Blueprint, request, jsonify, send_file
-from config import TTS_VOICES, DEFAULT_VOICE, AUDIO_OUTPUT_FOLDER, GROQ_API_KEY, PRIMARY_LLM_MODEL
+from config import TTS_VOICES, DEFAULT_VOICE, AUDIO_OUTPUT_FOLDER, PRIMARY_LLM_MODEL
 
 module_b_bp = Blueprint('module_b', __name__)
 

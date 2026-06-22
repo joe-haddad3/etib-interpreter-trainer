@@ -13,7 +13,6 @@ from typing import Any
 
 from config import (
     GOOGLE_AI_KEY,
-    GROQ_API_KEY,
     LLM_PROVIDER,
     LOCAL_MODEL_DEVICE_MAP,
     LOCAL_MODEL_ID,
@@ -26,20 +25,17 @@ from config import (
 )
 
 # All clients are lazy — nothing is imported or created until first call.
-_groq_client: Any | None = None          # cached client for the server-side key only
 _local_pipeline: Any | None = None
 _local_tokenizer: Any | None = None
 
 
 def _active_groq_key() -> str | None:
-    """Return the per-request key (from frontend) if present, else the server key."""
+    """Return the per-request user key only — no server-key fallback."""
     try:
         from flask import g
-        if getattr(g, 'groq_api_key', None):
-            return g.groq_api_key
+        return getattr(g, 'groq_api_key', None)
     except RuntimeError:
-        pass  # called outside a request context (e.g. tests)
-    return GROQ_API_KEY
+        return None
 
 GEMINI_MODEL = 'gemini-1.5-flash-latest'
 
@@ -138,19 +134,12 @@ def _generate_with_groq(
     key = _active_groq_key()
     if not key:
         raise RuntimeError(
-            'No Groq API key configured. '
-            'Add your key in Settings or set GROQ_API_KEY in the server .env file.'
+            'No Groq API key found. Please open Settings and add your '
+            'personal Groq API key (free at console.groq.com).'
         )
 
     from groq import Groq
-
-    # Use cached client only for the server key; create a fresh one for user keys
-    if key == GROQ_API_KEY:
-        if _groq_client is None:
-            _groq_client = Groq(api_key=key)
-        client = _groq_client
-    else:
-        client = Groq(api_key=key)
+    client = Groq(api_key=key)
 
     response = client.chat.completions.create(
         model=PRIMARY_LLM_MODEL,

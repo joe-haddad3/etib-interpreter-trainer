@@ -282,7 +282,7 @@ def align_pronunciation():
 
     try:
         from modules.alignment import align_words, extract_word_scores, compare_against_source
-        from config import GROQ_API_KEY, PRIMARY_LLM_MODEL
+        from config import PRIMARY_LLM_MODEL
 
         # Step 1: WhisperX forced alignment (or fall back to Whisper scores)
         aligned_segs  = align_words(temp_path, segments)
@@ -291,10 +291,10 @@ def align_pronunciation():
         # Step 2: extract flat word list with scores
         word_scores = extract_word_scores(aligned_segs)
 
-        # Step 3: compare against source + LLM analysis
+        # Step 3: compare against source + LLM analysis (key comes from flask.g via groq_client)
         result = compare_against_source(
             word_scores, source_text, language,
-            GROQ_API_KEY, PRIMARY_LLM_MODEL
+            None, PRIMARY_LLM_MODEL
         )
         result['whisperx_used'] = whisperx_used
         return jsonify(result)

@@ -33,7 +33,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, session as flask_session
-from config import GROQ_API_KEY, PRIMARY_LLM_MODEL, UPLOAD_FOLDER
+from config import PRIMARY_LLM_MODEL, UPLOAD_FOLDER
 
 # ── Session storage (MongoDB when available, in-memory fallback) ──────────────
 _mongo_sessions = None   # pymongo collection once connected
