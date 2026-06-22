@@ -211,6 +211,13 @@ export async function getSavedSpeech(un_id) {
   return parseJsonResponse(res);
 }
 
+export async function deleteSavedSpeech(un_id) {
+  const res = await fetch(`${BASE}/library/saved/${encodeURIComponent(un_id)}`, {
+    method: 'DELETE',
+  });
+  return parseJsonResponse(res);
+}
+
 export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain) {
   const form = new FormData();
   form.append('audio', audioFile, audioFile.name || 'recording.webm');

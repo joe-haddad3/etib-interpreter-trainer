@@ -111,6 +111,14 @@ def _load_saved(limit: int = 50) -> list:
     return list(col.find({}, {'_id': 0}).sort('saved_at', -1).limit(limit))
 
 
+def _delete_saved(un_id: str) -> int:
+    col = _get_db()
+    if col is None:
+        return -1
+    result = col.delete_one({'un_id': un_id})
+    return result.deleted_count
+
+
 # ── Search ───────────────────────────────────────────────────────────────────
 
 @module_library_bp.route('/search', methods=['GET'])
@@ -524,3 +532,14 @@ def get_saved_speech(un_id: str):
         return jsonify({'error': 'Speech not found'}), 404
 
     return jsonify(doc)
+
+
+@module_library_bp.route('/saved/<un_id>', methods=['DELETE'])
+def delete_saved_speech(un_id: str):
+    """Remove a cached UN speech from the saved list."""
+    deleted_count = _delete_saved(un_id)
+    if deleted_count < 0:
+        return jsonify({'error': 'Database not available'}), 503
+    if deleted_count == 0:
+        return jsonify({'error': 'Speech not found'}), 404
+    return jsonify({'ok': True, 'un_id': un_id})
