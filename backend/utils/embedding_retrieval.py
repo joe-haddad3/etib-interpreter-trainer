@@ -23,6 +23,13 @@ LOCAL_DENSE_MODEL_PATH = (
     / 'models'
     / 'paraphrase-multilingual-MiniLM-L12-v2'
 )
+LOCAL_DENSE_MODEL_PATHS = [
+    LOCAL_DENSE_MODEL_PATH,
+    Path(__file__).resolve().parents[3]
+    / 'ETIB-Interpreter-Trainer'
+    / 'models'
+    / 'paraphrase-multilingual-MiniLM-L12-v2',
+]
 DEFAULT_HYBRID_BM25_WEIGHT = 0.5
 DEFAULT_HYBRID_DENSE_WEIGHT = 0.5
 OPTIONAL_DEPENDENCY_MESSAGE = (
@@ -288,9 +295,10 @@ def _load_sentence_transformer(model_name: str):
         ) from exc
 
     try:
-        local_model = LOCAL_DENSE_MODEL_PATH
-        if model_name == DEFAULT_DENSE_MODEL_NAME and local_model.exists():
-            return SentenceTransformer(str(local_model))
+        if model_name == DEFAULT_DENSE_MODEL_NAME:
+            for local_model in LOCAL_DENSE_MODEL_PATHS:
+                if local_model.exists():
+                    return SentenceTransformer(str(local_model))
         return SentenceTransformer(model_name)
     except Exception as exc:
         raise DenseEmbeddingUnavailable(

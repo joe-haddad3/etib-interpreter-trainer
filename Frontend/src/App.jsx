@@ -18,6 +18,7 @@ import {
   fetchUNDocument,
   getSavedSpeeches,
   getSavedSpeech,
+  deleteSavedSpeech,
   getSessionHistory,
   getAdaptiveParams,
 } from './api.js';
@@ -194,7 +195,7 @@ const UI = {
     numIncorrect: 'Incorrect',
     expectedLabel: 'Should be',
     studentSaidShort: 'Said',
-    pronunciationTitle: 'Pronunciation Assessment (إعراب)',
+    pronunciationTitle: 'Pronunciation Assessment',
     pronunciationMismatches: 'Word-level clarity mismatches',
     runPronunciation: 'Run pronunciation check',
     runningPronunciation: 'Aligning audio against source — may take 1 min...',
@@ -419,7 +420,7 @@ const UI = {
     numIncorrect: 'غير صحيح',
     expectedLabel: 'الصواب',
     studentSaidShort: 'ما قاله الطالب',
-    pronunciationTitle: 'تقييم النطق والإعراب',
+    pronunciationTitle: 'تقييم النطق',
     pronunciationMismatches: 'تباينات وضوح الكلمات',
     runPronunciation: 'تشغيل فحص النطق',
     runningPronunciation: 'جارٍ المحاذاة الصوتية — قد تستغرق دقيقة...',
@@ -624,7 +625,7 @@ const UI = {
     numIncorrect: 'Incorrect',
     expectedLabel: 'Attendu',
     studentSaidShort: 'Dit',
-    pronunciationTitle: 'Évaluation de la prononciation (إعراب)',
+    pronunciationTitle: 'Évaluation de la prononciation',
     pronunciationMismatches: 'Divergences de clarté mot par mot',
     runPronunciation: 'Lancer le contrôle de prononciation',
     runningPronunciation: 'Alignement audio en cours — peut prendre 1 min...',
@@ -727,6 +728,14 @@ function glossaryValue(item, keys) {
 }
 
 function glossaryArabicValue(item) {
+  const combined = Object.values(item || {})
+    .filter(value => value !== undefined && value !== null && typeof value !== 'object')
+    .map(value => String(value).toLowerCase())
+    .join(' ');
+  if (combined.includes('giec') || combined.includes('ipcc') || combined.includes('groupe d')) {
+    return 'الهيئة الحكومية الدولية المعنية بتغير المناخ';
+  }
+
   const direct = glossaryValue(item, ['arabic', 'Arabic', 'ar', 'AR', 'arabic_term', 'term_ar', 'arabic_translation', 'translation_ar', 'العربية', 'عربي']);
   if (direct) return direct;
 
@@ -850,7 +859,7 @@ const initialSpeechForm = {
 // ── Module E — Progress & Adaptive Difficulty ─────────────────────────────────
 function ScoreBadge({ score }) {
   const pct = Math.round((score || 0) * 10);
-  const color = score >= 8 ? 'var(--sage)' : score >= 6.5 ? 'var(--gold)' : 'var(--sienna)';
+  const color = score >= 8 ? 'var(--sage)' : score >= 6.5 ? 'var(--primary)' : 'var(--sienna)';
   return (
     <span style={{ fontWeight: 700, color, fontFamily: 'Playfair Display, serif', fontSize: '1rem' }}>
       {score?.toFixed(1) ?? '—'}
@@ -929,7 +938,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
       <div className="progress-stat-row">
         <div className="progress-stat-card">
           <div className="progress-stat-label">{labels.progressAvgOver}</div>
-          <div className="progress-stat-value" style={{ color: avgOverall >= 7 ? 'var(--sage)' : avgOverall >= 5.5 ? 'var(--gold)' : 'var(--sienna)' }}>
+          <div className="progress-stat-value" style={{ color: avgOverall >= 7 ? 'var(--sage)' : avgOverall >= 5.5 ? 'var(--primary)' : 'var(--sienna)' }}>
             {avgOverall ?? '—'}
             {trend && trend !== 'not_enough_data' && <TrendBadge trend={trend} labels={labels} />}
           </div>
@@ -941,12 +950,12 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
         </div>
         <div className="progress-stat-card">
           <div className="progress-stat-label">{labels.progressAvgFluency}</div>
-          <div className="progress-stat-value" style={{ color: avgFluency >= 7 ? 'var(--sage)' : avgFluency >= 5.5 ? 'var(--gold)' : 'var(--sienna)' }}>{avgFluency ?? '—'}</div>
+          <div className="progress-stat-value" style={{ color: avgFluency >= 7 ? 'var(--sage)' : avgFluency >= 5.5 ? 'var(--primary)' : 'var(--sienna)' }}>{avgFluency ?? '—'}</div>
           <div className="progress-stat-sub">/ 10</div>
         </div>
         <div className="progress-stat-card">
           <div className="progress-stat-label">{labels.progressAvgNumbers}</div>
-          <div className="progress-stat-value" style={{ color: avgNumbers <= 1 ? 'var(--sage)' : avgNumbers <= 3 ? 'var(--gold)' : 'var(--sienna)' }}>{avgNumbers ?? '—'}</div>
+          <div className="progress-stat-value" style={{ color: avgNumbers <= 1 ? 'var(--sage)' : avgNumbers <= 3 ? 'var(--primary)' : 'var(--sienna)' }}>{avgNumbers ?? '—'}</div>
           <div className="progress-stat-sub">avg / session</div>
         </div>
         <div className="progress-stat-card">
@@ -1032,7 +1041,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
             <div className="trend-chart">
               {recentTen.map((s, i) => {
                 const h = Math.round(((s.overall_score || 0) / 10) * 100);
-                const color = s.overall_score >= 8 ? 'var(--sage)' : s.overall_score >= 6.5 ? 'var(--gold)' : 'var(--sienna)';
+                const color = s.overall_score >= 8 ? 'var(--sage)' : s.overall_score >= 6.5 ? 'var(--primary)' : 'var(--sienna)';
                 return (
                   <div key={i} className="trend-bar-wrap">
                     <div className="trend-score-label" style={{ color }}>{s.overall_score?.toFixed(1)}</div>
@@ -1094,7 +1103,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                     <span className="session-date">{new Date(s.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                     <div className="session-scores">
                       <span title="Overall"><ScoreBadge score={s.overall_score} /></span>
-                      <MiniBar value={s.overall_score} color={s.overall_score >= 7 ? 'var(--sage)' : s.overall_score >= 5.5 ? 'var(--gold)' : 'var(--sienna)'} />
+                      <MiniBar value={s.overall_score} color={s.overall_score >= 7 ? 'var(--sage)' : s.overall_score >= 5.5 ? 'var(--primary)' : 'var(--sienna)'} />
                     </div>
                     <div className="session-error-chips">
                       {(s.error_counts?.number_errors > 0) && <span className="err-chip err-chip--num">🔢 {s.error_counts.number_errors}</span>}
@@ -1415,6 +1424,7 @@ function UNLibraryPanel({ language, domain, onSelect, onClose }) {
   const [tab, setTab]             = useState('search'); // 'search' | 'saved'
   const [status, setStatus]       = useState('idle');   // 'idle'|'searching'|'fetching'
   const [fetchingId, setFetchingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [error, setError]         = useState('');
 
   useEffect(() => {
@@ -1458,6 +1468,17 @@ function UNLibraryPanel({ language, domain, onSelect, onClose }) {
     } catch (err) {
       setError(err.message);
     } finally { setFetchingId(null); }
+  }
+
+  async function handleDeleteSaved(item) {
+    if (!item.un_id || deletingId) return;
+    setDeletingId(item.un_id); setError('');
+    try {
+      await deleteSavedSpeech(item.un_id);
+      setSaved(prev => prev.filter(s => s.un_id !== item.un_id));
+    } catch (err) {
+      setError(`Could not remove saved speech: ${err.message}`);
+    } finally { setDeletingId(null); }
   }
 
   return (
@@ -1534,7 +1555,17 @@ function UNLibraryPanel({ language, domain, onSelect, onClose }) {
           <div className="library-results">
             {saved.length === 0 && <p className="lib-empty">No speeches saved yet. Search and load one first.</p>}
             {saved.map(item => (
-              <div key={item.un_id} className="library-result-card">
+              <div key={item.un_id} className="library-result-card library-result-card--saved">
+                <button
+                  type="button"
+                  className="saved-speech-remove"
+                  onClick={() => handleDeleteSaved(item)}
+                  disabled={deletingId === item.un_id}
+                  title="Remove from saved"
+                  aria-label="Remove saved speech"
+                >
+                  ×
+                </button>
                 <div className="lib-result-title">{item.title}</div>
                 <div className="lib-result-meta">
                   {item.word_count && <span>📝 {item.word_count} words</span>}
@@ -1860,6 +1891,9 @@ function SpeechResult({ data, labels }) {
   const isArabic = data.language === 'ar';
   const requestedRange = data.word_count_range?.label;
   const rangeMissed = data.word_count_range && data.word_count_range.within_range === false;
+  const visibleDomain = !['groq', 'openai', 'gemini', 'local_aya', 'remote_aya'].includes(
+    String(data.domain || '').trim().toLowerCase()
+  ) ? data.domain : '';
 
   return (
     <div className="speech-result">
@@ -1871,7 +1905,7 @@ function SpeechResult({ data, labels }) {
         </span>
         {duration && <span>~{duration}</span>}
         {data.topic && <span>{data.topic}</span>}
-        <span>{data.domain}</span>
+        {visibleDomain && <span>{visibleDomain}</span>}
         <span>{String(data.language || '').toUpperCase()} → {String(data.target_language || '').toUpperCase()}</span>
       </div>
       {data.mode === 'un_library_grounded' && data.source_speech && (
@@ -2315,7 +2349,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
 
 function ScoreBar({ score }) {
   const pct = Math.round((score / 10) * 100);
-  const color = score >= 7 ? '#2D5A4E' : score >= 5 ? '#B8962E' : '#8B3A2A';
+  const color = score >= 7 ? '#2D5A4E' : score >= 5 ? '#1B3A6B' : '#8B3A2A';
   const circumference = 188.5;
   const offset = circumference - (circumference * pct / 100);
   return (
@@ -2384,7 +2418,7 @@ function PronunciationPanel({ labels, lastTranscript, lastGeneratedScript }) {
   }
 
   const coverageColor = result
-    ? (result.coverage_score >= 8 ? '#1a6b3c' : result.coverage_score >= 6 ? '#b0772f' : '#c0392b')
+    ? (result.coverage_score >= 8 ? '#1a6b3c' : result.coverage_score >= 6 ? '#1B3A6B' : '#c0392b')
     : 'var(--color-text)';
 
   return (
@@ -2448,7 +2482,7 @@ function PronunciationPanel({ labels, lastTranscript, lastGeneratedScript }) {
           {/* Tashkeel errors */}
           {(result.tashkeel_errors || []).length > 0 && (
             <div className="materials-section">
-              <h4 style={{ color: '#b0772f', fontSize: '0.85rem', fontWeight: 700,
+              <h4 style={{ color: '#1B3A6B', fontSize: '0.85rem', fontWeight: 700,
                 textTransform: 'uppercase', marginBottom: '0.6rem' }}>
                 ⚠️ {labels.languageErrors} — إعراب / تشكيل ({result.tashkeel_errors.length})
               </h4>
@@ -2568,6 +2602,13 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
   const algo = report?.algorithmic || {};
   const fluency = report?.fluency || null;
   const isAr = (lastTranscript.language || lastTranscript.language_detected) === 'ar';
+  const llmNumberErrors = (report?.number_accuracy || [])
+    .filter(item => item && item.correct === false)
+    .map(item => ({
+      ...item,
+      message: `${item.source_value || ''} was rendered as ${item.student_said || 'missing'}`.trim(),
+    }));
+  const displayNumberErrors = llmNumberErrors.length > 0 ? llmNumberErrors : (algo.number_errors || []);
 
   return (
     <div>
@@ -2627,7 +2668,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 { label: labels.longSilences,  icon: '🔇', items: algo.long_silences || [] },
                 { label: labels.repetitions,   icon: '🔁', items: algo.repetitions || [] },
                 { label: labels.hesitations,   icon: '🗣️', items: algo.hesitation_words || [] },
-                { label: labels.numberErrors,  icon: '🔢', items: algo.number_errors || [] },
+                { label: labels.numberErrors,  icon: '🔢', items: displayNumberErrors },
               ].map(({ label, icon, items }) => (
                 <div key={label} className={`algo-card ${items.length > 0 ? 'algo-card-warn' : ''}`}>
                   <span className="algo-icon">{icon}</span>
@@ -2675,11 +2716,11 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 </div>
               </div>
             )}
-            {(algo.number_errors || []).length > 0 && (
+            {displayNumberErrors.length > 0 && (
               <div className="algo-detail-block">
                 <p className="algo-detail-title">🔢 {labels.numberErrors}</p>
                 <div className="algo-chips">
-                  {algo.number_errors.map((n, i) => (
+                  {displayNumberErrors.map((n, i) => (
                     <span key={i} className="algo-chip algo-chip-err">
                       {typeof n === 'string' ? n : (n.message || `${n.expected || ''} → ${n.heard || ''}`)}
                     </span>
@@ -2696,12 +2737,22 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               {report.pause_analysis.comment && (
                 <p className={isAr ? 'arabic' : ''} style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>{report.pause_analysis.comment}</p>
               )}
-              {(report.pause_analysis.problem_pauses || []).map((p, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginTop: '0.5rem' }}>
-                  <strong style={{ fontSize: '0.84rem' }}>{p.duration_seconds}s {labels.longSilences.toLowerCase()} — {p.at_seconds}s</strong>
-                  {p.impact && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{p.impact}</div>}
-                </div>
-              ))}
+              {(report.pause_analysis.problem_pauses || []).map((p, i) => {
+                const detectedPause = (algo.long_silences || [])[i] || {};
+                const duration = detectedPause.duration_seconds ?? p.duration_seconds;
+                const atSeconds = detectedPause.at_seconds ?? p.at_seconds;
+                return (
+                  <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginTop: '0.5rem' }}>
+                    <strong style={{ fontSize: '0.84rem' }}>
+                      {duration}s {labels.longSilences.toLowerCase()}
+                      {Number.isFinite(Number(atSeconds)) && (
+                        Number(atSeconds) === 0 ? ' — at start' : ` — at ${atSeconds}s`
+                      )}
+                    </strong>
+                    {p.impact && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{p.impact}</div>}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -2736,7 +2787,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           )}
 
           {/* Pronunciation assessment (LLM commentary, all languages) */}
-          {report.pronunciation_assessment?.comment && (
+          {false && report.pronunciation_assessment?.comment && (
             <div className="card">
               <h3 className="report-section-title">🗣️ {labels.pronunciationAssessmentTitle}</h3>
               <p className={isAr ? 'arabic' : ''} style={{ fontSize: '0.85rem', color: 'var(--ink)', marginBottom: '0.6rem' }}>{report.pronunciation_assessment.comment}</p>
@@ -2829,7 +2880,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--warm-gray)', marginBottom: '0.3rem' }}>{labels.pronunciationScore}</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'Playfair Display, serif', color: report.pronunciation.overall_score >= 0.8 ? 'var(--sage)' : report.pronunciation.overall_score >= 0.65 ? 'var(--gold)' : 'var(--sienna)' }}>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'Playfair Display, serif', color: report.pronunciation.overall_score >= 0.8 ? 'var(--sage)' : report.pronunciation.overall_score >= 0.65 ? 'var(--primary)' : 'var(--sienna)' }}>
                     {Math.round(report.pronunciation.overall_score * 100)}%
                   </div>
                 </div>
