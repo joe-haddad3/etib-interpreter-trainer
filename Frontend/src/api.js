@@ -9,39 +9,44 @@
 
 const BASE = (import.meta.env.VITE_API_URL || 'https://joe-haddad3-etib-backend.hf.space') + '/api';
 
-// ── Groq API key (stored in localStorage, sent as header with every request) ─
-
-const GROQ_KEY_STORAGE = 'etib_groq_api_key';
-
-export function getStoredGroqKey() {
-  return localStorage.getItem(GROQ_KEY_STORAGE) || '';
+// ── Auth token (stored in localStorage) ──────────────────────────────────────
+const AUTH_TOKEN_KEY = 'etib_auth_token';
+export function getAuthToken() { return localStorage.getItem(AUTH_TOKEN_KEY) || ''; }
+export function saveAuthToken(token) {
+  if (token) localStorage.setItem(AUTH_TOKEN_KEY, token.trim());
+  else localStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
+// ── Groq API key (stored in localStorage) ────────────────────────────────────
+const GROQ_KEY_STORAGE = 'etib_groq_api_key';
+export function getStoredGroqKey() { return localStorage.getItem(GROQ_KEY_STORAGE) || ''; }
 export function saveGroqKey(key) {
   if (key) localStorage.setItem(GROQ_KEY_STORAGE, key.trim());
   else localStorage.removeItem(GROQ_KEY_STORAGE);
 }
 
-function groqHeaders(extra = {}) {
+// ── Body helpers (no custom headers — works with HF Spaces CORS proxy) ───────
+function authBody(extra = {}) {
+  const token = getAuthToken();
+  return token ? { auth_token: token, ...extra } : { ...extra };
+}
+function groqBody(extra = {}) {
   const key = getStoredGroqKey();
-  return key ? { 'X-Groq-Api-Key': key, ...extra } : { ...extra };
+  return key ? authBody({ groq_api_key: key, ...extra }) : authBody(extra);
 }
 
-// ── Generic helpers ──────────────────────────────────────────────────────────
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 async function parseJsonResponse(res) {
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.error || `HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
 
 export async function loginUser(credentials) {
   const res = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+    headers: JSON_HEADERS,
     body: JSON.stringify(credentials)
   });
   return parseJsonResponse(res);
@@ -50,24 +55,23 @@ export async function loginUser(credentials) {
 export async function signupUser(account) {
   const res = await fetch(`${BASE}/auth/signup`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+    headers: JSON_HEADERS,
     body: JSON.stringify(account)
   });
   return parseJsonResponse(res);
 }
 
 export async function getCurrentUser() {
-  const res = await fetch(`${BASE}/auth/me`, {
-    credentials: 'include'
-  });
+  const token = getAuthToken();
+  const res = await fetch(`${BASE}/auth/me?auth_token=${encodeURIComponent(token)}`);
   return parseJsonResponse(res);
 }
 
 export async function logoutUser() {
   const res = await fetch(`${BASE}/auth/logout`, {
     method: 'POST',
-    credentials: 'include'
+    headers: JSON_HEADERS,
+    body: JSON.stringify(authBody())
   });
   return parseJsonResponse(res);
 }
@@ -75,8 +79,7 @@ export async function logoutUser() {
 export async function validateGroqKey(apiKey) {
   const res = await fetch(`${BASE}/auth/validate-groq-key`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+    headers: JSON_HEADERS,
     body: JSON.stringify({ api_key: apiKey }),
   });
   return parseJsonResponse(res);
@@ -85,9 +88,8 @@ export async function validateGroqKey(apiKey) {
 export async function generateSpeech(params) {
   const res = await fetch(`${BASE}/module-a/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...groqHeaders() },
-    credentials: 'include',
-    body: JSON.stringify(params)
+    headers: JSON_HEADERS,
+    body: JSON.stringify(groqBody(params))
   });
   return parseJsonResponse(res);
 }
@@ -95,65 +97,48 @@ export async function generateSpeech(params) {
 export async function generateSpeechFromDocument(file, params) {
   const form = new FormData();
   form.append('document', file);
-  Object.entries(params).forEach(([key, value]) => {
-    form.append(key, String(value));
-  });
-
-  const res = await fetch(`${BASE}/module-a/from-document`, {
-    method: 'POST',
-    headers: groqHeaders(),
-    credentials: 'include',
-    body: form
-  });
+  form.append('auth_token', getAuthToken());
+  form.append('groq_api_key', getStoredGroqKey());
+  Object.entries(params).forEach(([key, value]) => form.append(key, String(value)));
+  const res = await fetch(`${BASE}/module-a/from-document`, { method: 'POST', body: form });
   return parseJsonResponse(res);
 }
 
 export async function retrieveDocumentContext(file, params) {
   const form = new FormData();
   form.append('document', file);
-  Object.entries(params).forEach(([key, value]) => {
-    form.append(key, String(value));
-  });
-
-  const res = await fetch(`${BASE}/module-a/retrieve-document-context`, {
-    method: 'POST',
-    headers: groqHeaders(),
-    credentials: 'include',
-    body: form
-  });
+  form.append('auth_token', getAuthToken());
+  form.append('groq_api_key', getStoredGroqKey());
+  Object.entries(params).forEach(([key, value]) => form.append(key, String(value)));
+  const res = await fetch(`${BASE}/module-a/retrieve-document-context`, { method: 'POST', body: form });
   return parseJsonResponse(res);
 }
 
 export async function textToSpeech(params) {
   const res = await fetch(`${BASE}/module-b/tts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params)
+    headers: JSON_HEADERS,
+    body: JSON.stringify(authBody(params))
   });
   return parseJsonResponse(res);
 }
 
 export async function transcribeAudio(audioFile, language = 'ar', sourceText = '') {
   const form = new FormData();
-  const filename = audioFile.name || 'recording.webm';
-  form.append('audio', audioFile, filename);
+  form.append('audio', audioFile, audioFile.name || 'recording.webm');
   form.append('language', language);
+  form.append('auth_token', getAuthToken());
+  form.append('groq_api_key', getStoredGroqKey());
   if (sourceText) form.append('source_text', sourceText);
-  const res = await fetch(`${BASE}/module-c/transcribe`, {
-    method: 'POST',
-    headers: groqHeaders(),
-    credentials: 'include',
-    body: form
-  });
+  const res = await fetch(`${BASE}/module-c/transcribe`, { method: 'POST', body: form });
   return parseJsonResponse(res);
 }
 
 export async function generateMaterials(params) {
   const res = await fetch(`${BASE}/module-b/materials`, {
     method: 'POST',
-    headers: groqHeaders({ 'Content-Type': 'application/json' }),
-    credentials: 'include',
-    body: JSON.stringify(params)
+    headers: JSON_HEADERS,
+    body: JSON.stringify(groqBody(params))
   });
   return parseJsonResponse(res);
 }
@@ -161,8 +146,8 @@ export async function generateMaterials(params) {
 export async function downloadGlossary(params) {
   const res = await fetch(`${BASE}/module-b/glossary/download`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params)
+    headers: JSON_HEADERS,
+    body: JSON.stringify(authBody(params))
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -174,9 +159,8 @@ export async function downloadGlossary(params) {
 export async function evaluatePerformance(sourceScript, transcript, language) {
   const res = await fetch(`${BASE}/module-d/evaluate`, {
     method: 'POST',
-    headers: groqHeaders({ 'Content-Type': 'application/json' }),
-    credentials: 'include',
-    body: JSON.stringify({ source_script: sourceScript, transcript, language })
+    headers: JSON_HEADERS,
+    body: JSON.stringify(groqBody({ source_script: sourceScript, transcript, language }))
   });
   return parseJsonResponse(res);
 }
@@ -184,9 +168,8 @@ export async function evaluatePerformance(sourceScript, transcript, language) {
 export async function tashkeelCompare(sourceText, transcript, language) {
   const res = await fetch(`${BASE}/module-d/tashkeel-compare`, {
     method: 'POST',
-    headers: groqHeaders({ 'Content-Type': 'application/json' }),
-    credentials: 'include',
-    body: JSON.stringify({ source_text: sourceText, transcript, language })
+    headers: JSON_HEADERS,
+    body: JSON.stringify(groqBody({ source_text: sourceText, transcript, language }))
   });
   return parseJsonResponse(res);
 }
@@ -197,16 +180,17 @@ export async function alignPronunciation(audioFile, segments, sourceText, langua
   form.append('segments', JSON.stringify(segments || []));
   form.append('source_text', sourceText || '');
   form.append('language', language || 'ar');
-  const res = await fetch(`${BASE}/module-c/align`, { method: 'POST', headers: groqHeaders(), credentials: 'include', body: form });
+  form.append('auth_token', getAuthToken());
+  form.append('groq_api_key', getStoredGroqKey());
+  const res = await fetch(`${BASE}/module-c/align`, { method: 'POST', body: form });
   return parseJsonResponse(res);
 }
 
 export async function getPronunciationReport(alignment, sourceText, language) {
   const res = await fetch(`${BASE}/module-d/pronunciation`, {
     method: 'POST',
-    headers: groqHeaders({ 'Content-Type': 'application/json' }),
-    credentials: 'include',
-    body: JSON.stringify({ alignment, source_text: sourceText, language })
+    headers: JSON_HEADERS,
+    body: JSON.stringify(groqBody({ alignment, source_text: sourceText, language }))
   });
   return parseJsonResponse(res);
 }
@@ -214,9 +198,8 @@ export async function getPronunciationReport(alignment, sourceText, language) {
 export async function generateFeedback(params) {
   const res = await fetch(`${BASE}/module-d/feedback`, {
     method: 'POST',
-    headers: groqHeaders({ 'Content-Type': 'application/json' }),
-    credentials: 'include',
-    body: JSON.stringify(params)
+    headers: JSON_HEADERS,
+    body: JSON.stringify(groqBody(params))
   });
   return parseJsonResponse(res);
 }
@@ -234,9 +217,8 @@ export async function searchUNLibrary({ q, language, domain, limit = 10 }) {
 export async function fetchUNDocument({ pdf_url, web_url, un_id, title, language }) {
   const res = await fetch(`${BASE}/library/fetch`, {
     method: 'POST',
-    headers: groqHeaders({ 'Content-Type': 'application/json' }),
-    credentials: 'include',
-    body: JSON.stringify({ pdf_url, web_url, un_id, title, language }),
+    headers: JSON_HEADERS,
+    body: JSON.stringify(groqBody({ pdf_url, web_url, un_id, title, language })),
   });
   return parseJsonResponse(res);
 }
@@ -255,9 +237,7 @@ export async function getSavedSpeech(un_id) {
 }
 
 export async function deleteSavedSpeech(un_id) {
-  const res = await fetch(`${BASE}/library/saved/${encodeURIComponent(un_id)}`, {
-    method: 'DELETE',
-  });
+  const res = await fetch(`${BASE}/library/saved/${encodeURIComponent(un_id)}`, { method: 'DELETE' });
   return parseJsonResponse(res);
 }
 
@@ -267,28 +247,21 @@ export async function evaluateWithAudio(audioFile, sourceScript, language, sourc
   form.append('source_script', sourceScript || '');
   form.append('language', language || 'ar');
   form.append('source_language', sourceLanguage || language || 'ar');
+  form.append('auth_token', getAuthToken());
+  form.append('groq_api_key', getStoredGroqKey());
   if (domain) form.append('domain', domain);
-  const res = await fetch(`${BASE}/module-d/full-evaluation`, {
-    method: 'POST',
-    headers: groqHeaders(),
-    credentials: 'include',
-    body: form
-  });
+  const res = await fetch(`${BASE}/module-d/full-evaluation`, { method: 'POST', body: form });
   return parseJsonResponse(res);
 }
 
 export async function getSessionHistory(limit = 20) {
-  const res = await fetch(`${BASE}/module-d/sessions?limit=${limit}`, {
-    headers: groqHeaders(),
-    credentials: 'include',
-  });
+  const token = getAuthToken();
+  const res = await fetch(`${BASE}/module-d/sessions?limit=${limit}&auth_token=${encodeURIComponent(token)}`);
   return parseJsonResponse(res);
 }
 
 export async function getAdaptiveParams() {
-  const res = await fetch(`${BASE}/module-d/adaptive-params`, {
-    headers: groqHeaders(),
-    credentials: 'include',
-  });
+  const token = getAuthToken();
+  const res = await fetch(`${BASE}/module-d/adaptive-params?auth_token=${encodeURIComponent(token)}`);
   return parseJsonResponse(res);
 }

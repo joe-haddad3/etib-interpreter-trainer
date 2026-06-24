@@ -24,6 +24,7 @@ import {
   getStoredGroqKey,
   saveGroqKey,
   validateGroqKey,
+  saveAuthToken,
 } from './api.js';
 
 const UI = {
@@ -1239,6 +1240,7 @@ export default function App() {
       password: formData.get('password'),
       role: formData.get('role')
     });
+    saveAuthToken(result.token);
     setCurrentUser(result.user);
     setIsAuthenticated(true);
   }
@@ -1253,12 +1255,14 @@ export default function App() {
       password: formData.get('password'),
       role: formData.get('role')
     });
+    saveAuthToken(result.token);
     setCurrentUser(result.user);
     setIsAuthenticated(true);
   }
 
   async function handleLogout() {
     await logoutUser().catch(() => {});
+    saveAuthToken(null);
     setIsAuthenticated(false);
     setCurrentUser(null);
     setActivePanel('module-a');
