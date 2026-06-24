@@ -7,7 +7,7 @@
  * Person 3 maintains this file.
  */
 
-const BASE = 'http://127.0.0.1:5000/api';
+const BASE = (import.meta.env.VITE_API_URL || 'https://joe-haddad3-etib-backend.hf.space') + '/api';
 
 // ── Groq API key (stored in localStorage, sent as header with every request) ─
 
