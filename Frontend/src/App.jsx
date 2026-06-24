@@ -738,7 +738,7 @@ const NAV_ITEMS = [
   { id: 'module-b', labelKey: 'navB' },
   { id: 'module-c', labelKey: 'navC' },
   { id: 'module-d', labelKey: 'navD' },
-  { id: 'module-e', labelKey: 'navE' },
+  // { id: 'module-e', labelKey: 'navE' },
 ];
 
 // MARC 041 language codes -> UI language codes / display labels
