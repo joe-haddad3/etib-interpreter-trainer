@@ -25,6 +25,7 @@ import {
   saveGroqKey,
   validateGroqKey,
   saveAuthToken,
+  sendChatMessage,
 } from './api.js';
 
 const UI = {
@@ -1299,6 +1300,116 @@ export default function App() {
       {showSettings && (
         <SettingsModal labels={L} onClose={() => setShowSettings(false)} />
       )}
+      {isAuthenticated && <ChatWidget />}
+    </div>
+  );
+}
+
+function ChatWidget() {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: 'Hi! I\'m your ETIB assistant. Ask me anything about interpretation techniques, the platform, or terminology.' }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, open]);
+
+  async function handleSend() {
+    const text = input.trim();
+    if (!text || loading) return;
+    const userMsg = { role: 'user', content: text };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+    try {
+      const apiMessages = [...messages, userMsg]
+        .filter(m => m.role !== 'assistant' || messages.indexOf(m) > 0)
+        .map(m => ({ role: m.role, content: m.content }));
+      const { reply } = await sendChatMessage(apiMessages);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 1000 }}>
+      {open && (
+        <div style={{
+          width: 340, height: 440, background: 'var(--surface, #fff)',
+          border: '1px solid var(--border, #ddd)', borderRadius: 16,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex',
+          flexDirection: 'column', marginBottom: '0.75rem', overflow: 'hidden'
+        }}>
+          <div style={{
+            background: 'var(--primary, #1a3a5c)', color: '#fff',
+            padding: '0.85rem 1rem', fontWeight: 600, fontSize: '0.95rem',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          }}>
+            <span>ETIB Assistant</span>
+            <button onClick={() => setOpen(false)} style={{
+              background: 'none', border: 'none', color: '#fff',
+              fontSize: '1.2rem', cursor: 'pointer', lineHeight: 1
+            }}>×</button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {messages.map((m, i) => (
+              <div key={i} style={{
+                alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                background: m.role === 'user' ? 'var(--primary, #1a3a5c)' : 'var(--surface-raised, #f0f4f8)',
+                color: m.role === 'user' ? '#fff' : 'inherit',
+                padding: '0.55rem 0.85rem', borderRadius: 12,
+                maxWidth: '85%', fontSize: '0.875rem', lineHeight: 1.5,
+                whiteSpace: 'pre-wrap'
+              }}>
+                {m.content}
+              </div>
+            ))}
+            {loading && (
+              <div style={{
+                alignSelf: 'flex-start', background: 'var(--surface-raised, #f0f4f8)',
+                padding: '0.55rem 0.85rem', borderRadius: 12, fontSize: '0.875rem',
+                color: 'var(--warm-gray, #888)'
+              }}>Thinking…</div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+          <div style={{ padding: '0.65rem', borderTop: '1px solid var(--border, #ddd)', display: 'flex', gap: '0.5rem' }}>
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              placeholder="Ask anything…"
+              style={{
+                flex: 1, padding: '0.5rem 0.75rem', borderRadius: 8,
+                border: '1px solid var(--border, #ddd)', fontSize: '0.875rem',
+                outline: 'none', background: 'var(--bg, #fff)'
+              }}
+            />
+            <button onClick={handleSend} disabled={loading || !input.trim()} style={{
+              padding: '0.5rem 0.9rem', borderRadius: 8, border: 'none',
+              background: 'var(--primary, #1a3a5c)', color: '#fff',
+              cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem',
+              opacity: loading || !input.trim() ? 0.5 : 1
+            }}>Send</button>
+          </div>
+        </div>
+      )}
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: 52, height: 52, borderRadius: '50%',
+        background: 'var(--primary, #1a3a5c)', color: '#fff',
+        border: 'none', cursor: 'pointer', fontSize: '1.5rem',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        {open ? '×' : '💬'}
+      </button>
     </div>
   );
 }

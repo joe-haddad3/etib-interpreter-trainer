@@ -265,3 +265,12 @@ export async function getAdaptiveParams() {
   const res = await fetch(`${BASE}/module-d/adaptive-params?auth_token=${encodeURIComponent(token)}`);
   return parseJsonResponse(res);
 }
+
+export async function sendChatMessage(messages) {
+  const res = await fetch(`${BASE}/chat/message`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(groqBody({ messages })),
+  });
+  return parseJsonResponse(res);
+}
