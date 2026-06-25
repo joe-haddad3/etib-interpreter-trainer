@@ -9,7 +9,6 @@ Run with:
 """
 import os
 from flask import Flask, jsonify, request, g
-from flask_cors import CORS
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -18,13 +17,35 @@ from config import LLM_PROVIDER, LOCAL_MODEL_ID, REMOTE_AYA_URL
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-change-in-prod')
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
-CORS(app, supports_credentials=True, origins=[
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB — audio files can be large
+
+_ALLOWED_ORIGINS = {
+    'https://etib-interpreter-trainer.vercel.app',
     'http://127.0.0.1:5174',
     'http://localhost:5174',
     'http://127.0.0.1:5173',
     'http://localhost:5173',
-])
+}
+for _o in os.getenv('ALLOWED_ORIGINS', '').split(','):
+    _o = _o.strip()
+    if _o:
+        _ALLOWED_ORIGINS.add(_o)
+
+@app.after_request
+def add_cors(response):
+    origin = request.headers.get('Origin', '')
+    if origin in _ALLOWED_ORIGINS:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Groq-Api-Key'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Vary'] = 'Origin'
+    return response
+
+@app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+@app.route('/<path:path>', methods=['OPTIONS'])
+def options_handler(path):
+    return add_cors(app.make_response(''))
 
 # Ensure output directories exist at startup
 os.makedirs(os.getenv('UPLOAD_FOLDER', './uploads'), exist_ok=True)
@@ -37,6 +58,7 @@ from modules.module_c import module_c_bp
 from modules.module_d import module_d_bp
 from modules.module_library import module_library_bp
 from modules.auth import auth_bp
+from modules.chat import chat_bp
 
 app.register_blueprint(module_a_bp,       url_prefix='/api/module-a')
 app.register_blueprint(module_b_bp,       url_prefix='/api/module-b')
@@ -44,12 +66,17 @@ app.register_blueprint(module_c_bp,       url_prefix='/api/module-c')
 app.register_blueprint(module_d_bp,       url_prefix='/api/module-d')
 app.register_blueprint(module_library_bp, url_prefix='/api/library')
 app.register_blueprint(auth_bp,           url_prefix='/api/auth')
+app.register_blueprint(chat_bp,           url_prefix='/api/chat')
 
 # ── Per-request Groq key from frontend ──────────────────────────────────────
 @app.before_request
-def extract_groq_key():
-    """If the client sends X-Groq-Api-Key, make it available to all modules via flask.g."""
-    key = request.headers.get('X-Groq-Api-Key', '').strip()
+def extract_request_context():
+    payload = request.get_json(silent=True) or {}
+    key = (
+        request.headers.get('X-Groq-Api-Key', '') or
+        payload.get('groq_api_key', '') or
+        request.form.get('groq_api_key', '')
+    ).strip()
     g.groq_api_key = key if key.startswith('gsk_') else None
 
 
@@ -88,13 +115,18 @@ def get_config():
         'remote_aya_configured': bool(REMOTE_AYA_URL and 'PASTE_' not in REMOTE_AYA_URL)
     })
 
+@app.errorhandler(413)
+def too_large(_):
+    return jsonify({'error': 'File too large. Maximum upload size is 50 MB.'}), 413
+
 @app.errorhandler(Exception)
-def handle_exception(e):
+def handle_exception(_):
     """Return JSON for all unhandled errors so the browser gets CORS headers."""
     import traceback
     traceback.print_exc()
-    return jsonify({'error': str(e)}), 500
+    return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
 
 
 if __name__ == '__main__':
-    app.run(debug=os.getenv('FLASK_DEBUG', 'true').lower() == 'true', port=5000, use_reloader=False)
+    port = int(os.getenv('PORT', 5000))
+    app.run(debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true', port=port, host='0.0.0.0', use_reloader=False)

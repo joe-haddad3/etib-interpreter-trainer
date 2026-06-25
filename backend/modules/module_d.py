@@ -32,8 +32,22 @@ import re
 import json
 import uuid
 from datetime import datetime, timezone
-from flask import Blueprint, request, jsonify, session as flask_session
+from flask import Blueprint, request, jsonify
 from config import PRIMARY_LLM_MODEL, UPLOAD_FOLDER
+
+def _current_user_id() -> str:
+    """Extract user id from auth token in request args, form, or JSON body."""
+    try:
+        from modules.auth import get_user_from_token
+        token = (
+            request.args.get('auth_token', '') or
+            request.form.get('auth_token', '') or
+            (request.get_json(silent=True) or {}).get('auth_token', '')
+        ).strip()
+        user = get_user_from_token(token)
+        return user['id'] if user else 'anonymous'
+    except Exception:
+        return 'anonymous'
 
 # ── Session storage (MongoDB when available, in-memory fallback) ──────────────
 _mongo_sessions = None   # pymongo collection once connected
@@ -2048,7 +2062,7 @@ def full_evaluation():
         llm_result['transcript'] = transcript
 
         # Step 5: Persist session for history / adaptive difficulty (D11-D12)
-        user_id = flask_session.get('user_id', 'anonymous')
+        user_id = _current_user_id()
         _save_session(user_id, {
             **llm_result,
             'language':        language,
@@ -2241,8 +2255,8 @@ def pronunciation_report():
 
 @module_d_bp.route('/sessions', methods=['GET'])
 def list_sessions():
-    """Return the last N evaluation sessions for the current user (D11). Works even when not logged in."""
-    user_id = flask_session.get('user_id', 'anonymous')
+    """Return the last N evaluation sessions for the current user (D11)."""
+    user_id = _current_user_id()
     limit = min(int(request.args.get('limit', 20)), 50)
     sessions = _load_sessions(user_id, limit=limit)
     return jsonify({'sessions': sessions, 'count': len(sessions)})
@@ -2251,7 +2265,7 @@ def list_sessions():
 @module_d_bp.route('/adaptive-params', methods=['GET'])
 def adaptive_params():
     """Analyse recent sessions and return recommended Module A parameters + trend + problems (D12)."""
-    user_id = flask_session.get('user_id', 'anonymous')
+    user_id = _current_user_id()
     sessions = _load_sessions(user_id, limit=20)
     return jsonify(_compute_adaptive_params(sessions))
 
@@ -2259,8 +2273,8 @@ def adaptive_params():
 @module_d_bp.route('/history/<session_id>')
 def get_history(session_id: str):
     """Return a single session by id (D11)."""
-    user_id = flask_session.get('user_id')
-    if not user_id:
+    user_id = _current_user_id()
+    if not user_id or user_id == 'anonymous':
         return jsonify({'error': 'Not authenticated'}), 401
     col = _get_sessions_collection()
     if col is not None:

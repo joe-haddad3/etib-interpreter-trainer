@@ -23,13 +23,13 @@ LOCAL_DENSE_MODEL_PATH = (
     / 'models'
     / 'paraphrase-multilingual-MiniLM-L12-v2'
 )
-LOCAL_DENSE_MODEL_PATHS = [
-    LOCAL_DENSE_MODEL_PATH,
-    Path(__file__).resolve().parents[3]
-    / 'ETIB-Interpreter-Trainer'
-    / 'models'
-    / 'paraphrase-multilingual-MiniLM-L12-v2',
-]
+def _extra_model_paths():
+    try:
+        return [Path(__file__).resolve().parents[3] / 'ETIB-Interpreter-Trainer' / 'models' / 'paraphrase-multilingual-MiniLM-L12-v2']
+    except IndexError:
+        return []
+
+LOCAL_DENSE_MODEL_PATHS = [LOCAL_DENSE_MODEL_PATH] + _extra_model_paths()
 DEFAULT_HYBRID_BM25_WEIGHT = 0.5
 DEFAULT_HYBRID_DENSE_WEIGHT = 0.5
 OPTIONAL_DEPENDENCY_MESSAGE = (

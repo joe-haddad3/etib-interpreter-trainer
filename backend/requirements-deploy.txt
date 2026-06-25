@@ -1,0 +1,41 @@
+# Deployment requirements — excludes local LLM and heavy torch (torch installed separately in Dockerfile)
+# whisperx is included but torch must be installed first via Dockerfile
+
+# Core framework
+flask==3.0.3
+flask-cors==4.0.1
+python-dotenv==1.0.1
+
+# LLM clients (cloud APIs only)
+groq==0.9.0
+httpx==0.27.2
+tiktoken
+protobuf
+
+# TTS
+edge-tts>=7.2.8
+
+# ASR
+faster-whisper>=1.1.1
+whisperx>=3.1.1
+torchaudio>=2.0.0
+librosa>=0.10.0
+
+# Audio processing
+pydub==0.25.1
+ffmpeg-python==0.2.0
+
+# File generation
+python-docx==1.1.0
+pypdf==6.13.2
+pdfplumber==0.11.10
+pdfminer.six==20260107
+pypdfium2==5.10.1
+Pillow==12.2.0
+fpdf2==2.7.9
+
+# Database
+pymongo==4.10.1
+
+# Utilities
+requests==2.32.3

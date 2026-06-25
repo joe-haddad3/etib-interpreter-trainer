@@ -8,14 +8,50 @@ Expected defaults:
   MONGODB_DB=etib_interpreter_trainer
 """
 import os
+import secrets
 import uuid
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
 auth_bp = Blueprint('auth', __name__)
+
+# ── Token store ───────────────────────────────────────────────────────────────
+_tokens: dict = {}  # in-memory fallback: token_hex → email
+
+def _get_tokens_col():
+    if _try_mongo():
+        return _mongo_client[MONGODB_DB]['auth_tokens']
+    return None
+
+def create_token(user: dict) -> str:
+    token = secrets.token_hex(32)
+    col = _get_tokens_col()
+    if col is not None:
+        col.update_one({'token': token}, {'$set': {'token': token, 'email': user['email']}}, upsert=True)
+    else:
+        _tokens[token] = user['email']
+    return token
+
+def revoke_token(token: str) -> None:
+    col = _get_tokens_col()
+    if col is not None:
+        col.delete_one({'token': token})
+    else:
+        _tokens.pop(token, None)
+
+def get_user_from_token(token: str):
+    if not token:
+        return None
+    col = _get_tokens_col()
+    if col is not None:
+        doc = col.find_one({'token': token})
+        email = doc['email'] if doc else None
+    else:
+        email = _tokens.get(token)
+    return find_user_by_email(email) if email else None
 
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017')
 MONGODB_DB = os.getenv('MONGODB_DB', 'etib_interpreter_trainer')
@@ -44,19 +80,21 @@ def utc_now():
 def _try_mongo():
     """Return True if MongoDB is reachable, False otherwise."""
     global _mongo_client, _use_mongo
-    if _use_mongo is not None:
-        return _use_mongo
+    # If already connected, reuse the client
+    if _use_mongo is True:
+        return True
+    # Always retry if previous attempt failed (don't permanently cache False)
     try:
         from pymongo import MongoClient
-        from pymongo.errors import ServerSelectionTimeoutError
-        client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=2000)
+        client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=8000)
         client.admin.command('ping')
         _mongo_client = client
         _use_mongo = True
         print('[Auth] MongoDB connected.')
-    except Exception:
-        _use_mongo = False
-        print('[Auth] MongoDB not available — using in-memory store (data resets on restart).')
+    except Exception as exc:
+        _use_mongo = None  # allow retry next request
+        print(f'[Auth] MongoDB not available ({exc}) — using in-memory store (data resets on restart).')
+        return False
     return _use_mongo
 
 
@@ -137,11 +175,6 @@ def validate_signup_payload(payload):
     }, None
 
 
-def set_user_session(user):
-    session['user_id'] = user['id']
-    session['email'] = user['email']
-
-
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
     payload = request.get_json(silent=True) or {}
@@ -170,9 +203,10 @@ def signup():
             return jsonify({'error': 'An account with this email already exists'}), 409
         _mem_users[user_data['email']] = user
 
-    set_user_session(user)
+    token = create_token(user)
     return jsonify({
         'user': public_user(user),
+        'token': token,
         'message': 'Signup successful',
     }), 201
 
@@ -194,30 +228,28 @@ def login():
     if requested_role and requested_role != user['role']:
         return jsonify({'error': 'Selected role does not match this account'}), 403
 
-    set_user_session(user)
-
+    token = create_token(user)
     return jsonify({
         'user': public_user(user),
+        'token': token,
         'message': 'Login successful',
     })
 
 
 @auth_bp.route('/me', methods=['GET'])
 def me():
-    email = session.get('email')
-    user = find_user_by_email(email) if email else None
+    token = request.args.get('auth_token', '').strip()
+    user = get_user_from_token(token)
     if not user:
         return jsonify({'authenticated': False}), 401
-
-    return jsonify({
-        'authenticated': True,
-        'user': public_user(user),
-    })
+    return jsonify({'authenticated': True, 'user': public_user(user)})
 
 
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
-    session.clear()
+    payload = request.get_json(silent=True) or {}
+    token = payload.get('auth_token', '').strip()
+    revoke_token(token)
     return jsonify({'message': 'Logout successful'})
 
 
