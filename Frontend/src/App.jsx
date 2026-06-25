@@ -1629,12 +1629,6 @@ function LoginScreen({ labels, onLogin, onSignup }) {
               </button>
             </div>
           </div>
-          <div className="field">
-            <label htmlFor="login-role">{labels.role}</label>
-            <select id="login-role" name="role">
-              <option value="student">{labels.student}</option>
-            </select>
-          </div>
           {error && <div className="error-msg">{labels.errorPrefix}: {error}</div>}
           <button type="submit" className="btn-primary login-submit" disabled={isSubmitting}>
             {isSubmitting ? (isSignup ? labels.signupLoading : labels.loginLoading) : (isSignup ? labels.signupSubmit : labels.loginSubmit)}
