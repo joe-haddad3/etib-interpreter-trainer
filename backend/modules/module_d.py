@@ -478,7 +478,7 @@ HESITATION_PATTERNS = {
         r'\beuh+\b', r'\bheu+\b', r'\bum+\b', r'\buh+\b', r'\bhmm+\b', r'\bhm+\b',
         r'\bben\b', r'\bvoilà\b', r'\bdonc\b',
     ],
-    'fr': [r'\beuh+\b', r'\bheu+\b', r'\bhm+\b', r'\bvoilà\b', r'\bdonc\b', r'\bben\b', r'\bquoi\b'],
+    'fr': [r'\beuh+\b', r'\bheu+\b', r'\bhm+\b', r'\bvoil[aà]\b', r'\bdonc\b', r'\bben\b', r'\bquoi\b', r'\bhum\b'],
     'en': [r'\bum+\b', r'\buh+\b', r'\ber+\b', r'\bhmm+\b', r'\bhm+\b', r'\blike\b'],
 }
 
@@ -489,11 +489,11 @@ HESITATION_FILLERS = {
     },
     'fr': {
         'euh', 'heu', 'euuh', 'euhm', 'hum', 'hm', 'hmm', 'ben', 'bah',
-        'quoi', 'enfin', 'disons', 'comment', 'bref',
+        'quoi', 'enfin', 'disons', 'comment', 'bref', 'voila', 'voilà',
     },
     'en': {
         'um', 'umm', 'uh', 'uhh', 'er', 'erm', 'hmm', 'hm', 'mm',
-        'like', 'basically', 'actually', 'right', 'okay', 'so', 'well',
+        'like',
     },
 }
 
@@ -604,7 +604,7 @@ def build_repetition_hotwords(source_script: str, language: str = 'en') -> str:
     return ' '.join(base + source_terms)
 
 
-def repetition_compare_key(text: str) -> str:
+def repetition_compare_key(text: str, language: str = 'ar') -> str:
     """Normalize a word for repetition comparison without changing display text."""
     import unicodedata
 
@@ -612,20 +612,20 @@ def repetition_compare_key(text: str) -> str:
     token = unicodedata.normalize('NFKD', token)
     token = ''.join(char for char in token if not unicodedata.combining(char))
 
-    # French plural markers are often silent and ASR may spell the two occurrences
-    # differently even when the student repeated the same spoken word.
-    if len(token) > 3 and token.endswith('s'):
+    # French plural markers are often silent; strip trailing 's' only for French
+    # so English words like "goes"/"go" or "days"/"day" are not conflated.
+    if language == 'fr' and len(token) > 3 and token.endswith('s'):
         token = token[:-1]
     return token
 
 
-def words_are_repetition_equivalent(first: str, second: str) -> bool:
-    first_key = repetition_compare_key(first)
-    second_key = repetition_compare_key(second)
+def words_are_repetition_equivalent(first: str, second: str, language: str = 'ar') -> bool:
+    first_key = repetition_compare_key(first, language)
+    second_key = repetition_compare_key(second, language)
     return bool(first_key and first_key == second_key)
 
 
-def detect_repetitions_from_text(full_text: str) -> list:
+def detect_repetitions_from_text(full_text: str, language: str = 'ar') -> list:
     """Detect immediate repeated words or repeated adjacent short phrases."""
     words = []
     for match in re.finditer(r'\w+', full_text or '', flags=re.UNICODE):
@@ -633,14 +633,14 @@ def detect_repetitions_from_text(full_text: str) -> list:
         if word:
             words.append({
                 'word': word,
-                'key': repetition_compare_key(word),
+                'key': repetition_compare_key(word, language),
                 'position': len(words),
                 'char': match.start(),
             })
     repetitions = []
 
     for i in range(len(words) - 1):
-        if words_are_repetition_equivalent(words[i]['word'], words[i + 1]['word']):
+        if words_are_repetition_equivalent(words[i]['word'], words[i + 1]['word'], language):
             repetitions.append({
                 'word': words[i]['word'],
                 'position': words[i]['position'],
@@ -935,7 +935,7 @@ def merge_silence_reports(*reports: list) -> list:
     return sorted(merged, key=lambda item: item.get('at_seconds', 0))
 
 
-def detect_repetitions(segments: list) -> list:
+def detect_repetitions(segments: list, language: str = 'ar') -> list:
     """
     Detect immediate repeated words and adjacent repeated short phrases.
     """
@@ -946,7 +946,7 @@ def detect_repetitions(segments: list) -> list:
             if clean:
                 all_words.append({
                     'word': clean,
-                    'key': repetition_compare_key(clean),
+                    'key': repetition_compare_key(clean, language),
                     'start': w.get('start', 0),
                 })
 
@@ -957,7 +957,7 @@ def detect_repetitions(segments: list) -> list:
     i = 0
     while i < len(all_words) - 1:
         word = all_words[i]['word']
-        if words_are_repetition_equivalent(word, all_words[i + 1]['word']):
+        if words_are_repetition_equivalent(word, all_words[i + 1]['word'], language):
             repetitions.append({
                 'word': word,
                 'at_seconds': round(all_words[i]['start'], 1),
@@ -1099,11 +1099,12 @@ def detect_low_confidence_words(segments: list, threshold: float = 0.6) -> list:
     low_conf = []
     for seg in segments:
         for w in seg.get('words', []):
-            if w.get('probability', 1.0) < threshold:
+            prob = w.get('probability', 1.0)
+            if prob < threshold:
                 low_conf.append({
-                    'word': w['word'].strip(),
-                    'at_seconds': round(w['start'], 1),
-                    'confidence': w['probability']
+                    'word': str(w.get('word', '')).strip(),
+                    'at_seconds': round(float(w.get('start', 0)), 1),
+                    'confidence': prob,
                 })
     return low_conf
 
@@ -1712,14 +1713,14 @@ def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar'
 
     # Word-level detection (works when faster-whisper is used)
     silences        = detect_long_silences(segments)
-    word_reps       = detect_repetitions(segments)
+    word_reps       = detect_repetitions(segments, language)
     word_hesitations = detect_hesitation_words(segments, language)
     low_conf        = detect_low_confidence_words(segments)
     number_errs     = detect_number_errors(source_script, full_text)
 
     # Text-based detection (always works, even with Groq transcript)
     text_hesitations = detect_hesitations_from_text(full_text, language)
-    text_repetitions = detect_repetitions_from_text(full_text)
+    text_repetitions = detect_repetitions_from_text(full_text, language)
 
     # Merge word-level timestamps with transcript-text fillers, because ASR word
     # timestamps can miss or normalize fillers such as "uhhh".
@@ -1821,9 +1822,11 @@ def generate_feedback():
         )
         coverage_diagnostics = estimate_length_coverage(source_script, transcript_text)
 
-        lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
+        lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English', 'unknown': 'an unknown language'}
+        _raw_src = data.get('source_language', '')
+        _src_key = _raw_src if _raw_src and _raw_src != language else 'unknown'
         prompt = LLM_ANALYSIS_PROMPT.format(
-            source_language=lang_names.get(data.get('source_language', language), language),
+            source_language=lang_names.get(_src_key, _src_key),
             target_language=lang_names.get(language, language),
             source=source_script or '(source speech not provided)',
             transcript=transcript_text,
@@ -1852,7 +1855,7 @@ def generate_feedback():
                 },
                 {'role': 'user', 'content': prompt}
             ],
-            max_tokens=2000,
+            max_tokens=3500,
             temperature=0.2
         )
 
@@ -1900,7 +1903,9 @@ def full_evaluation():
     audio_file       = request.files['audio']
     source_script    = request.form.get('source_script', '')
     language         = request.form.get('language', 'ar')
-    source_language  = request.form.get('source_language', language)
+    _raw_src_lang    = request.form.get('source_language', '')
+    # Avoid telling the LLM source==target (monolingual confusion) when not explicitly set
+    source_language  = _raw_src_lang if _raw_src_lang and _raw_src_lang != language else 'unknown'
 
     ext       = os.path.splitext(audio_file.filename)[1] or '.webm'
     temp_path = os.path.join(UPLOAD_FOLDER, f'eval_{uuid.uuid4().hex[:8]}{ext}')
@@ -1998,7 +2003,7 @@ def full_evaluation():
         from utils.groq_client import get_groq_client
         client = get_groq_client()
 
-        lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
+        lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English', 'unknown': 'an unknown language'}
         rep_examples     = ', '.join(f'"{r.get("word","")}"' for r in algo.get('repetitions', [])[:3])
         hes_examples     = ', '.join(f'"{h.get("word","")}"' for h in algo.get('hesitation_words', [])[:3])
         sil_examples     = '; '.join(
@@ -2038,7 +2043,7 @@ def full_evaluation():
                  'Return only valid JSON. Be thorough — detect ALL error types listed.'},
                 {'role': 'user', 'content': prompt}
             ],
-            max_tokens=2000,
+            max_tokens=3500,
             temperature=0.2
         )
 
@@ -2178,7 +2183,7 @@ def tashkeel_compare():
                     )
                 }
             ],
-            max_tokens=2000,
+            max_tokens=3500,
             temperature=0.1
         )
 
