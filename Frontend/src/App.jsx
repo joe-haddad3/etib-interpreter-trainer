@@ -1302,6 +1302,7 @@ export default function App() {
             lastGeneratedScript={lastGeneratedScript}
             currentUser={currentUser}
             isRtl={uiLang === 'ar'}
+            onOpenSettings={() => setShowSettings(true)}
           />
         )}
       </main>
@@ -1632,7 +1633,6 @@ function LoginScreen({ labels, onLogin, onSignup }) {
             <label htmlFor="login-role">{labels.role}</label>
             <select id="login-role" name="role">
               <option value="student">{labels.student}</option>
-              <option value="instructor">{labels.instructor}</option>
             </select>
           </div>
           {error && <div className="error-msg">{labels.errorPrefix}: {error}</div>}
@@ -1651,11 +1651,12 @@ function LoginScreen({ labels, onLogin, onSignup }) {
   );
 }
 
-function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, lastGeneratedScript, currentUser, isRtl }) {
+function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, lastGeneratedScript, currentUser, isRtl, onOpenSettings }) {
   const [sharedAudioUrl, setSharedAudioUrl] = useState(null);
   const [lastTranscript, setLastTranscript] = useState(null);
   const [lastRecordingBlob, setLastRecordingBlob] = useState(null);
   const [progressRefresh, setProgressRefresh] = useState(0);
+  const hasKey = Boolean(getStoredGroqKey());
 
   return (
     <section>
@@ -1665,6 +1666,27 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
         </span>
         <button type="button" className="sign-out-btn" onClick={onLogout}>{labels.signOut}</button>
       </div>
+
+      {!hasKey && (
+        <div style={{
+          background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 10,
+          padding: '0.85rem 1.2rem', margin: '0 0 1rem 0',
+          display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap'
+        }}>
+          <span style={{ flex: 1, fontSize: '0.92rem' }}>
+            ⚠️ <strong>Groq API key required.</strong> The platform needs a key to generate speeches, transcribe audio, and evaluate your performance.
+          </span>
+          <button
+            onClick={() => { onOpenSettings(); }}
+            style={{
+              background: '#1a3a5c', color: '#fff', border: 'none', borderRadius: 7,
+              padding: '0.45rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem', whiteSpace: 'nowrap'
+            }}
+          >
+            ⚙ Add API key in Settings
+          </button>
+        </div>
+      )}
 
       {/* Keep all panels mounted — state persists when switching tabs */}
       <div style={{ display: activePanel === 'module-a' ? 'block' : 'none' }}>

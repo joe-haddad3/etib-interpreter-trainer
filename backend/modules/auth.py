@@ -55,7 +55,7 @@ def get_user_from_token(token: str):
 
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017')
 MONGODB_DB = os.getenv('MONGODB_DB', 'etib_interpreter_trainer')
-VALID_ROLES = {'student', 'instructor', 'coordinator'}
+VALID_ROLES = {'student', 'coordinator'}
 
 SEED_USERS = [
     ('Demo Student', 'student@etib.edu', 'student', 'student123'),
