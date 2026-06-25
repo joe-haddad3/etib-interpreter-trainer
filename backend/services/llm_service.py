@@ -30,12 +30,16 @@ _local_tokenizer: Any | None = None
 
 
 def _active_groq_key() -> str | None:
-    """Return the per-request user key only — no server-key fallback."""
+    """Return user-provided key if present, otherwise fall back to server key."""
     try:
         from flask import g
-        return getattr(g, 'groq_api_key', None)
+        user_key = getattr(g, 'groq_api_key', None)
+        if user_key:
+            return user_key
     except RuntimeError:
-        return None
+        pass
+    server_key = os.getenv('GROQ_API_KEY', '').strip()
+    return server_key if server_key.startswith('gsk_') else None
 
 GEMINI_MODEL = 'gemini-1.5-flash-latest'
 

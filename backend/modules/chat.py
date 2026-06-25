@@ -27,7 +27,8 @@ def chat_message():
     if not messages:
         return jsonify({'error': 'messages array is required'}), 400
 
-    if not g.groq_api_key:
+    from services.llm_service import _active_groq_key
+    if not _active_groq_key():
         return jsonify({'error': 'Groq API key required. Please set it in the settings (⚙).'}), 400
 
     full_messages = [{'role': 'system', 'content': SYSTEM_PROMPT}] + messages[-20:]
