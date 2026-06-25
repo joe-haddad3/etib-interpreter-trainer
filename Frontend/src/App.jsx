@@ -1236,29 +1236,37 @@ export default function App() {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const result = await loginUser({
-      email: formData.get('email'),
-      password: formData.get('password'),
-      role: formData.get('role')
-    });
-    saveAuthToken(result.token);
-    setCurrentUser(result.user);
-    setIsAuthenticated(true);
+    try {
+      const result = await loginUser({
+        email: formData.get('email'),
+        password: formData.get('password'),
+        role: formData.get('role')
+      });
+      saveAuthToken(result.token);
+      setCurrentUser(result.user);
+      setIsAuthenticated(true);
+    } catch (err) {
+      throw err; // let LoginScreen.handleSubmit surface the error
+    }
   }
 
   async function handleSignup(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const result = await signupUser({
-      name: formData.get('name'),
-      email: formData.get('email'),
-      password: formData.get('password'),
-      role: formData.get('role')
-    });
-    saveAuthToken(result.token);
-    setCurrentUser(result.user);
-    setIsAuthenticated(true);
+    try {
+      const result = await signupUser({
+        name: formData.get('name'),
+        email: formData.get('email'),
+        password: formData.get('password'),
+        role: formData.get('role')
+      });
+      saveAuthToken(result.token);
+      setCurrentUser(result.user);
+      setIsAuthenticated(true);
+    } catch (err) {
+      throw err;
+    }
   }
 
   async function handleLogout() {
@@ -2072,6 +2080,12 @@ function ModuleA({ labels, onGenerated, isRtl }) {
       </form>
 
       {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{labels.errorPrefix}: {error}</div>}
+      {isLoading && (
+        <div className="card" style={{ textAlign: 'center', padding: '2rem', marginTop: '1rem' }}>
+          <div className="spinner" />
+          <p style={{ marginTop: '1rem', color: 'var(--warm-gray)' }}>{labels.generating}</p>
+        </div>
+      )}
       {retrievalResult && <RetrievalResult data={retrievalResult} labels={labels} />}
       {result && <SpeechResult data={result} labels={labels} />}
 
