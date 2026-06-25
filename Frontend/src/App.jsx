@@ -1232,6 +1232,12 @@ export default function App() {
     document.body.classList.toggle('rtl', isAr);
   }, [uiLang]);
 
+  function handleGuest() {
+    saveAuthToken(null);
+    setCurrentUser({ name: 'Guest', role: 'student', id: 'guest' });
+    setIsAuthenticated(true);
+  }
+
   async function handleLogin(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -1291,7 +1297,7 @@ export default function App() {
       />
       <main>
         {!isAuthenticated ? (
-          <LoginScreen labels={L} onLogin={handleLogin} onSignup={handleSignup} />
+          <LoginScreen labels={L} onLogin={handleLogin} onSignup={handleSignup} onGuest={handleGuest} />
         ) : (
           <Workspace
             labels={L}
@@ -1560,7 +1566,7 @@ function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, o
   );
 }
 
-function LoginScreen({ labels, onLogin, onSignup }) {
+function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
   const [mode, setMode] = useState('login');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1639,6 +1645,21 @@ function LoginScreen({ labels, onLogin, onSignup }) {
               {isSignup ? labels.switchToLogin : labels.switchToSignup}
             </button>
           </div>
+          <div style={{ textAlign: 'center', margin: '0.75rem 0 0' }}>
+            <span style={{ color: '#aaa', fontSize: '0.8rem' }}>— or —</span>
+          </div>
+          <button
+            type="button"
+            onClick={onGuest}
+            style={{
+              width: '100%', marginTop: '0.5rem', padding: '0.6rem',
+              background: 'transparent', border: '1.5px solid #ccc',
+              borderRadius: 8, cursor: 'pointer', fontSize: '0.9rem',
+              color: '#555', fontWeight: 500,
+            }}
+          >
+            Continue as Guest
+          </button>
         </form>
       </div>
     </section>
