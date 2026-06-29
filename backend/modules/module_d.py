@@ -306,8 +306,13 @@ LLM_ANALYSIS_PROMPT = """You are a professional interpreter training evaluator a
 
 THIS IS AN INTERPRETATION TASK — NOT A READING TASK.
 The student heard a speech in {source_language} and interpreted it into {target_language}.
-The two texts are in DIFFERENT languages. Do NOT compare them word-for-word.
-Compare MEANING, CONCEPTS, NUMBERS, and TERMINOLOGY across languages.
+The two texts are in DIFFERENT languages. Compare MEANING, CONCEPTS, NUMBERS, and TERMINOLOGY.
+
+YOU ARE A STRICT PROFESSOR. Your job is to FIND and REPORT errors, not to excuse them.
+- If the student's rendering changes the meaning even slightly → flag it as a translation error.
+- If a term is imprecise, vague, or weakened → flag it.
+- If you find fewer than 3 translation errors in a student transcript that has obvious mistakes, you are being too lenient. Re-read and look harder.
+- Do NOT give the student the benefit of the doubt. If something is wrong, say so clearly.
 
 SOURCE SPEECH (in {source_language}):
 {source}
@@ -341,17 +346,25 @@ Important reliability rule:
 
 EVALUATION TASKS — check every category thoroughly:
 
-TASK 1 — TRANSLATION ACCURACY:
-Go through each key concept, argument, and sentence of the source speech.
-Did the student convey the correct meaning in {target_language}?
-Flag any concept that was mistranslated, distorted, or given the wrong equivalent.
-Example: source says "sustainable development", student said "développement durable" (correct) vs "développement stable" (wrong).
-List every clear translation error you find. Do not stop after the first two errors.
-Before saying a word or phrase is missing, verify it is not already present in the STUDENT transcript.
-Do not mark a phrase as missing if the transcript contains the same phrase or a close equivalent.
-Only put actual wrong renderings in translation_errors.
-Do not include correct translations or items where nothing needs to be fixed.
-If the student did not say anything for a source segment, put that under missing_content, not translation_errors.
+TASK 1 — TRANSLATION ACCURACY (most important task — be thorough and strict):
+Go through the source speech sentence by sentence. For each sentence ask:
+"Did the student convey the EXACT meaning in {target_language}?"
+
+Flag ALL of the following as translation_errors:
+- Wrong word choice that changes meaning (e.g. "increase" when source said "decrease")
+- A vague or weakened rendering (e.g. "problem" when source said "crisis")
+- A term from the wrong domain (e.g. "durable" vs "développement durable")
+- An opposite meaning (e.g. "approve" vs "reject")
+- A number that is wrong or approximate (e.g. "about 50%" when source said "exactly 47%")
+- A concept rendered in a way a listener would understand differently
+
+Do NOT accept these excuses:
+- "close enough" — if meaning shifted, it is an error
+- "approximate" — approximation is an error in interpretation
+- "implied by context" — the student must say it, not imply it
+
+List EVERY translation error you find. Do not stop early. Do not summarize multiple errors into one.
+If the student said nothing for a source segment → put it under missing_content, not here.
 
 TASK 2 — CONTENT COVERAGE:
 List every important idea, fact, number, name, or argument from the source speech.
@@ -419,12 +432,13 @@ Give specific, actionable pronunciation feedback for {target_language}:
 - English: word stress, "th" sounds (θ/ð), vowel reduction in unstressed syllables
 For each low-confidence word above, explain the likely mispronunciation and give the correct way to say it.
 
-Give overall_score 0-10 and coverage_score 0-10:
-- 9-10: Excellent — near-complete, accurate, fluent
-- 7-8: Good — minor gaps or errors
-- 5-6: Acceptable — several issues but core meaning preserved
-- 3-4: Weak — significant mistranslations or information loss
-- 0-2: Very poor — incomplete or incomprehensible
+Give overall_score 0-10 and coverage_score 0-10. Be strict — most student interpretations score 4–7:
+- 9-10: Exceptional — virtually no errors, complete coverage, professional fluency
+- 7-8: Good — only 1-2 minor errors, no significant meaning loss
+- 5-6: Acceptable — several errors but core meaning mostly preserved
+- 3-4: Weak — multiple mistranslations or significant information loss
+- 0-2: Very poor — major errors, incomplete, or incomprehensible
+If you found 3+ translation errors or missing_content items, overall_score cannot exceed 6.
 
 Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
 {{
