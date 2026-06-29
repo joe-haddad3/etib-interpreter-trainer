@@ -266,6 +266,13 @@ const UI = {
     domEconomics: 'Economics',
     domHealth: 'Health',
     domEducation: 'Education',
+    domClimate: 'Climate & Environment',
+    domHumanRights: 'Human Rights',
+    domTechnology: 'Technology & AI',
+    domMigration: 'Migration & Refugees',
+    domDisarmament: 'Disarmament',
+    domWomen: 'Women & Gender',
+    domFood: 'Food & Hunger',
     diffBeginner: 'Beginner',
     diffIntermediate: 'Intermediate',
     diffAdvanced: 'Advanced',
@@ -507,6 +514,13 @@ const UI = {
     domEconomics: 'الاقتصاد',
     domHealth: 'الصحة',
     domEducation: 'التعليم',
+    domClimate: 'المناخ والبيئة',
+    domHumanRights: 'حقوق الإنسان',
+    domTechnology: 'التكنولوجيا والذكاء الاصطناعي',
+    domMigration: 'الهجرة واللاجئون',
+    domDisarmament: 'نزع السلاح',
+    domWomen: 'المرأة والنوع الاجتماعي',
+    domFood: 'الغذاء والجوع',
     diffBeginner: 'مبتدئ',
     diffIntermediate: 'متوسط',
     diffAdvanced: 'متقدم',
@@ -728,6 +742,13 @@ const UI = {
     domEconomics: 'Économie',
     domHealth: 'Santé',
     domEducation: 'Éducation',
+    domClimate: 'Climat & Environnement',
+    domHumanRights: 'Droits de l\'homme',
+    domTechnology: 'Technologie & IA',
+    domMigration: 'Migration & Réfugiés',
+    domDisarmament: 'Désarmement',
+    domWomen: 'Femmes & Genre',
+    domFood: 'Alimentation & Faim',
     diffBeginner: 'Débutant',
     diffIntermediate: 'Intermédiaire',
     diffAdvanced: 'Avancé',
@@ -2038,9 +2059,17 @@ function ModuleA({ labels, onGenerated, isRtl }) {
 
           <select name="domain" value={form.domain} onChange={updateField} className="quick-select">
             <option value="politics">{labels.domPolitics || 'Politics'}</option>
+            <option value="diplomacy">{labels.domDiplomacy || 'Diplomacy'}</option>
             <option value="economics">{labels.domEconomics || 'Economics'}</option>
             <option value="health">{labels.domHealth || 'Health'}</option>
             <option value="education">{labels.domEducation || 'Education'}</option>
+            <option value="climate">{labels.domClimate || 'Climate & Environment'}</option>
+            <option value="human rights">{labels.domHumanRights || 'Human Rights'}</option>
+            <option value="technology">{labels.domTechnology || 'Technology & AI'}</option>
+            <option value="migration">{labels.domMigration || 'Migration & Refugees'}</option>
+            <option value="disarmament">{labels.domDisarmament || 'Disarmament'}</option>
+            <option value="women">{labels.domWomen || 'Women & Gender'}</option>
+            <option value="food">{labels.domFood || 'Food & Hunger'}</option>
           </select>
 
           <select name="difficulty" value={form.difficulty} onChange={updateField} className="quick-select">

@@ -50,6 +50,11 @@ DOMAIN_QUERIES = {
     'health':      'health pandemic disease WHO public health',
     'human rights':'human rights humanitarian law protection refugees',
     'education':   'education UNESCO literacy development',
+    'technology':  'artificial intelligence digital technology cybersecurity innovation',
+    'migration':   'migration refugees displaced persons UNHCR asylum',
+    'disarmament': 'disarmament nuclear weapons arms control non-proliferation',
+    'women':       'gender equality women empowerment',
+    'food':        'food security hunger malnutrition FAO WFP',
 }
 
 FETCH_TIMEOUT = 30   # seconds for API calls
@@ -275,6 +280,17 @@ _DEMO_SPEECHES = [
      'web_url':'https://digitallibrary.un.org/record/4036800',
      'pdf_url':'https://digitallibrary.un.org/record/4036800/files/S_2024_98-EN.pdf',
      'description':'Report on women\'s participation in conflict prevention, peacekeeping, post-conflict reconstruction and Security Council Resolution 1325 implementation.','demo':True},
+    # ── Technology & AI ──────────────────────────────────────────────────────
+    {'un_id':'demo-t1','domain':'technology','date':'2024-09-19','languages':['eng','ara','fre'],
+     'title':'Secretary-General Report: Governing Artificial Intelligence for Humanity',
+     'web_url':'https://digitallibrary.un.org/record/4055500',
+     'pdf_url':'https://digitallibrary.un.org/record/4055500/files/A_79_PV.4-EN.pdf',
+     'description':'Report outlining the UN framework for international AI governance, ethics guidelines, risks of autonomous systems and recommendations for a global AI watchdog body.','demo':True},
+    {'un_id':'demo-t2','domain':'technology','date':'2024-03-22','languages':['eng','ara','fre'],
+     'title':'ITU AI for Good: Artificial Intelligence and Sustainable Development Goals',
+     'web_url':'https://digitallibrary.un.org/record/4040500',
+     'pdf_url':'https://digitallibrary.un.org/record/4040500/files/ITU_AI4Good_2024-EN.pdf',
+     'description':'Report on how AI and emerging digital technologies can accelerate the SDGs in health, education, agriculture and climate action while addressing algorithmic bias and data governance.','demo':True},
     # ── Food & Poverty ───────────────────────────────────────────────────────
     {'un_id':'demo-f1','domain':'food','date':'2024-07-25','languages':['eng','ara','fre'],
      'title':'FAO Report: The State of Food Security and Nutrition in the World 2024',
@@ -300,6 +316,7 @@ _DOMAIN_ALIASES = {
     'disarmament':  ['disarm', 'nuclear', 'weapon', 'arms', 'missile', 'npt', 'proliferation', 'landmine', 'explosive'],
     'women':        ['women', 'gender', 'feminin', 'girl', 'feminist', 'equality', 'empowerment', 'violence against'],
     'food':         ['food', 'hunger', 'famine', 'malnutri', 'fao', 'wfp', 'agriculture', 'farm', 'crop'],
+    'technology':   ['technolog', 'artificial intelligence', ' ai ', 'digital', 'cyber', 'internet', 'data', 'algorithm', 'robot', 'automat', 'machine learning', 'innovation', 'itu', 'software', 'platform', 'blockchain'],
 }
 
 def _demo_results(q: str, domain: str, limit: int) -> list:
