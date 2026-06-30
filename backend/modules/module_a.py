@@ -214,10 +214,16 @@ Hesitations:         {'Yes — ' + hesitation_note if hesitations else 'No'}
 ═══════════════════════════════════════════════
 SPEECH WRITING RULES
 ═══════════════════════════════════════════════
-1. Open with a realistic protocol greeting appropriate to the scenario:
-   - Arabic: «السيدات والسادة...» / «أصحاب المعالي والسعادة...»
-   - French: «Monsieur le Président, Mesdames et Messieurs...»
-   - English: «Mr. President, distinguished delegates...»
+1. Open with a greeting that matches the ACTUAL scenario ({scenario}) — vary it, do not default to
+   a UN-style "Mr. President" opening unless the scenario genuinely is a UN/parliamentary assembly:
+   - UN General Assembly / Security Council: formal chair address — "Mr./Madam President, distinguished delegates..." (EN), «Monsieur/Madame le Président...» (FR), «السيد/السيدة الرئيس، أصحاب المعالي...» (AR)
+   - EU Parliament: "Mr./Madam President, honourable Members..." (EN), «Monsieur/Madame le Président, chers collègues...» (FR), «السيد الرئيس، الأعضاء الموقرون...» (AR)
+   - Arab League summit: «أصحاب الجلالة والفخامة والسمو...» (AR), "Your Majesties, Excellencies..." (EN/FR equivalents)
+   - Press conference: a direct opening statement to journalists, no chair address — "Good morning, thank you all for being here today..." / «Bonjour à tous, merci d'être présents...» / «صباح الخير للجميع، شكراً لحضوركم...»
+   - Diplomatic meeting: a direct address to counterparts by name/title — "Minister, colleagues, thank you for receiving us..." / no generic chair greeting
+   - Political debate: a direct address to the audience/moderator — "Thank you, and good evening to everyone watching..."
+   - Interview: no protocol greeting at all — start naturally as if answering a question
+   Within the SAME scenario, still vary the exact wording each time — do not reuse the identical sentence verbatim across different speeches.
 
 2. Structure: Opening → Context/Background → Main Arguments (2–3) → Conclusion with call to action.
 
@@ -1059,6 +1065,77 @@ def find_un_grounding_source(params: dict) -> dict | None:
     return None
 
 
+def find_wikipedia_grounding_source(params: dict) -> dict | None:
+    """
+    Fallback grounding source used when no UN Digital Library document is found.
+    Searches real Wikipedia articles for the topic so the LLM is grounded in
+    actual searched data instead of relying solely on its own internal
+    knowledge. Free, no API key, and reliable from cloud server IPs (unlike
+    the UN Digital Library, which blocks them via WAF).
+    """
+    import logging
+    import requests
+    log = logging.getLogger(__name__)
+
+    topic = str(params.get('topic', '')).strip()
+    if not topic:
+        return None
+
+    domain_keywords = DOMAIN_QUERIES.get(params.get('domain', ''), '')
+    search_query = f'{topic} {domain_keywords}'.strip()
+
+    primary_lang = {'ar': 'ar', 'fr': 'fr', 'en': 'en'}.get(params.get('language', 'en'), 'en')
+    wiki_langs = [primary_lang] if primary_lang == 'en' else [primary_lang, 'en']
+    headers = {'User-Agent': 'ETIB-Interpreter-Trainer/1.0 (USJ Beirut ETIB project)'}
+
+    for wiki_lang in wiki_langs:
+        try:
+            search_resp = requests.get(
+                f'https://{wiki_lang}.wikipedia.org/w/api.php',
+                params={'action': 'query', 'list': 'search', 'srsearch': search_query,
+                        'format': 'json', 'srlimit': 3},
+                timeout=10, headers=headers,
+            )
+            search_resp.raise_for_status()
+            hits = search_resp.json().get('query', {}).get('search', [])
+            if not hits:
+                continue
+
+            title = hits[0]['title']
+            extract_resp = requests.get(
+                f'https://{wiki_lang}.wikipedia.org/w/api.php',
+                params={'action': 'query', 'prop': 'extracts', 'explaintext': 1,
+                        'titles': title, 'format': 'json'},
+                timeout=10, headers=headers,
+            )
+            extract_resp.raise_for_status()
+            pages = extract_resp.json().get('query', {}).get('pages', {})
+            page = next(iter(pages.values()), {})
+            text = (page.get('extract') or '').strip()
+
+            if len(text.split()) < 60:
+                log.debug('[Wikipedia Grounding] Too short: %s', title)
+                continue
+
+            log.info('[Wikipedia Grounding] Found: "%s" (%s, %d words)', title, wiki_lang, len(text.split()))
+            return {
+                'text':    text[:8000],
+                'title':   title,
+                'un_id':   '',
+                'web_url': f'https://{wiki_lang}.wikipedia.org/wiki/{title.replace(" ", "_")}',
+                'pdf_url': '',
+                'date':    '',
+                'query':   search_query,
+                'source_label': 'Wikipedia',
+            }
+        except Exception as exc:
+            log.debug('[Wikipedia Grounding] error (%s, %s): %s', search_query, wiki_lang, exc)
+            continue
+
+    log.info('[Wikipedia Grounding] No usable article found for: %s', search_query)
+    return None
+
+
 def should_auto_ground_generation(params: dict) -> bool:
     """Automatic UN lookup is useful but slow; keep it opt-in for normal generation."""
     value = params.get('auto_ground') or params.get('use_un_grounding')
@@ -1077,8 +1154,12 @@ def generate_speech():
 
     try:
         # Always attempt UN Library grounding to ensure factual accuracy.
-        # If no matching document is found, falls back to LLM knowledge only.
+        # If no matching document is found, fall back to a real Wikipedia
+        # search on the topic so the speech is still grounded in actual
+        # searched data rather than relying only on the LLM's own knowledge.
         source = find_un_grounding_source(params)
+        if not source:
+            source = find_wikipedia_grounding_source(params)
         excerpts = None
         if source:
             normalized_text = normalize_text(source['text'])
@@ -1128,10 +1209,11 @@ def generate_speech():
             mode = 'un_library_grounded'
             extra = {
                 'source_speech': {
-                    'title':   source['title'],
-                    'un_id':   source['un_id'],
-                    'web_url': source['web_url'],
-                    'date':    source['date'],
+                    'title':        source['title'],
+                    'un_id':        source['un_id'],
+                    'web_url':      source['web_url'],
+                    'date':         source['date'],
+                    'source_label': source.get('source_label', 'UN Digital Library'),
                 },
             }
 

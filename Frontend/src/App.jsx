@@ -105,7 +105,7 @@ const UI = {
     progressTopErrors: 'Specific errors',
     progressNoData: 'Not enough data yet',
     moduleATitle: 'Generate training speech',
-    groundedSourceLabel: 'Grounded in real UN document:',
+    groundedSourceLabel: 'Grounded in a real source:',
     ungroundedNote: 'No matching UN document was found — this speech was generated without source grounding.',
     language: 'Speech language',
     targetLanguage: 'Target language',
@@ -353,7 +353,7 @@ const UI = {
     progressTopErrors: 'أخطاء محددة',
     progressNoData: 'بيانات غير كافية بعد',
     moduleATitle: 'توليد خطاب تدريبي',
-    groundedSourceLabel: 'مستند إلى وثيقة أممية حقيقية:',
+    groundedSourceLabel: 'مستند إلى مصدر حقيقي:',
     ungroundedNote: 'لم يتم العثور على وثيقة أممية مطابقة — تم إنشاء هذا الخطاب دون الاستناد إلى مصدر.',
     language: 'لغة الخطاب',
     targetLanguage: 'لغة الترجمة الهدف',
@@ -601,7 +601,7 @@ const UI = {
     progressTopErrors: 'Erreurs spécifiques',
     progressNoData: 'Pas encore assez de données',
     moduleATitle: 'Générer un discours d’entraînement',
-    groundedSourceLabel: 'Basé sur un document réel de l’ONU :',
+    groundedSourceLabel: 'Basé sur une source réelle :',
     ungroundedNote: 'Aucun document de l’ONU correspondant n’a été trouvé — ce discours a été généré sans source.',
     language: 'Langue du discours',
     targetLanguage: 'Langue cible',
@@ -1754,13 +1754,13 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
   );
 }
 
-// ── UN Library Panel ─────────────────────────────────────────────────────────
+// ── Sources Panel (upload a document OR search the library — one place) ──────
 
-function UNLibraryPanel({ language, domain, onSelect, onClose }) {
-  const [query, setQuery]         = useState('');
+function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelectFile, onClose }) {
+  const [query, setQuery]         = useState(initialQuery || '');
   const [results, setResults]     = useState([]);
   const [saved, setSaved]         = useState([]);
-  const [tab, setTab]             = useState('search'); // 'search' | 'saved'
+  const [tab, setTab]             = useState(initialQuery ? 'search' : 'upload'); // 'upload' | 'search' | 'saved'
   const [status, setStatus]       = useState('idle');   // 'idle'|'searching'|'fetching'
   const [fetchingId, setFetchingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -1770,8 +1770,16 @@ function UNLibraryPanel({ language, domain, onSelect, onClose }) {
     getSavedSpeeches({ language }).then(d => setSaved(d.saved || [])).catch(() => {});
   }, [language]);
 
+  // If the student already typed a topic before opening, run that search immediately.
+  useEffect(() => {
+    if (initialQuery && initialQuery.trim()) {
+      handleSearch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSearch(e) {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (!query.trim() && !domain) return;
     setStatus('searching'); setError(''); setResults([]);
     try {
@@ -1791,7 +1799,7 @@ function UNLibraryPanel({ language, domain, onSelect, onClose }) {
         un_id: item.un_id, title: item.title, language,
       });
       setSaved(prev => [{ ...data }, ...prev.filter(s => s.un_id !== data.un_id)]);
-      onSelect({ text: data.text, title: data.title, un_id: data.un_id, source: 'UN Digital Library' });
+      onSelectLibrary({ text: data.text, title: data.title, un_id: data.un_id, source: 'Document Library' });
       onClose();
     } catch (err) {
       setError(`Could not load: ${err.message}`);
@@ -1802,7 +1810,7 @@ function UNLibraryPanel({ language, domain, onSelect, onClose }) {
     setFetchingId(item.un_id); setError('');
     try {
       const data = await getSavedSpeech(item.un_id);
-      onSelect({ text: data.text, title: data.title, un_id: data.un_id, source: 'UN Digital Library' });
+      onSelectLibrary({ text: data.text, title: data.title, un_id: data.un_id, source: 'Document Library' });
       onClose();
     } catch (err) {
       setError(err.message);
@@ -1820,21 +1828,41 @@ function UNLibraryPanel({ language, domain, onSelect, onClose }) {
     } finally { setDeletingId(null); }
   }
 
+  function handleFileChosen(file) {
+    if (!file) return;
+    onSelectFile(file);
+    onClose();
+  }
+
   return (
     <div className="library-overlay">
       <div className="library-panel">
         <div className="library-header">
-          <h2 className="library-title">📚 Document Library</h2>
+          <h2 className="library-title">📚 Sources</h2>
           <button className="library-close" onClick={onClose}>✕</button>
         </div>
-        <p className="library-subtitle">Search real international speeches and reports — UN agencies, WHO, World Bank, FAO, UNESCO, and more — to use as grounding for speech generation.</p>
+        <p className="library-subtitle">Add one document to ground your speech — upload your own file, or search real international speeches and reports (UN agencies, WHO, World Bank, FAO, UNESCO, and more). Everything lives in one place here.</p>
 
         <div className="library-tabs">
-          <button className={`lib-tab ${tab === 'search' ? 'lib-tab-active' : ''}`} onClick={() => setTab('search')}>Search</button>
+          <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>📄 Upload</button>
+          <button className={`lib-tab ${tab === 'search' ? 'lib-tab-active' : ''}`} onClick={() => setTab('search')}>🔍 Search</button>
           <button className={`lib-tab ${tab === 'saved' ? 'lib-tab-active' : ''}`} onClick={() => setTab('saved')}>
-            Saved ({saved.length})
+            💾 Saved ({saved.length})
           </button>
         </div>
+
+        {tab === 'upload' && (
+          <div className="library-results" style={{ padding: '0.75rem 0' }}>
+            <p style={{ margin: '0 0 0.9rem', color: 'var(--warm-gray, #777)', fontSize: '0.9rem' }}>
+              Upload a PDF, Word, or text file — the AI extracts the key content and grounds your speech in it.
+            </p>
+            <input
+              type="file"
+              accept=".txt,.docx,.pdf"
+              onChange={e => handleFileChosen(e.target.files?.[0] || null)}
+            />
+          </div>
+        )}
 
         {tab === 'search' && (
           <>
@@ -1935,7 +1963,6 @@ function ModuleA({ labels, onGenerated, isRtl }) {
   const [result, setResult] = useState(null);
   const [showLibrary, setShowLibrary] = useState(false);
   const [librarySource, setLibrarySource] = useState(null); // {text, title, un_id}
-  const fileInputRef = useRef(null);
   const isLoading = status === 'loading';
 
   function updateField(event) {
@@ -2018,18 +2045,11 @@ function ModuleA({ labels, onGenerated, isRtl }) {
           <button
             type="button"
             className="topic-attach-btn"
-            title="Attach a document (PDF, DOCX, TXT)"
-            onClick={() => fileInputRef.current?.click()}
+            title="Add a source document (upload a file or search the library)"
+            onClick={() => setShowLibrary(true)}
           >
-            {documentFile ? '📄' : '+'}
+            {documentFile || librarySource ? '📄' : '+'}
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".txt,.docx,.pdf"
-            style={{ display: 'none' }}
-            onChange={event => { setDocumentFile(event.target.files?.[0] || null); setRetrievalResult(null); }}
-          />
         </div>
 
         {/* ── Attached file chip ── */}
@@ -2128,7 +2148,7 @@ function ModuleA({ labels, onGenerated, isRtl }) {
         {/* ── Action buttons ── */}
         <div className="action-row">
           <button type="button" className="btn-un-library" onClick={() => setShowLibrary(true)} disabled={isLoading}>
-            📚 Document Library
+            📚 Add source
           </button>
           {librarySource ? (
             <button type="button" className="btn-primary" onClick={handleLibraryGenerate} disabled={isLoading}>
@@ -2163,10 +2183,12 @@ function ModuleA({ labels, onGenerated, isRtl }) {
       {result && <SpeechResult data={result} labels={labels} />}
 
       {showLibrary && (
-        <UNLibraryPanel
+        <SourcesPanel
           language={form.language}
           domain={form.domain}
-          onSelect={src => { setLibrarySource(src); setDocumentFile(null); }}
+          initialQuery={form.topic}
+          onSelectLibrary={src => { setLibrarySource(src); setDocumentFile(null); setRetrievalResult(null); }}
+          onSelectFile={file => { setDocumentFile(file); setLibrarySource(null); setRetrievalResult(null); }}
           onClose={() => setShowLibrary(false)}
         />
       )}
@@ -2250,9 +2272,11 @@ function SpeechResult({ data, labels }) {
   const isArabic = data.language === 'ar';
   const requestedRange = data.word_count_range?.label;
   const rangeMissed = data.word_count_range && data.word_count_range.within_range === false;
-  const visibleDomain = !['groq', 'openai', 'gemini', 'local_aya', 'remote_aya'].includes(
+  const topicLooksLikeDomain = String(data.topic || '').trim().toLowerCase()
+    === String(data.domain || '').trim().toLowerCase();
+  const visibleDomain = (!['groq', 'openai', 'gemini', 'local_aya', 'remote_aya'].includes(
     String(data.domain || '').trim().toLowerCase()
-  ) ? data.domain : '';
+  ) && !topicLooksLikeDomain) ? data.domain : '';
 
   return (
     <div className="speech-result">
@@ -2270,6 +2294,7 @@ function SpeechResult({ data, labels }) {
       {data.mode === 'un_library_grounded' && data.source_speech && (
         <p className="grounded-source-note">
           {labels.groundedSourceLabel}{' '}
+          {data.source_speech.source_label ? `[${data.source_speech.source_label}] ` : ''}
           {data.source_speech.web_url ? (
             <a href={data.source_speech.web_url} target="_blank" rel="noopener noreferrer">
               {data.source_speech.title || data.source_speech.un_id}
