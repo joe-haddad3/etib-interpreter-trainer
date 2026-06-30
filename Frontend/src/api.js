@@ -7,7 +7,8 @@
  * Person 3 maintains this file.
  */
 
-const BASE = (import.meta.env.VITE_API_URL || 'https://joe-haddad3-etib-backend.hf.space') + '/api';
+export const SERVER_BASE = import.meta.env.VITE_API_URL || 'https://joe-haddad3-etib-backend.hf.space';
+const BASE = SERVER_BASE + '/api';
 
 // ── Auth token (stored in localStorage) ──────────────────────────────────────
 const AUTH_TOKEN_KEY = 'etib_auth_token';

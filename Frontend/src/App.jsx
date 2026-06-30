@@ -26,6 +26,7 @@ import {
   validateGroqKey,
   saveAuthToken,
   sendChatMessage,
+  SERVER_BASE,
 } from './api.js';
 
 const UI = {
@@ -2325,7 +2326,7 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, isRtl }) {
     setAudioStatus('loading'); setAudioError('');
     try {
       const data = await textToSpeech({ text: lastGeneratedScript.script, language, accent: selectedAccent, rate_adjustment: speechRate });
-      const url = `http://127.0.0.1:5000${data.audio_url}`;
+      const url = `${SERVER_BASE}${data.audio_url}`;
       setAudioUrl(url); onAudioGenerated?.(url); setAudioStatus('success');
     } catch (err) { setAudioError(err.message); setAudioStatus('error'); }
   }
