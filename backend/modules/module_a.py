@@ -186,6 +186,18 @@ FACTUAL ACCURACY RULES (no source document available):
 Your task is to generate a REALISTIC CONFERENCE SPEECH for interpretation training — NOT an academic essay.
 
 ═══════════════════════════════════════════════
+CRITICAL — TOPIC FIDELITY
+═══════════════════════════════════════════════
+The speech MUST be specifically about the EXACT topic given below: "{topic}"
+Do NOT substitute it with a different, more common, or "safer" topic (such as
+climate change, human rights, or any other generic theme) even if "{topic}"
+seems unusual, narrow, technical, or an odd fit for the stated domain.
+If the topic is a specialised/technical term, treat it as the subject of a
+conference, summit, or panel specifically dedicated to that exact subject —
+do not drift to a related-but-different theme. Every paragraph must be
+recognisably about "{topic}".
+
+═══════════════════════════════════════════════
 SPEECH PARAMETERS
 ═══════════════════════════════════════════════
 Topic:               {topic}

@@ -1,7 +1,7 @@
 """
 Chat endpoint — AI assistant for interpretation training.
 """
-from flask import Blueprint, jsonify, request, g
+from flask import Blueprint, jsonify, request
 from services.llm_service import generate_text
 
 chat_bp = Blueprint('chat', __name__)
@@ -48,9 +48,6 @@ def chat_message():
     messages = payload.get('messages', [])
     if not messages:
         return jsonify({'error': 'messages array is required'}), 400
-
-    if not g.groq_api_key:
-        return jsonify({'error': 'Groq API key required. Please add it in ⚙ Settings.'}), 400
 
     full_messages = [{'role': 'system', 'content': SYSTEM_PROMPT}] + messages[-20:]
 

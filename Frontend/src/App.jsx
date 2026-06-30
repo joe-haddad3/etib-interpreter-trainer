@@ -1706,12 +1706,12 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
 
       {!hasKey && (
         <div style={{
-          background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 10,
+          background: '#eaf2fb', border: '1px solid #b6d4f5', borderRadius: 10,
           padding: '0.85rem 1.2rem', margin: '0 0 1rem 0',
           display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap'
         }}>
           <span style={{ flex: 1, fontSize: '0.92rem' }}>
-            ⚠️ <strong>Groq API key required.</strong> The platform needs a key to generate speeches, transcribe audio, and evaluate your performance.
+            ℹ️ You're using the platform's shared demo key. <strong>Add your own free Groq key</strong> in Settings for faster responses and higher usage limits.
           </span>
           <button
             onClick={() => { onOpenSettings(); }}
@@ -1824,10 +1824,10 @@ function UNLibraryPanel({ language, domain, onSelect, onClose }) {
     <div className="library-overlay">
       <div className="library-panel">
         <div className="library-header">
-          <h2 className="library-title">🇺🇳 UN Digital Library</h2>
+          <h2 className="library-title">📚 Document Library</h2>
           <button className="library-close" onClick={onClose}>✕</button>
         </div>
-        <p className="library-subtitle">Search real UN speeches to use as grounding for speech generation.</p>
+        <p className="library-subtitle">Search real international speeches and reports — UN agencies, WHO, World Bank, FAO, UNESCO, and more — to use as grounding for speech generation.</p>
 
         <div className="library-tabs">
           <button className={`lib-tab ${tab === 'search' ? 'lib-tab-active' : ''}`} onClick={() => setTab('search')}>Search</button>
@@ -1940,6 +1940,12 @@ function ModuleA({ labels, onGenerated, isRtl }) {
 
   function updateField(event) {
     const { name, value, type, checked } = event.target;
+    // Changing topic or domain after attaching a library document means the
+    // student changed their mind — detach it so generation isn't silently
+    // grounded in the old (now-irrelevant) document text.
+    if ((name === 'topic' || name === 'domain') && librarySource) {
+      setLibrarySource(null);
+    }
     setForm(current => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
   }
 
@@ -2034,11 +2040,11 @@ function ModuleA({ labels, onGenerated, isRtl }) {
           </div>
         )}
 
-        {/* ── UN Library source chip ── */}
+        {/* ── Document Library source chip ── */}
         {librarySource && (
           <div className="file-chip file-chip-un">
-            <span>🇺🇳 {librarySource.title.slice(0, 60)}{librarySource.title.length > 60 ? '…' : ''}</span>
-            <button type="button" className="file-chip-remove" onClick={() => setLibrarySource(null)}>×</button>
+            <span>📚 {librarySource.title.slice(0, 60)}{librarySource.title.length > 60 ? '…' : ''}</span>
+            <button type="button" className="file-chip-remove" onClick={() => setLibrarySource(null)} title="Remove attached document">×</button>
           </div>
         )}
 
@@ -2122,11 +2128,11 @@ function ModuleA({ labels, onGenerated, isRtl }) {
         {/* ── Action buttons ── */}
         <div className="action-row">
           <button type="button" className="btn-un-library" onClick={() => setShowLibrary(true)} disabled={isLoading}>
-            UN Library
+            📚 Document Library
           </button>
           {librarySource ? (
             <button type="button" className="btn-primary" onClick={handleLibraryGenerate} disabled={isLoading}>
-              {isLoading ? labels.generating : '▷ Generate from UN speech'}
+              {isLoading ? labels.generating : '▷ Generate from selected document'}
             </button>
           ) : documentFile ? (
             <>

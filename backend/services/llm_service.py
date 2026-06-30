@@ -13,6 +13,7 @@ from typing import Any
 
 from config import (
     GOOGLE_AI_KEY,
+    GROQ_API_KEY,
     LLM_PROVIDER,
     LOCAL_MODEL_DEVICE_MAP,
     LOCAL_MODEL_ID,
@@ -30,12 +31,15 @@ _local_tokenizer: Any | None = None
 
 
 def _active_groq_key() -> str | None:
-    """Return the per-request user key only."""
+    """Return the per-request user key, falling back to the server default key."""
     try:
         from flask import g
-        return getattr(g, 'groq_api_key', None)
+        key = getattr(g, 'groq_api_key', None)
+        if key:
+            return key
     except RuntimeError:
-        return None
+        pass
+    return GROQ_API_KEY or None
 
 GEMINI_MODEL = 'gemini-1.5-flash-latest'
 

@@ -1,28 +1,33 @@
 """
-Groq client factory — per-student key mode.
+Groq client factory.
 
-Each student supplies their own Groq API key via the Settings modal.
-The key is stored in their browser (localStorage) and sent with every
-request as the X-Groq-Api-Key header.  There is NO server-level
-fallback key; if no student key is present the call raises RuntimeError.
+Each student can supply their own Groq API key via the Settings modal
+(stored in their browser, sent with every request). If they haven't,
+the server falls back to a shared default key (GROQ_API_KEY env var)
+when one is configured, so the platform works out of the box for
+demos/testing without forcing every visitor to create a Groq account.
 """
 
 _client_cache: dict = {}  # key -> Groq client
 
 
 def get_groq_key() -> str | None:
-    """Return the per-request user key, or None if not set."""
+    """Return the per-request user key, falling back to the server default key."""
     try:
         from flask import g
-        return getattr(g, 'groq_api_key', None)
+        key = getattr(g, 'groq_api_key', None)
+        if key:
+            return key
     except RuntimeError:
-        return None
+        pass
+    from config import GROQ_API_KEY
+    return GROQ_API_KEY or None
 
 
 def get_groq_client():
-    """Return a Groq client for the current request's key.
+    """Return a Groq client for the current request's key (user key or server default).
 
-    Raises RuntimeError if the student hasn't saved their key yet.
+    Raises RuntimeError if neither a user key nor a server default key is configured.
     """
     from groq import Groq
 
