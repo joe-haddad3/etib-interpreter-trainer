@@ -1444,7 +1444,7 @@ function ChatWidget() {
         boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
         display: 'flex', alignItems: 'center', justifyContent: 'center'
       }}>
-        {open ? '×' : '💬'}
+        💬
       </button>
     </div>
   );
