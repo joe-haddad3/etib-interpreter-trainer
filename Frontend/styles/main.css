@@ -505,7 +505,7 @@ main { padding: 2.5rem 0 4rem; display: flex; flex-direction: column; gap: 2rem;
 
 .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.9rem; }
 
-.action-row { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.25rem; }
+.action-row { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; margin-top: 0.75rem; }
 
 /* ══════════════════════════════════
    SPEECH RESULT
@@ -1060,8 +1060,7 @@ body.rtl .advanced-toggle {
   margin-left: auto;
 }
 
-/* ── action row: keep right-aligned in RTL means justify-content end ── */
-body.rtl .action-row { justify-content: flex-start; }
+/* ── action row: space-between works the same in both LTR and RTL ── */
 
 /* ── Chunk items: decorative left border → right ── */
 body.rtl .chunk-item {

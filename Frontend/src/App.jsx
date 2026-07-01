@@ -2042,14 +2042,6 @@ function ModuleA({ labels, onGenerated, isRtl }) {
             onChange={updateField}
             disabled={isLoading}
           />
-          <button
-            type="button"
-            className="topic-attach-btn"
-            title="Add a source document (upload a file or search the library)"
-            onClick={() => setShowLibrary(true)}
-          >
-            {documentFile || librarySource ? '📄' : '+'}
-          </button>
         </div>
 
         {/* ── Attached file chip ── */}
@@ -2083,21 +2075,6 @@ function ModuleA({ labels, onGenerated, isRtl }) {
               <option value="en">EN</option>
             </select>
           </div>
-
-          <select name="domain" value={form.domain} onChange={updateField} className="quick-select">
-            <option value="politics">{labels.domPolitics || 'Politics'}</option>
-            <option value="diplomacy">{labels.domDiplomacy || 'Diplomacy'}</option>
-            <option value="economics">{labels.domEconomics || 'Economics'}</option>
-            <option value="health">{labels.domHealth || 'Health'}</option>
-            <option value="education">{labels.domEducation || 'Education'}</option>
-            <option value="climate">{labels.domClimate || 'Climate & Environment'}</option>
-            <option value="human rights">{labels.domHumanRights || 'Human Rights'}</option>
-            <option value="technology">{labels.domTechnology || 'Technology & AI'}</option>
-            <option value="migration">{labels.domMigration || 'Migration & Refugees'}</option>
-            <option value="disarmament">{labels.domDisarmament || 'Disarmament'}</option>
-            <option value="women">{labels.domWomen || 'Women & Gender'}</option>
-            <option value="food">{labels.domFood || 'Food & Hunger'}</option>
-          </select>
 
           <select name="difficulty" value={form.difficulty} onChange={updateField} className="quick-select">
             <option value="beginner">{labels.diffBeginner || 'Beginner'}</option>
