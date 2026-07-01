@@ -1838,29 +1838,34 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
     <div className="library-overlay">
       <div className="library-panel">
         <div className="library-header">
-          <h2 className="library-title">📚 Sources</h2>
-          <button className="library-close" onClick={onClose}>✕</button>
+          <h2 className="library-title">Sources</h2>
+          <button className="library-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <p className="library-subtitle">Add one document to ground your speech — upload your own file, or search real international speeches and reports (UN agencies, WHO, World Bank, FAO, UNESCO, and more). Everything lives in one place here.</p>
+        <p className="library-subtitle">Upload a file or search international speeches to ground your speech in a real source.</p>
 
         <div className="library-tabs">
-          <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>📄 Upload</button>
-          <button className={`lib-tab ${tab === 'search' ? 'lib-tab-active' : ''}`} onClick={() => setTab('search')}>🔍 Search</button>
+          <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>Upload</button>
+          <button className={`lib-tab ${tab === 'search' ? 'lib-tab-active' : ''}`} onClick={() => setTab('search')}>Search</button>
           <button className={`lib-tab ${tab === 'saved' ? 'lib-tab-active' : ''}`} onClick={() => setTab('saved')}>
-            💾 Saved ({saved.length})
+            Saved ({saved.length})
           </button>
         </div>
 
         {tab === 'upload' && (
-          <div className="library-results" style={{ padding: '0.75rem 0' }}>
-            <p style={{ margin: '0 0 0.9rem', color: 'var(--warm-gray, #777)', fontSize: '0.9rem' }}>
-              Upload a PDF, Word, or text file — the AI extracts the key content and grounds your speech in it.
-            </p>
-            <input
-              type="file"
-              accept=".txt,.docx,.pdf"
-              onChange={e => handleFileChosen(e.target.files?.[0] || null)}
-            />
+          <div className="library-results" style={{ padding: '0.9rem 0 0' }}>
+            <label className="upload-zone">
+              <input
+                type="file"
+                accept=".txt,.docx,.pdf"
+                onChange={e => handleFileChosen(e.target.files?.[0] || null)}
+                style={{ display: 'none' }}
+              />
+              <svg className="upload-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <div className="upload-zone-label">Drop a file here or <span className="upload-zone-browse">browse</span></div>
+              <div className="upload-zone-hint">PDF, Word (.docx), or plain text</div>
+            </label>
           </div>
         )}
 
