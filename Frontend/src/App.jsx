@@ -1754,102 +1754,11 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
   );
 }
 
-// ── Sources Panel (upload a document OR search the library — one place) ──────
+// ── Sources Panel ─────────────────────────────────────────────────────────────
 
 function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelectFile, onClose }) {
-  const [tab, setTab]               = useState('search');   // 'search' | 'upload'
-  const [query, setQuery]           = useState(initialQuery || '');
-  const [results, setResults]       = useState([]);
-  const [status, setStatus]         = useState('idle');
-  const [fetchingId, setFetchingId] = useState(null);
-  const [error, setError]           = useState('');
-  const didAutoSearch               = useRef(false);
-
-  useEffect(() => {
-    if (initialQuery?.trim() && !didAutoSearch.current) {
-      didAutoSearch.current = true;
-      runSearch(initialQuery);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function searchUNDirect(q) {
-    // Search the UN Digital Library directly from the browser — user's IP is not WAF-blocked.
-    const params = new URLSearchParams({ p: q, of: 'recjson', rg: '20', ln: 'en',
-      sf: 'date', so: 'd', rm: '', f: '', action_search: 'Search',
-      fct__1: 'Documents and Publications' });
-    params.append('c', 'Resource Type');
-    params.append('c', 'UN Bodies');
-    const res = await fetch(`https://digitallibrary.un.org/search?${params}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const records = await res.json();
-    if (!Array.isArray(records)) throw new Error('Unexpected response format');
-    return records.map(r => {
-      const files = Array.isArray(r.files) ? r.files : [];
-      const pdf = files.find(f => f && typeof f === 'object' && (f.url || '').toLowerCase().endsWith('.pdf'));
-      if (!pdf?.url) return null;
-      return {
-        un_id:       String(r.recid || ''),
-        title:       typeof r.title === 'string' ? r.title
-                     : (r.title?.[0]?.a || r.title?.[0] || 'Untitled UN Document'),
-        date:        r.date || r.imprint?.[0]?.c || '',
-        languages:   [],
-        web_url:     r.recid ? `https://digitallibrary.un.org/record/${r.recid}` : '',
-        pdf_url:     pdf.url,
-        description: r.abstract?.[0]?.a || r.summary?.[0]?.a || '',
-        demo:        false,
-      };
-    }).filter(Boolean);
-  }
-
-  async function runSearch(q) {
-    if (!q?.trim()) return;
-    setStatus('searching'); setError(''); setResults([]);
-    let pdfOnly = [];
-    try {
-      // Try direct browser fetch first (no WAF restriction on user's IP)
-      pdfOnly = await searchUNDirect(q);
-    } catch (_) {
-      // CORS blocked — try backend which now uses curl_cffi browser impersonation
-      try {
-        const data = await searchUNLibrary({ q, language, domain, limit: 20 });
-        pdfOnly = (data.results || []).filter(r => r.pdf_url);
-      } catch (err) {
-        setError(err.message);
-        setStatus('idle');
-        return;
-      }
-    }
-    setResults(pdfOnly);
-    if (!pdfOnly.length) {
-      setError('No PDF documents found. The UN Library may be temporarily unavailable — try uploading your own file instead.');
-      setTab('upload');
-    }
-    setStatus('idle');
-  }
-
-  async function handleSearch(e) {
-    e?.preventDefault?.();
-    runSearch(query);
-  }
-
-  async function handleFetch(item) {
-    setFetchingId(item.un_id); setError('');
-    try {
-      const data = await fetchUNDocument({
-        pdf_url: item.pdf_url,
-        web_url: item.web_url,
-        un_id: item.un_id,
-        title: item.title,
-        language,
-        description: item.description || '',
-      });
-      onSelectLibrary({ text: data.text, title: data.title, un_id: data.un_id, source: 'UN Digital Library' });
-      onClose();
-    } catch (err) {
-      setError(`Could not load document: ${err.message}`);
-    } finally { setFetchingId(null); }
-  }
+  const [tab, setTab]   = useState('library');  // 'library' | 'upload'
+  const [query, setQuery] = useState(initialQuery || '');
 
   function handleFileChosen(file) {
     if (!file) return;
@@ -1857,7 +1766,7 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
     onClose();
   }
 
-  const isDemo = id => id?.startsWith('demo-');
+  const unSearchUrl = `https://digitallibrary.un.org/search?p=${encodeURIComponent(query || 'United Nations')}&ln=en&sf=date&so=d&of=hb&fct__1=Documents+and+Publications`;
 
   return (
     <div className="library-overlay">
@@ -1866,12 +1775,58 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
           <h2 className="library-title">Add Source</h2>
           <button className="library-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <p className="library-subtitle">Search UN documents or upload your own file to ground the speech in real content.</p>
+        <p className="library-subtitle">Find a UN document or upload your own file to ground the speech in real content.</p>
 
         <div className="library-tabs">
-          <button className={`lib-tab ${tab === 'search' ? 'lib-tab-active' : ''}`} onClick={() => setTab('search')}>UN Library</button>
+          <button className={`lib-tab ${tab === 'library' ? 'lib-tab-active' : ''}`} onClick={() => setTab('library')}>UN Library</button>
           <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>Upload file</button>
         </div>
+
+        {tab === 'library' && (
+          <div style={{ padding: '1.2rem 0' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--warm-gray)', marginBottom: '1rem', lineHeight: 1.6 }}>
+              Search the UN Digital Library for your topic, download the PDF, then upload it below.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.2rem' }}>
+              <input
+                className="library-search-input"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="e.g. climate change, AI governance…"
+                onKeyDown={e => { if (e.key === 'Enter') window.open(unSearchUrl, '_blank'); }}
+              />
+              <a
+                href={unSearchUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary"
+                style={{ whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              >
+                Search UN Library ↗
+              </a>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.1rem' }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>
+                Once you have downloaded the PDF, upload it here:
+              </p>
+              <label className="upload-zone">
+                <input
+                  type="file"
+                  accept=".pdf,.txt,.docx"
+                  onChange={e => handleFileChosen(e.target.files?.[0] || null)}
+                  style={{ display: 'none' }}
+                />
+                <svg className="upload-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <div className="upload-zone-label">Drop the PDF here or <span className="upload-zone-browse">browse</span></div>
+                <div className="upload-zone-hint">PDF, Word (.docx), or plain text</div>
+              </label>
+            </div>
+          </div>
+        )}
 
         {tab === 'upload' && (
           <div className="library-results" style={{ padding: '0.9rem 0 0' }}>
@@ -1889,75 +1844,6 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
               <div className="upload-zone-hint">PDF, Word (.docx), or plain text</div>
             </label>
           </div>
-        )}
-
-        {tab === 'search' && (
-          <>
-            <form className="library-search-form" onSubmit={handleSearch}>
-              <input
-                className="library-search-input"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="e.g. climate change, human rights, AI governance…"
-                autoFocus
-              />
-              <button type="submit" className="btn-primary" disabled={status === 'searching'}>
-                {status === 'searching' ? 'Searching…' : 'Search'}
-              </button>
-            </form>
-
-            {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{error}</div>}
-
-            <div className="library-results">
-              {status === 'searching' && (
-                <div style={{ textAlign: 'center', padding: '2rem' }}>
-                  <div className="spinner" />
-                  <p style={{ marginTop: '0.75rem', color: 'var(--warm-gray)', fontSize: '0.875rem' }}>
-                    Searching UN Digital Library…
-                  </p>
-                </div>
-              )}
-
-              {status === 'idle' && results.map(item => (
-                <div key={item.un_id} className="library-result-card">
-                  <div className="lib-result-title">{item.title}</div>
-                  <div className="lib-result-meta">
-                    {item.date && <span>📅 {item.date}</span>}
-                    {item.web_url && !isDemo(item.un_id) && (
-                      <a href={item.web_url} target="_blank" rel="noreferrer" className="lib-result-link">
-                        View on UN site ↗
-                      </a>
-                    )}
-                  </div>
-                  {item.languages && item.languages.length > 0 && (
-                    <div className="lib-result-langs">
-                      {item.languages.map(lang => (
-                        <span key={lang} className={`lib-lang-badge ${UN_LANG_TO_UI[lang] === language ? 'lib-lang-badge--match' : ''}`}>
-                          {UN_LANG_LABEL[lang] || lang.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {item.description && <p className="lib-result-desc">{item.description}</p>}
-                  <button
-                    className="btn-primary lib-use-btn"
-                    disabled={!!fetchingId}
-                    onClick={() => handleFetch(item)}
-                  >
-                    {fetchingId === item.un_id ? 'Loading…' : '▷ Use this document'}
-                  </button>
-                </div>
-              ))}
-
-              {status === 'idle' && !results.length && !error && (
-                <p className="lib-empty">
-                  {initialQuery
-                    ? `Searching for "${initialQuery}"…`
-                    : 'Search for a topic above to find UN speeches and reports.'}
-                </p>
-              )}
-            </div>
-          </>
         )}
       </div>
     </div>
@@ -2059,7 +1945,7 @@ function ModuleA({ labels, onGenerated, isRtl }) {
         {documentFile && (
           <div className="file-chip">
             <span>📄 {documentFile.name}</span>
-            <button type="button" className="file-chip-remove" onClick={() => { setDocumentFile(null); setRetrievalResult(null); }}>×</button>
+            <button type="button" className="file-chip-remove" onClick={() => { setDocumentFile(null); setRetrievalResult(null); setResult(null); setError(''); }}>×</button>
           </div>
         )}
 
@@ -2067,7 +1953,7 @@ function ModuleA({ labels, onGenerated, isRtl }) {
         {librarySource && (
           <div className="file-chip file-chip-un">
             <span>📚 {librarySource.title.slice(0, 60)}{librarySource.title.length > 60 ? '…' : ''}</span>
-            <button type="button" className="file-chip-remove" onClick={() => setLibrarySource(null)} title="Remove attached document">×</button>
+            <button type="button" className="file-chip-remove" onClick={() => { setLibrarySource(null); setResult(null); setError(''); }} title="Remove attached document">×</button>
           </div>
         )}
 
@@ -2175,8 +2061,8 @@ function ModuleA({ labels, onGenerated, isRtl }) {
           language={form.language}
           domain={form.domain}
           initialQuery={form.topic}
-          onSelectLibrary={src => { setLibrarySource(src); setDocumentFile(null); setRetrievalResult(null); }}
-          onSelectFile={file => { setDocumentFile(file); setLibrarySource(null); setRetrievalResult(null); }}
+          onSelectLibrary={src => { setLibrarySource(src); setDocumentFile(null); setRetrievalResult(null); setResult(null); setError(''); }}
+          onSelectFile={file => { setDocumentFile(file); setLibrarySource(null); setRetrievalResult(null); setResult(null); setError(''); }}
           onClose={() => setShowLibrary(false)}
         />
       )}
@@ -3245,47 +3131,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
-          {/* Audio clarity / ASR confidence report */}
-          {report.pronunciation && (report.pronunciation.uncertain_count > 0 || (report.pronunciation.diff_errors || []).length > 0) && (
-            <div className="card">
-              <h3 className="report-section-title">🔊 {labels.pronunciationTitle}</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--warm-gray)', marginBottom: '0.3rem' }}>{labels.pronunciationScore}</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'Playfair Display, serif', color: report.pronunciation.overall_score >= 0.8 ? 'var(--sage)' : report.pronunciation.overall_score >= 0.65 ? 'var(--primary)' : 'var(--sienna)' }}>
-                    {Math.round(report.pronunciation.overall_score * 100)}%
-                  </div>
-                </div>
-                <p style={{ fontSize: '0.83rem', color: 'var(--warm-gray)', maxWidth: 340 }}>{report.pronunciation.summary}</p>
-              </div>
-
-              {/* Flagged words with notes */}
-              {(report.pronunciation.flagged_words || []).length > 0 && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <p style={{ fontSize: '0.74rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--warm-gray)', marginBottom: '0.5rem' }}>{labels.uncertainWords}</p>
-                  <div className="word-grid">
-                    {(report.pronunciation.flagged_words || []).map((w, i) => (
-                      <span key={i} className="word-chip word-poor" title={w.note || ''} style={{ cursor: w.note ? 'help' : 'default' }}>
-                        {w.word}
-                        {Number.isFinite(Number(w.confidence ?? w.score)) && (
-                          <small style={{ opacity: 0.7 }}>
-                            {Math.round(Number(w.confidence ?? w.score) * 100)}%
-                          </small>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                  {(report.pronunciation.flagged_words || []).filter(w => w.note).slice(0, 3).map((w, i) => (
-                    <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.6rem', marginTop: '0.4rem' }}>
-                      <strong style={{ fontSize: '0.84rem' }}>"{w.word}"</strong>
-                      <div className="eval-explanation">{w.note}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-            </div>
-          )}
 
 
           {/* Recommendations */}
@@ -3300,17 +3145,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
         </div>
       )}
 
-      {/* Audio clarity panel — Arabic only */}
-      {lastTranscript && (lastTranscript.language || lastTranscript.language_detected) === 'ar' && (
-        <div className="card" style={{ marginTop: '1rem' }}>
-          <h3 className="report-section-title">🔤 {labels.pronunciationTitle}</h3>
-          <PronunciationPanel
-            labels={labels}
-            lastTranscript={lastTranscript}
-            lastGeneratedScript={lastGeneratedScript}
-          />
-        </div>
-      )}
     </div>
   );
 }
