@@ -223,11 +223,11 @@ export async function searchUNLibrary({ q, language, domain, limit = 10 }) {
   return parseJsonResponse(res);
 }
 
-export async function fetchUNDocument({ pdf_url, web_url, un_id, title, language }) {
+export async function fetchUNDocument({ pdf_url, web_url, un_id, title, language, description = '' }) {
   const res = await safeFetch(`${BASE}/library/fetch`, {
     method: 'POST',
     headers: JSON_HEADERS,
-    body: JSON.stringify(groqBody({ pdf_url, web_url, un_id, title, language })),
+    body: JSON.stringify(groqBody({ pdf_url, web_url, un_id, title, language, description })),
   });
   return parseJsonResponse(res);
 }

@@ -1756,203 +1756,134 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
 
 // ── Sources Panel (upload a document OR search the library — one place) ──────
 
-function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelectFile, onClose }) {
-  const [query, setQuery]         = useState(initialQuery || '');
-  const [results, setResults]     = useState([]);
-  const [saved, setSaved]         = useState([]);
-  const [tab, setTab]             = useState(initialQuery ? 'search' : 'upload'); // 'upload' | 'search' | 'saved'
-  const [status, setStatus]       = useState('idle');   // 'idle'|'searching'|'fetching'
+function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onClose }) {
+  const [query, setQuery]           = useState(initialQuery || '');
+  const [results, setResults]       = useState([]);
+  const [status, setStatus]         = useState('idle');
   const [fetchingId, setFetchingId] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
-  const [error, setError]         = useState('');
+  const [error, setError]           = useState('');
+  const didAutoSearch               = useRef(false);
 
   useEffect(() => {
-    getSavedSpeeches({ language }).then(d => setSaved(d.saved || [])).catch(() => {});
-  }, [language]);
-
-  // If the student already typed a topic before opening, run that search immediately.
-  useEffect(() => {
-    if (initialQuery && initialQuery.trim()) {
-      handleSearch();
+    if (initialQuery?.trim() && !didAutoSearch.current) {
+      didAutoSearch.current = true;
+      runSearch(initialQuery);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleSearch(e) {
-    e?.preventDefault?.();
-    if (!query.trim() && !domain) return;
+  async function runSearch(q) {
+    if (!q?.trim()) return;
     setStatus('searching'); setError(''); setResults([]);
     try {
-      const data = await searchUNLibrary({ q: query, language, domain, limit: 12 });
-      setResults(data.results || []);
-      if (!data.results?.length) setError('No results found. Try different keywords.');
+      const data = await searchUNLibrary({ q, language, domain, limit: 12 });
+      const pdfOnly = (data.results || []).filter(r => r.pdf_url);
+      setResults(pdfOnly);
+      if (!pdfOnly.length) setError('No PDF documents found for this topic. Try different keywords.');
     } catch (err) {
       setError(err.message);
     } finally { setStatus('idle'); }
+  }
+
+  async function handleSearch(e) {
+    e?.preventDefault?.();
+    runSearch(query);
   }
 
   async function handleFetch(item) {
     setFetchingId(item.un_id); setError('');
     try {
       const data = await fetchUNDocument({
-        pdf_url: item.pdf_url, web_url: item.web_url,
-        un_id: item.un_id, title: item.title, language,
+        pdf_url: item.pdf_url,
+        web_url: item.web_url,
+        un_id: item.un_id,
+        title: item.title,
+        language,
+        description: item.description || '',
       });
-      setSaved(prev => [{ ...data }, ...prev.filter(s => s.un_id !== data.un_id)]);
-      onSelectLibrary({ text: data.text, title: data.title, un_id: data.un_id, source: 'Document Library' });
+      onSelectLibrary({ text: data.text, title: data.title, un_id: data.un_id, source: 'UN Digital Library' });
       onClose();
     } catch (err) {
-      setError(`Could not load: ${err.message}`);
+      setError(`Could not load document: ${err.message}`);
     } finally { setFetchingId(null); }
-  }
-
-  async function handleUseSaved(item) {
-    setFetchingId(item.un_id); setError('');
-    try {
-      const data = await getSavedSpeech(item.un_id);
-      onSelectLibrary({ text: data.text, title: data.title, un_id: data.un_id, source: 'Document Library' });
-      onClose();
-    } catch (err) {
-      setError(err.message);
-    } finally { setFetchingId(null); }
-  }
-
-  async function handleDeleteSaved(item) {
-    if (!item.un_id || deletingId) return;
-    setDeletingId(item.un_id); setError('');
-    try {
-      await deleteSavedSpeech(item.un_id);
-      setSaved(prev => prev.filter(s => s.un_id !== item.un_id));
-    } catch (err) {
-      setError(`Could not remove saved speech: ${err.message}`);
-    } finally { setDeletingId(null); }
-  }
-
-  function handleFileChosen(file) {
-    if (!file) return;
-    onSelectFile(file);
-    onClose();
   }
 
   return (
     <div className="library-overlay">
       <div className="library-panel">
         <div className="library-header">
-          <h2 className="library-title">Sources</h2>
+          <h2 className="library-title">UN Document Library</h2>
           <button className="library-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <p className="library-subtitle">Upload a file or search international speeches to ground your speech in a real source.</p>
+        <p className="library-subtitle">Search official UN speeches and reports to ground your speech in real source material. Only documents with a PDF are shown.</p>
 
-        <div className="library-tabs">
-          <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>Upload</button>
-          <button className={`lib-tab ${tab === 'search' ? 'lib-tab-active' : ''}`} onClick={() => setTab('search')}>Search</button>
-          <button className={`lib-tab ${tab === 'saved' ? 'lib-tab-active' : ''}`} onClick={() => setTab('saved')}>
-            Saved ({saved.length})
+        <form className="library-search-form" onSubmit={handleSearch}>
+          <input
+            className="library-search-input"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="e.g. climate change, human rights, AI governance…"
+            autoFocus
+          />
+          <button type="submit" className="btn-primary" disabled={status === 'searching'}>
+            {status === 'searching' ? 'Searching…' : 'Search'}
           </button>
-        </div>
+        </form>
 
-        {tab === 'upload' && (
-          <div className="library-results" style={{ padding: '0.9rem 0 0' }}>
-            <label className="upload-zone">
-              <input
-                type="file"
-                accept=".txt,.docx,.pdf"
-                onChange={e => handleFileChosen(e.target.files?.[0] || null)}
-                style={{ display: 'none' }}
-              />
-              <svg className="upload-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              <div className="upload-zone-label">Drop a file here or <span className="upload-zone-browse">browse</span></div>
-              <div className="upload-zone-hint">PDF, Word (.docx), or plain text</div>
-            </label>
-          </div>
-        )}
+        {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{error}</div>}
 
-        {tab === 'search' && (
-          <>
-            <form className="library-search-form" onSubmit={handleSearch}>
-              <input
-                className="library-search-input"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="e.g. climate change, human rights, economic development…"
-              />
-              <button type="submit" className="btn-primary" disabled={status === 'searching'}>
-                {status === 'searching' ? 'Searching…' : 'Search'}
-              </button>
-            </form>
-
-            {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{error}</div>}
-
-            <div className="library-results">
-              {results.map(item => (
-                <div key={item.un_id} className="library-result-card">
-                  <div className="lib-result-title">{item.title}</div>
-                  <div className="lib-result-meta">
-                    {item.date && <span>📅 {item.date}</span>}
-                    {item.web_url && <a href={item.web_url} target="_blank" rel="noreferrer" className="lib-result-link">View on UN site ↗</a>}
-                  </div>
-                  {item.languages && item.languages.length > 0 && (
-                    <div className="lib-result-langs">
-                      {item.languages.map(lang => (
-                        <span
-                          key={lang}
-                          className={`lib-lang-badge ${UN_LANG_TO_UI[lang] === language ? 'lib-lang-badge--match' : ''}`}
-                        >
-                          {UN_LANG_LABEL[lang] || lang.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {item.description && <p className="lib-result-desc">{item.description}</p>}
-                  <button
-                    className="btn-primary lib-use-btn"
-                    disabled={fetchingId === item.un_id || !item.pdf_url}
-                    onClick={() => handleFetch(item)}
-                    title={!item.pdf_url ? 'No PDF available for this record' : ''}
-                  >
-                    {fetchingId === item.un_id ? 'Loading…' : item.pdf_url ? '▷ Use this speech' : 'No PDF'}
-                  </button>
-                </div>
-              ))}
-              {status === 'idle' && !results.length && !error && (
-                <p className="lib-empty">Search for a topic above to find UN speeches.</p>
-              )}
+        <div className="library-results">
+          {status === 'searching' && (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <div className="spinner" />
+              <p style={{ marginTop: '0.75rem', color: 'var(--warm-gray)', fontSize: '0.875rem' }}>
+                Searching UN Digital Library…
+              </p>
             </div>
-          </>
-        )}
+          )}
 
-        {tab === 'saved' && (
-          <div className="library-results">
-            {saved.length === 0 && <p className="lib-empty">No speeches saved yet. Search and load one first.</p>}
-            {saved.map(item => (
-              <div key={item.un_id} className="library-result-card library-result-card--saved">
-                <button
-                  type="button"
-                  className="saved-speech-remove"
-                  onClick={() => handleDeleteSaved(item)}
-                  disabled={deletingId === item.un_id}
-                  title="Remove from saved"
-                  aria-label="Remove saved speech"
-                >
-                  ×
-                </button>
-                <div className="lib-result-title">{item.title}</div>
-                <div className="lib-result-meta">
-                  {item.word_count && <span>📝 {item.word_count} words</span>}
-                  {item.language && <span>🌐 {item.language.toUpperCase()}</span>}
-                  {item.saved_at && <span>💾 {new Date(item.saved_at).toLocaleDateString()}</span>}
-                </div>
-                <button className="btn-primary lib-use-btn"
-                  disabled={fetchingId === item.un_id}
-                  onClick={() => handleUseSaved(item)}>
-                  {fetchingId === item.un_id ? 'Loading…' : '▷ Use this speech'}
-                </button>
+          {status === 'idle' && results.map(item => (
+            <div key={item.un_id} className="library-result-card">
+              <div className="lib-result-title">{item.title}</div>
+              <div className="lib-result-meta">
+                {item.date && <span>📅 {item.date}</span>}
+                {item.web_url && (
+                  <a href={item.web_url} target="_blank" rel="noreferrer" className="lib-result-link">
+                    View on UN site ↗
+                  </a>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+              {item.languages && item.languages.length > 0 && (
+                <div className="lib-result-langs">
+                  {item.languages.map(lang => (
+                    <span
+                      key={lang}
+                      className={`lib-lang-badge ${UN_LANG_TO_UI[lang] === language ? 'lib-lang-badge--match' : ''}`}
+                    >
+                      {UN_LANG_LABEL[lang] || lang.toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {item.description && <p className="lib-result-desc">{item.description}</p>}
+              <button
+                className="btn-primary lib-use-btn"
+                disabled={!!fetchingId}
+                onClick={() => handleFetch(item)}
+              >
+                {fetchingId === item.un_id ? 'Loading…' : '▷ Use this document'}
+              </button>
+            </div>
+          ))}
+
+          {status === 'idle' && !results.length && !error && (
+            <p className="lib-empty">
+              {initialQuery
+                ? `Searching for "${initialQuery}"…`
+                : 'Search for a topic above to find UN speeches and reports.'}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2170,7 +2101,6 @@ function ModuleA({ labels, onGenerated, isRtl }) {
           domain={form.domain}
           initialQuery={form.topic}
           onSelectLibrary={src => { setLibrarySource(src); setDocumentFile(null); setRetrievalResult(null); }}
-          onSelectFile={file => { setDocumentFile(file); setLibrarySource(null); setRetrievalResult(null); }}
           onClose={() => setShowLibrary(false)}
         />
       )}
