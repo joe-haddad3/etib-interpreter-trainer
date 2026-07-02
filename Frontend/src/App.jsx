@@ -2179,11 +2179,6 @@ function SpeechResult({ data, labels }) {
           {data.source_speech.date ? ` (${data.source_speech.date})` : ''}
         </p>
       )}
-      {data.mode === 'generated' && (
-        <p className="grounded-source-note grounded-source-note--missing">
-          {labels.ungroundedNote}
-        </p>
-      )}
       <div className={`speech-text ${isArabic ? 'arabic' : ''}`}>
         {data.script}
       </div>
