@@ -1805,15 +1805,27 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
   async function runSearch(q) {
     if (!q?.trim()) return;
     setStatus('searching'); setError(''); setResults([]);
+    let pdfOnly = [];
     try {
-      const pdfOnly = await searchUNDirect(q);
-      setResults(pdfOnly);
-      if (!pdfOnly.length) setError('No PDF documents found for this topic. Try different keywords.');
+      // Try direct browser fetch first (no WAF restriction on user's IP)
+      pdfOnly = await searchUNDirect(q);
     } catch (_) {
-      // CORS blocks cross-origin fetch from the browser — UN Library is unavailable
-      setError('The UN Digital Library cannot be accessed from this browser (CORS restriction). Use the "Upload file" tab to add your own document.');
+      // CORS blocked — try backend which now uses curl_cffi browser impersonation
+      try {
+        const data = await searchUNLibrary({ q, language, domain, limit: 20 });
+        pdfOnly = (data.results || []).filter(r => r.pdf_url);
+      } catch (err) {
+        setError(err.message);
+        setStatus('idle');
+        return;
+      }
+    }
+    setResults(pdfOnly);
+    if (!pdfOnly.length) {
+      setError('No PDF documents found. The UN Library may be temporarily unavailable — try uploading your own file instead.');
       setTab('upload');
-    } finally { setStatus('idle'); }
+    }
+    setStatus('idle');
   }
 
   async function handleSearch(e) {
