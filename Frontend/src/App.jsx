@@ -1756,7 +1756,8 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
 
 // ── Sources Panel (upload a document OR search the library — one place) ──────
 
-function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onClose }) {
+function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelectFile, onClose }) {
+  const [tab, setTab]               = useState('search');   // 'search' | 'upload'
   const [query, setQuery]           = useState(initialQuery || '');
   const [results, setResults]       = useState([]);
   const [status, setStatus]         = useState('idle');
@@ -1773,7 +1774,7 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onClose
   }, []);
 
   async function searchUNDirect(q) {
-    // Call UN Digital Library directly from the browser — bypasses HuggingFace WAF block.
+    // Search the UN Digital Library directly from the browser — user's IP is not WAF-blocked.
     const params = new URLSearchParams({ p: q, of: 'recjson', rg: '20', ln: 'en',
       sf: 'date', so: 'd', rm: '', f: '', action_search: 'Search',
       fct__1: 'Documents and Publications' });
@@ -1796,6 +1797,7 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onClose
         web_url:     r.recid ? `https://digitallibrary.un.org/record/${r.recid}` : '',
         pdf_url:     pdf.url,
         description: r.abstract?.[0]?.a || r.summary?.[0]?.a || '',
+        demo:        false,
       };
     }).filter(Boolean);
   }
@@ -1805,10 +1807,10 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onClose
     setStatus('searching'); setError(''); setResults([]);
     let pdfOnly = [];
     try {
-      // Primary: search directly from the browser (no WAF restriction on user IPs)
+      // Primary: direct browser fetch (user's IP is not blocked by UN Library WAF)
       pdfOnly = await searchUNDirect(q);
     } catch (_) {
-      // Fallback: backend search (returns demo docs when UN API is WAF-blocked on HuggingFace)
+      // Fallback: backend (returns curated demo docs when direct fetch is CORS-blocked)
       try {
         const data = await searchUNLibrary({ q, language, domain, limit: 20 });
         pdfOnly = (data.results || []).filter(r => r.pdf_url);
@@ -1846,82 +1848,114 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onClose
     } finally { setFetchingId(null); }
   }
 
+  function handleFileChosen(file) {
+    if (!file) return;
+    onSelectFile(file);
+    onClose();
+  }
+
+  const isDemo = id => id?.startsWith('demo-');
+
   return (
     <div className="library-overlay">
       <div className="library-panel">
         <div className="library-header">
-          <h2 className="library-title">UN Document Library</h2>
+          <h2 className="library-title">Add Source</h2>
           <button className="library-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <p className="library-subtitle">Search official UN speeches and reports to ground your speech in real source material. Only documents with a PDF are shown.</p>
+        <p className="library-subtitle">Search UN documents or upload your own file to ground the speech in real content.</p>
 
-        <form className="library-search-form" onSubmit={handleSearch}>
-          <input
-            className="library-search-input"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="e.g. climate change, human rights, AI governance…"
-            autoFocus
-          />
-          <button type="submit" className="btn-primary" disabled={status === 'searching'}>
-            {status === 'searching' ? 'Searching…' : 'Search'}
-          </button>
-        </form>
+        <div className="library-tabs">
+          <button className={`lib-tab ${tab === 'search' ? 'lib-tab-active' : ''}`} onClick={() => setTab('search')}>UN Library</button>
+          <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>Upload file</button>
+        </div>
 
-        {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{error}</div>}
+        {tab === 'upload' && (
+          <div className="library-results" style={{ padding: '0.9rem 0 0' }}>
+            <label className="upload-zone">
+              <input
+                type="file"
+                accept=".txt,.docx,.pdf"
+                onChange={e => handleFileChosen(e.target.files?.[0] || null)}
+                style={{ display: 'none' }}
+              />
+              <svg className="upload-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <div className="upload-zone-label">Drop a file here or <span className="upload-zone-browse">browse</span></div>
+              <div className="upload-zone-hint">PDF, Word (.docx), or plain text</div>
+            </label>
+          </div>
+        )}
 
-        <div className="library-results">
-          {status === 'searching' && (
-            <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <div className="spinner" />
-              <p style={{ marginTop: '0.75rem', color: 'var(--warm-gray)', fontSize: '0.875rem' }}>
-                Searching UN Digital Library…
-              </p>
-            </div>
-          )}
+        {tab === 'search' && (
+          <>
+            <form className="library-search-form" onSubmit={handleSearch}>
+              <input
+                className="library-search-input"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="e.g. climate change, human rights, AI governance…"
+                autoFocus
+              />
+              <button type="submit" className="btn-primary" disabled={status === 'searching'}>
+                {status === 'searching' ? 'Searching…' : 'Search'}
+              </button>
+            </form>
 
-          {status === 'idle' && results.map(item => (
-            <div key={item.un_id} className="library-result-card">
-              <div className="lib-result-title">{item.title}</div>
-              <div className="lib-result-meta">
-                {item.date && <span>📅 {item.date}</span>}
-                {item.web_url && (
-                  <a href={item.web_url} target="_blank" rel="noreferrer" className="lib-result-link">
-                    View on UN site ↗
-                  </a>
-                )}
-              </div>
-              {item.languages && item.languages.length > 0 && (
-                <div className="lib-result-langs">
-                  {item.languages.map(lang => (
-                    <span
-                      key={lang}
-                      className={`lib-lang-badge ${UN_LANG_TO_UI[lang] === language ? 'lib-lang-badge--match' : ''}`}
-                    >
-                      {UN_LANG_LABEL[lang] || lang.toUpperCase()}
-                    </span>
-                  ))}
+            {error && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{error}</div>}
+
+            <div className="library-results">
+              {status === 'searching' && (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <div className="spinner" />
+                  <p style={{ marginTop: '0.75rem', color: 'var(--warm-gray)', fontSize: '0.875rem' }}>
+                    Searching UN Digital Library…
+                  </p>
                 </div>
               )}
-              {item.description && <p className="lib-result-desc">{item.description}</p>}
-              <button
-                className="btn-primary lib-use-btn"
-                disabled={!!fetchingId}
-                onClick={() => handleFetch(item)}
-              >
-                {fetchingId === item.un_id ? 'Loading…' : '▷ Use this document'}
-              </button>
-            </div>
-          ))}
 
-          {status === 'idle' && !results.length && !error && (
-            <p className="lib-empty">
-              {initialQuery
-                ? `Searching for "${initialQuery}"…`
-                : 'Search for a topic above to find UN speeches and reports.'}
-            </p>
-          )}
-        </div>
+              {status === 'idle' && results.map(item => (
+                <div key={item.un_id} className="library-result-card">
+                  <div className="lib-result-title">{item.title}</div>
+                  <div className="lib-result-meta">
+                    {item.date && <span>📅 {item.date}</span>}
+                    {item.web_url && !isDemo(item.un_id) && (
+                      <a href={item.web_url} target="_blank" rel="noreferrer" className="lib-result-link">
+                        View on UN site ↗
+                      </a>
+                    )}
+                  </div>
+                  {item.languages && item.languages.length > 0 && (
+                    <div className="lib-result-langs">
+                      {item.languages.map(lang => (
+                        <span key={lang} className={`lib-lang-badge ${UN_LANG_TO_UI[lang] === language ? 'lib-lang-badge--match' : ''}`}>
+                          {UN_LANG_LABEL[lang] || lang.toUpperCase()}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {item.description && <p className="lib-result-desc">{item.description}</p>}
+                  <button
+                    className="btn-primary lib-use-btn"
+                    disabled={!!fetchingId}
+                    onClick={() => handleFetch(item)}
+                  >
+                    {fetchingId === item.un_id ? 'Loading…' : '▷ Use this document'}
+                  </button>
+                </div>
+              ))}
+
+              {status === 'idle' && !results.length && !error && (
+                <p className="lib-empty">
+                  {initialQuery
+                    ? `Searching for "${initialQuery}"…`
+                    : 'Search for a topic above to find UN speeches and reports.'}
+                </p>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -2139,6 +2173,7 @@ function ModuleA({ labels, onGenerated, isRtl }) {
           domain={form.domain}
           initialQuery={form.topic}
           onSelectLibrary={src => { setLibrarySource(src); setDocumentFile(null); setRetrievalResult(null); }}
+          onSelectFile={file => { setDocumentFile(file); setLibrarySource(null); setRetrievalResult(null); }}
           onClose={() => setShowLibrary(false)}
         />
       )}
