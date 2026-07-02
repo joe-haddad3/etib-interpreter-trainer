@@ -1772,17 +1772,55 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function searchUNDirect(q) {
+    // Call UN Digital Library directly from the browser — bypasses HuggingFace WAF block.
+    const params = new URLSearchParams({ p: q, of: 'recjson', rg: '20', ln: 'en',
+      sf: 'date', so: 'd', rm: '', f: '', action_search: 'Search',
+      fct__1: 'Documents and Publications' });
+    params.append('c', 'Resource Type');
+    params.append('c', 'UN Bodies');
+    const res = await fetch(`https://digitallibrary.un.org/search?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const records = await res.json();
+    if (!Array.isArray(records)) throw new Error('Unexpected response format');
+    return records.map(r => {
+      const files = Array.isArray(r.files) ? r.files : [];
+      const pdf = files.find(f => f && typeof f === 'object' && (f.url || '').toLowerCase().endsWith('.pdf'));
+      if (!pdf?.url) return null;
+      return {
+        un_id:       String(r.recid || ''),
+        title:       typeof r.title === 'string' ? r.title
+                     : (r.title?.[0]?.a || r.title?.[0] || 'Untitled UN Document'),
+        date:        r.date || r.imprint?.[0]?.c || '',
+        languages:   [],
+        web_url:     r.recid ? `https://digitallibrary.un.org/record/${r.recid}` : '',
+        pdf_url:     pdf.url,
+        description: r.abstract?.[0]?.a || r.summary?.[0]?.a || '',
+      };
+    }).filter(Boolean);
+  }
+
   async function runSearch(q) {
     if (!q?.trim()) return;
     setStatus('searching'); setError(''); setResults([]);
+    let pdfOnly = [];
     try {
-      const data = await searchUNLibrary({ q, language, domain, limit: 12 });
-      const pdfOnly = (data.results || []).filter(r => r.pdf_url);
-      setResults(pdfOnly);
-      if (!pdfOnly.length) setError('No PDF documents found for this topic. Try different keywords.');
-    } catch (err) {
-      setError(err.message);
-    } finally { setStatus('idle'); }
+      // Primary: search directly from the browser (no WAF restriction on user IPs)
+      pdfOnly = await searchUNDirect(q);
+    } catch (_) {
+      // Fallback: backend search (returns demo docs when UN API is WAF-blocked on HuggingFace)
+      try {
+        const data = await searchUNLibrary({ q, language, domain, limit: 20 });
+        pdfOnly = (data.results || []).filter(r => r.pdf_url);
+      } catch (err) {
+        setError(err.message);
+        setStatus('idle');
+        return;
+      }
+    }
+    setResults(pdfOnly);
+    if (!pdfOnly.length) setError('No PDF documents found for this topic. Try different keywords.');
+    setStatus('idle');
   }
 
   async function handleSearch(e) {
