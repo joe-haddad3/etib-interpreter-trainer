@@ -97,9 +97,11 @@ def get_config():
         'languages': ['ar', 'fr', 'en'],
         'target_languages': ['ar', 'fr', 'en'],
         'domains': [
-            'politics', 'economics',
-            'climate', 'health', 'human rights', 'education'
+            'politics', 'diplomacy', 'economics', 'climate', 'health',
+            'human rights', 'education', 'technology', 'migration',
+            'disarmament', 'women', 'food'
         ],
+        'terminology_densities': ['low', 'medium', 'high'],
         'difficulties': ['beginner', 'intermediate', 'advanced'],
         'structures': ['well-organized', 'semi-structured', 'deliberately disorganized'],
         'scenarios': [

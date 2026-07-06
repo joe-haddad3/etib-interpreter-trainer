@@ -302,6 +302,185 @@ def _extract_json(text: str) -> dict:
     return json.loads(text)
 
 
+# ── ASR artifact / garbage-token filtering ────────────────────────────────────
+# Whisper sometimes hallucinates one character stretched dozens of times over
+# unclear or noisy audio (e.g. "ڨيييييييييييييي"). These are not student speech
+# and must never be shown as "what the student said" in a translation error.
+
+_ELONGATED_RUN_RE = re.compile(r'(.)\1{4,}', flags=re.UNICODE)
+
+
+def is_asr_garbage_token(token: str) -> bool:
+    """True if a token is an ASR hallucination artifact, not real speech."""
+    t = str(token or '').strip()
+    if len(t) < 6:
+        return False
+    if not _ELONGATED_RUN_RE.search(t):
+        return False
+    from collections import Counter
+    most_common_count = Counter(t).most_common(1)[0][1]
+    return (most_common_count / len(t)) >= 0.5
+
+
+def remove_asr_artifacts(text: str) -> tuple[str, list[str]]:
+    """Strip garbage tokens from a transcript. Returns (clean_text, artifacts)."""
+    artifacts = []
+    kept = []
+    for token in str(text or '').split():
+        if is_asr_garbage_token(token):
+            artifacts.append(token[:40])
+        else:
+            kept.append(token)
+    return ' '.join(kept), artifacts
+
+
+def contains_asr_garbage(text: str) -> bool:
+    return any(is_asr_garbage_token(token) for token in str(text or '').split())
+
+
+def reclassify_garbage_translation_errors(result: dict) -> dict:
+    """
+    Move translation errors whose "student said" is an ASR artifact into
+    missing_content as unclear audio — the audio was unintelligible there,
+    which is a coverage/clarity problem, not a mistranslation.
+    """
+    if not isinstance(result, dict):
+        return result
+
+    kept = []
+    missing = result.setdefault('missing_content', [])
+    if not isinstance(missing, list):
+        missing = []
+        result['missing_content'] = missing
+
+    for item in result.get('translation_errors', []) or []:
+        if isinstance(item, dict) and contains_asr_garbage(item.get('student_said', '')):
+            source_text = str(item.get('source_text', '')).strip()
+            if source_text:
+                missing.append({
+                    'content': f'{source_text} — the recording was unclear at this point '
+                               '(the recognizer could not identify real words)',
+                    'importance': 'high',
+                })
+            continue
+        kept.append(item)
+    result['translation_errors'] = kept
+
+    # Same cleanup for number accuracy: garbage "student said" means unclear
+    # audio, and the number should be reported as missing, not substituted.
+    for item in result.get('number_accuracy', []) or []:
+        if isinstance(item, dict) and contains_asr_garbage(item.get('student_said', '')):
+            item['student_said'] = '[unclear audio]'
+            item['note'] = (str(item.get('note', '')).strip() + ' '
+                            'The recording was unclear here — the number could not be recognized.').strip()
+    return result
+
+
+# ── Cross-language date/number equivalence (fixes false positives) ───────────
+# "29 June 2026", "June 29, 2026" and "٢٩ يونيو ٢٠٢٦" are the SAME date.
+# "8.8" and "8,8" are the same value (decimal separator differs by language).
+
+_MONTH_NUMBERS = {
+    # English
+    'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+    'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6, 'jul': 7, 'aug': 8,
+    'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    # French
+    'janvier': 1, 'fevrier': 2, 'février': 2, 'mars': 3, 'avril': 4, 'mai': 5,
+    'juin': 6, 'juillet': 7, 'aout': 8, 'août': 8, 'septembre': 9,
+    'octobre': 10, 'novembre': 11, 'decembre': 12, 'décembre': 12,
+    # Arabic (Levantine/MSA + transliterated Western months)
+    'يناير': 1, 'فبراير': 2, 'مارس': 3, 'أبريل': 4, 'ابريل': 4, 'مايو': 5,
+    'يونيو': 6, 'يوليو': 7, 'أغسطس': 8, 'اغسطس': 8, 'سبتمبر': 9,
+    'أكتوبر': 10, 'اكتوبر': 10, 'نوفمبر': 11, 'ديسمبر': 12,
+    'كانون الثاني': 1, 'شباط': 2, 'آذار': 3, 'اذار': 3, 'نيسان': 4, 'أيار': 5, 'ايار': 5,
+    'حزيران': 6, 'تموز': 7, 'آب': 8, 'اب': 8, 'أيلول': 9, 'ايلول': 9,
+    'تشرين الأول': 10, 'تشرين الاول': 10, 'تشرين الثاني': 11, 'كانون الأول': 12, 'كانون الاول': 12,
+}
+
+_ARABIC_INDIC_TO_WESTERN = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+
+
+def extract_numeric_fingerprint(text: str) -> list[float]:
+    """
+    Extract every numeric value in a text (digits in any script, decimal comma
+    or point, and month names) as a sorted list — a format-independent
+    fingerprint. Two renderings of the same date/number produce equal lists.
+    """
+    normalized = str(text or '').translate(_ARABIC_INDIC_TO_WESTERN).lower()
+    values: list[float] = []
+
+    for phrase, month_number in _MONTH_NUMBERS.items():
+        if phrase in normalized:
+            values.append(float(month_number))
+            normalized = normalized.replace(phrase, ' ')
+
+    for match in re.finditer(r'\d+(?:[.,]\d+)?', normalized):
+        raw = match.group(0)
+        # A comma followed by exactly 3 digits is a thousands separator;
+        # otherwise treat both , and . as decimal separators.
+        if re.fullmatch(r'\d+,\d{3}', raw):
+            raw = raw.replace(',', '')
+        else:
+            raw = raw.replace(',', '.')
+        try:
+            values.append(float(raw))
+        except ValueError:
+            continue
+
+    return sorted(values)
+
+
+def filter_equivalent_number_renderings(result: dict) -> dict:
+    """
+    Un-flag number_accuracy items where the student said the same values in a
+    different valid format: date word-order across languages, Arabic-Indic vs
+    Western digits, or decimal comma vs point.
+    """
+    items = result.get('number_accuracy') if isinstance(result, dict) else None
+    if not isinstance(items, list):
+        return result
+
+    for item in items:
+        if not isinstance(item, dict) or item.get('correct'):
+            continue
+        source_values = extract_numeric_fingerprint(
+            item.get('source_value', '') or item.get('expected_in_target', '')
+        )
+        student_values = extract_numeric_fingerprint(item.get('student_said', ''))
+        if source_values and source_values == student_values:
+            item['correct'] = True
+            item['note'] = (
+                'Same value in a different valid format (date order, digit script, '
+                'or decimal separator differ between languages) — not an error.'
+            )
+    return result
+
+
+# ── Foreign-script cleanup in LLM output ──────────────────────────────────────
+# The LLM occasionally emits stray CJK or other foreign-script characters
+# inside Arabic corrections (e.g. "官ة شؤون السكان"). Those characters are
+# never legitimate in this trilingual AR/FR/EN context.
+
+_FOREIGN_SCRIPT_RE = re.compile(
+    '[⺀-⿿　-〿぀-ヿ㄀-ㄯ㄰-㆏'
+    '㐀-䶿一-鿿ꀀ-꓏가-힯豈-﫿'
+    '\U00020000-\U0002EBEF]+'
+)
+
+
+def strip_foreign_script_chars(value):
+    """Recursively remove CJK/foreign-script characters from all result strings."""
+    if isinstance(value, str):
+        return _FOREIGN_SCRIPT_RE.sub('', value)
+    if isinstance(value, list):
+        return [strip_foreign_script_chars(item) for item in value]
+    if isinstance(value, dict):
+        return {key: strip_foreign_script_chars(item) for key, item in value.items()}
+    return value
+
+
 LLM_ANALYSIS_PROMPT = """You are a professional interpreter training evaluator at ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).
 
 THIS IS AN INTERPRETATION TASK — NOT A READING TASK.
@@ -319,7 +498,7 @@ SOURCE SPEECH (in {source_language}):
 
 STUDENT INTERPRETATION TRANSCRIPT (in {target_language}, raw ASR output):
 {transcript}
-
+{glossary_block}
 AUTOMATICALLY DETECTED ISSUES (algorithmic):
 - Long silences (> 1.0s gaps): {silence_count} detected → details: {silence_examples}
 - Word repetitions: {repetition_count} detected → examples: {repetition_examples}
@@ -421,6 +600,12 @@ For each one, find what the student actually said in {target_language} (numbers 
 or spelled out words — both count). Mark each as correct or incorrect.
 A wrong number, date, or statistic is a SERIOUS interpretation error — it can mislead an entire
 negotiation — so flag it clearly even if the rest of the sentence was fine.
+CRITICAL — do NOT flag format-only differences as errors:
+- Date word order differs between languages: "29 June 2026", "June 29, 2026" and "٢٩ يونيو ٢٠٢٦"
+  are the SAME date → correct.
+- Decimal separators differ: "8.8 billion" (EN) = "8,8 milliards" (FR) → correct.
+- Arabic-Indic digits (٢٠٢٦) and Western digits (2026) are the same number → correct.
+Only flag a number/date when the VALUE the listener hears is actually different.
 
 TASK 11 — PRONUNCIATION IN {target_language}:
 LOW-CONFIDENCE WORDS the speech recognizer was unsure about (often a sign of unclear or incorrect
@@ -479,6 +664,59 @@ Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
   "summary": "2-3 sentence overall assessment of interpretation quality."
 }}
 """
+
+def build_glossary_block(glossary_raw: str) -> str:
+    """
+    Build the approved-glossary section of the evaluation prompt (cahier des
+    charges request: the student reviews/corrects the glossary BEFORE recording
+    so terminology errors are judged against the approved equivalents).
+    """
+    if not glossary_raw:
+        return ''
+    try:
+        entries = json.loads(glossary_raw)
+    except (ValueError, TypeError):
+        return ''
+    if not isinstance(entries, list) or not entries:
+        return ''
+
+    lines = []
+    for entry in entries[:30]:
+        if not isinstance(entry, dict):
+            continue
+        term = str(entry.get('term', '') or '').strip()
+        ar = str(entry.get('arabic', '') or entry.get('ar', '') or '').strip()
+        fr = str(entry.get('french', '') or entry.get('fr', '') or '').strip()
+        en = str(entry.get('english', '') or entry.get('en', '') or '').strip()
+        parts = [p for p in [term, f'AR: {ar}' if ar else '', f'FR: {fr}' if fr else '', f'EN: {en}' if en else ''] if p]
+        if parts:
+            lines.append('- ' + ' | '.join(parts))
+    if not lines:
+        return ''
+
+    return (
+        '\nAPPROVED GLOSSARY (reviewed by the student BEFORE recording — these are the '
+        'REQUIRED terminology equivalents; in TASK 7 judge the student\'s terminology '
+        'against these exact equivalents and flag every deviation):\n'
+        + '\n'.join(lines) + '\n'
+    )
+
+
+def format_silences_for_prompt(silences: list) -> str:
+    """Format silence examples for the LLM, excluding leading preparation time."""
+    delivery_silences = [s for s in (silences or []) if not is_leading_silence(s)]
+    leading = [s for s in (silences or []) if is_leading_silence(s)]
+    parts = '; '.join(
+        f'{sl["duration_seconds"]}s' + (f' after "{sl["after_text"]}"' if sl.get('after_text') else '')
+        for sl in delivery_silences[:5]
+    )
+    note = ''
+    if leading:
+        lead_secs = max(float(s.get('duration_seconds', 0) or 0) for s in leading)
+        note = (f' (note: the student also took {lead_secs}s of preparation time before '
+                'starting to speak — this is normal and must NOT be judged as a delivery pause)')
+    return (parts or 'none found automatically') + note
+
 
 module_d_bp = Blueprint('module_d', __name__)
 
@@ -1123,6 +1361,13 @@ def detect_low_confidence_words(segments: list, threshold: float = 0.6) -> list:
     return low_conf
 
 
+def is_leading_silence(silence: dict) -> bool:
+    """Silence before the student starts speaking — preparation/reading time."""
+    if 'leading' in str(silence.get('type', '')):
+        return True
+    return float(silence.get('at_seconds', 1) or 1) <= 0.2
+
+
 def build_audio_fluency_report(transcript: dict, all_word_scores: list, silence_report: list | None = None) -> dict:
     """Cheap recording-based fluency metrics from local ASR timings."""
     segments = transcript.get('segments', []) or []
@@ -1135,7 +1380,17 @@ def build_audio_fluency_report(transcript: dict, all_word_scores: list, silence_
         max(0.0, float(seg.get('end', 0) or 0) - float(seg.get('start', 0) or 0))
         for seg in segments
     )
-    silences = silence_report if silence_report is not None else detect_long_silences(segments)
+    all_silences = silence_report if silence_report is not None else detect_long_silences(segments)
+    # Leading silence is preparation time (reading the source, collecting
+    # thoughts before starting) — it must NOT count against fluency. Only
+    # pauses DURING delivery reflect delivery quality.
+    leading_silences = [s for s in all_silences if is_leading_silence(s)]
+    silences = [s for s in all_silences if not is_leading_silence(s)]
+    leading_seconds = sum(float(s.get('duration_seconds', 0) or 0) for s in leading_silences)
+    # Remove preparation time from the effective duration so speech rate and
+    # silence ratio measure the delivery itself.
+    if leading_seconds and duration > leading_seconds:
+        duration = duration - leading_seconds
     long_pause_seconds = sum(float(s.get('duration_seconds', 0) or 0) for s in silences)
 
     if duration > 0:
@@ -1178,6 +1433,7 @@ def build_audio_fluency_report(transcript: dict, all_word_scores: list, silence_
 
     return {
         'duration_seconds': round(duration, 1),
+        'preparation_seconds': round(leading_seconds, 1),
         'word_count': word_count,
         'speech_rate_wpm': speech_rate_wpm,
         'long_pause_count': len(silences),
@@ -1813,9 +2069,15 @@ def generate_feedback():
     transcript_text = data.get('transcript_text', '')
     transcript_obj  = data.get('transcript', {})
     language        = data.get('language', 'ar')
+    glossary_block  = build_glossary_block(json.dumps(data.get('glossary'))
+                                           if isinstance(data.get('glossary'), list)
+                                           else str(data.get('glossary', '') or ''))
 
     if not transcript_text:
         return jsonify({'error': 'transcript_text is required'}), 400
+
+    # Strip ASR hallucination artifacts (elongated garbage tokens) before analysis
+    transcript_text, asr_artifacts = remove_asr_artifacts(transcript_text)
 
     # Run algorithmic analysis on segments
     algo = run_full_analysis(source_script, transcript_obj, language) if transcript_obj else {
@@ -1830,10 +2092,7 @@ def generate_feedback():
 
         rep_examples  = ', '.join(f'"{r["word"]}"' for r in (algo.get('repetitions', [])[:3]))
         hes_examples  = ', '.join(f'"{h["word"]}"' for h in (algo.get('hesitation_words', [])[:3]))
-        sil_examples  = '; '.join(
-            f'{sl["duration_seconds"]}s' + (f' after "{sl["after_text"]}"' if sl.get('after_text') else '')
-            for sl in algo.get('long_silences', [])[:5]
-        )
+        sil_examples  = format_silences_for_prompt(algo.get('long_silences', []))
         coverage_diagnostics = estimate_length_coverage(source_script, transcript_text)
 
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English', 'unknown': 'an unknown language'}
@@ -1855,6 +2114,7 @@ def generate_feedback():
             coverage_diagnostics=coverage_diagnostics,
             fluency_summary=format_fluency_for_prompt({}),
             uncertain_words='(not available in text-only mode)',
+            glossary_block=glossary_block,
         )
 
         response = client.chat.completions.create(
@@ -1874,10 +2134,15 @@ def generate_feedback():
         )
 
         llm_result = _extract_json(response.choices[0].message.content)
+        llm_result = strip_foreign_script_chars(llm_result)
         llm_result = filter_french_silent_plural_errors(llm_result, language)
         llm_result = remove_false_missing_translation_errors(llm_result, transcript_text)
         llm_result = clean_translation_error_items(llm_result)
+        llm_result = reclassify_garbage_translation_errors(llm_result)
+        llm_result = filter_equivalent_number_renderings(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, transcript_text)
+        if asr_artifacts:
+            llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = {
             'long_silences':    algo.get('long_silences', []),
             'repetitions':      algo.get('repetitions', []),
@@ -1917,6 +2182,7 @@ def full_evaluation():
     audio_file       = request.files['audio']
     source_script    = request.form.get('source_script', '')
     language         = request.form.get('language', 'ar')
+    glossary_block   = build_glossary_block(request.form.get('glossary', ''))
     _raw_src_lang    = request.form.get('source_language', '')
     # Avoid telling the LLM source==target (monolingual confusion) when not explicitly set
     source_language  = _raw_src_lang if _raw_src_lang and _raw_src_lang != language else 'unknown'
@@ -1985,6 +2251,9 @@ def full_evaluation():
         segment_text = full_text.strip()
         word_timestamp_text = build_transcript_from_word_timestamps(all_segments)
         full_text = word_timestamp_text or segment_text
+        # Strip ASR hallucination artifacts (e.g. one character stretched dozens
+        # of times over unclear audio) so they are never treated as student speech.
+        full_text, asr_artifacts = remove_asr_artifacts(full_text)
         transcript = {
             'full_text':           full_text,
             'segment_text':        segment_text,
@@ -2020,10 +2289,7 @@ def full_evaluation():
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English', 'unknown': 'an unknown language'}
         rep_examples     = ', '.join(f'"{r.get("word","")}"' for r in algo.get('repetitions', [])[:3])
         hes_examples     = ', '.join(f'"{h.get("word","")}"' for h in algo.get('hesitation_words', [])[:3])
-        sil_examples     = '; '.join(
-            f'{sl["duration_seconds"]}s' + (f' after "{sl["after_text"]}"' if sl.get('after_text') else '')
-            for sl in algo.get('long_silences', [])[:5]
-        )
+        sil_examples     = format_silences_for_prompt(algo.get('long_silences', []))
         uncertain_words  = [w for w in all_word_scores if w['grade'] == 'poor']
         uncertain_str    = ', '.join(
             f'"{w["word"]}" (confidence {w["score"]})'
@@ -2047,6 +2313,7 @@ def full_evaluation():
             coverage_diagnostics=coverage_diagnostics,
             fluency_summary=format_fluency_for_prompt(fluency),
             uncertain_words=uncertain_str,
+            glossary_block=glossary_block,
         )
 
         response = client.chat.completions.create(
@@ -2062,9 +2329,14 @@ def full_evaluation():
         )
 
         llm_result = _extract_json(response.choices[0].message.content)
+        llm_result = strip_foreign_script_chars(llm_result)
         llm_result = remove_false_missing_translation_errors(llm_result, full_text)
         llm_result = clean_translation_error_items(llm_result)
+        llm_result = reclassify_garbage_translation_errors(llm_result)
+        llm_result = filter_equivalent_number_renderings(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, full_text)
+        if asr_artifacts:
+            llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = {
             'long_silences':    algo.get('long_silences', []),
             'repetitions':      algo.get('repetitions', []),

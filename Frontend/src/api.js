@@ -250,7 +250,7 @@ export async function deleteSavedSpeech(un_id) {
   return parseJsonResponse(res);
 }
 
-export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain) {
+export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain, glossary) {
   const form = new FormData();
   form.append('audio', audioFile, audioFile.name || 'recording.webm');
   form.append('source_script', sourceScript || '');
@@ -259,7 +259,20 @@ export async function evaluateWithAudio(audioFile, sourceScript, language, sourc
   form.append('auth_token', getAuthToken());
   form.append('groq_api_key', getStoredGroqKey());
   if (domain) form.append('domain', domain);
+  // Student-reviewed glossary → terminology errors are judged against it
+  if (Array.isArray(glossary) && glossary.length > 0) {
+    form.append('glossary', JSON.stringify(glossary));
+  }
   const res = await safeFetch(`${BASE}/module-d/full-evaluation`, { method: 'POST', body: form });
+  return parseJsonResponse(res);
+}
+
+export async function fetchWebPage(url) {
+  const res = await safeFetch(`${BASE}/module-a/fetch-url`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(authBody({ url })),
+  });
   return parseJsonResponse(res);
 }
 

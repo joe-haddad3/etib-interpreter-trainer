@@ -98,6 +98,7 @@ def build_structured_material_prompt(params: dict, topic: str, excerpts: list[st
     structure       = params.get('structure', 'well-organized')
     scenario        = params.get('scenario', 'UN General Assembly')
     number_density  = params.get('number_density', 'low')
+    terminology_density = params.get('terminology_density', 'medium')
     hesitations     = bool(params.get('include_hesitations', False))
     mode            = params.get('mode', 'consecutive')
     pressure_enabled = bool(params.get('pressure_enabled', False))
@@ -135,6 +136,18 @@ def build_structured_material_prompt(params: dict, topic: str, excerpts: list[st
         'low':  'Include 2–3 statistics or figures.',
         'high': 'Include at least 8–10 statistics, percentages, dates, and large numbers spread throughout the speech.',
     }.get(number_density, 'Include 4–6 statistics or figures.')
+
+    # ── Lexical complexity / terminological density ──────────────────────────
+    terminology_instruction = {
+        'low': (
+            'Use everyday vocabulary. Only 1–2 specialised terms in the whole speech, '
+            'each introduced with a brief natural explanation.'
+        ),
+        'high': (
+            'Dense specialised terminology: at least 10–12 domain-specific technical terms, '
+            'institutional jargon, and formal register throughout. Do not simplify.'
+        ),
+    }.get(terminology_density, 'Moderate terminology: 5–7 domain-specific terms woven naturally into the speech.')
 
     # ── Pressure block ───────────────────────────────────────────────────────
     pressure_block = ''
@@ -209,21 +222,28 @@ Difficulty:          {difficulty.upper()} — {diff_profile}
 Required length:     between {word_count_min} and {word_count_max} words in the "script" field (target about {word_count} words)
 Interpretation mode: {mode} — {mode_note}
 Numbers/statistics:  {number_instruction}
+Terminology density: {terminology_density.upper()} — {terminology_instruction}
 Hesitations:         {'Yes — ' + hesitation_note if hesitations else 'No'}
 {pressure_block}{grounding_block}
 ═══════════════════════════════════════════════
 SPEECH WRITING RULES
 ═══════════════════════════════════════════════
-1. Open with a greeting that matches the ACTUAL scenario ({scenario}) — vary it, do not default to
-   a UN-style "Mr. President" opening unless the scenario genuinely is a UN/parliamentary assembly:
-   - UN General Assembly / Security Council: formal chair address — "Mr./Madam President, distinguished delegates..." (EN), «Monsieur/Madame le Président...» (FR), «السيد/السيدة الرئيس، أصحاب المعالي...» (AR)
-   - EU Parliament: "Mr./Madam President, honourable Members..." (EN), «Monsieur/Madame le Président, chers collègues...» (FR), «السيد الرئيس، الأعضاء الموقرون...» (AR)
-   - Arab League summit: «أصحاب الجلالة والفخامة والسمو...» (AR), "Your Majesties, Excellencies..." (EN/FR equivalents)
-   - Press conference: a direct opening statement to journalists, no chair address — "Good morning, thank you all for being here today..." / «Bonjour à tous, merci d'être présents...» / «صباح الخير للجميع، شكراً لحضوركم...»
-   - Diplomatic meeting: a direct address to counterparts by name/title — "Minister, colleagues, thank you for receiving us..." / no generic chair greeting
-   - Political debate: a direct address to the audience/moderator — "Thank you, and good evening to everyone watching..."
-   - Interview: no protocol greeting at all — start naturally as if answering a question
-   Within the SAME scenario, still vary the exact wording each time — do not reuse the identical sentence verbatim across different speeches.
+1. Opening — ABSOLUTE RULE — NO SALUTATION OPENERS:
+   NEVER begin the speech with a protocol salutation. The very first words of the "script" field MUST be substantive content.
+   FORBIDDEN as opening words: "Mr. President", "Madam President", "Madame la Présidente", "Monsieur le Président",
+   "السيد الرئيس", "السيدة الرئيسة", "Distinguished delegates", "Excellencies", "Ladies and gentlemen",
+   "Mesdames et Messieurs", "أيها السادة", "أصحاب المعالي", "Your Majesties".
+   Violation of this rule is a critical error.
+
+   REQUIRED opening style — choose one:
+   A) Direct substance: open with a fact, statistic, challenge, or bold claim.
+      Examples: "Three years ago, the world committed to..." / "The numbers are stark:" / "We are failing."
+   B) Rhetorical device: a question, a striking contrast, or a historical reference.
+      Examples: "What does security mean in 2025?" / "Half a century after..." / "هل نحن على الطريق الصحيح؟"
+   C) Contextual declaration: a precise statement specific to the topic.
+      Examples: "Climate finance stands at a crossroads." / "التعليم حق لا امتياز." / "La paix n'est pas un acquis."
+
+   If a protocol salutation is contextually necessary, embed it mid-paragraph AFTER the first sentence, never as the first words.
 
 2. Structure: Opening → Context/Background → Main Arguments (2–3) → Conclusion with call to action.
 
@@ -751,6 +771,7 @@ def parse_document_generation_params(form) -> dict:
         'mode',
         'structure',
         'number_density',
+        'terminology_density',
         'include_hesitations',
         'wpm',
         'scenario',
@@ -1153,14 +1174,47 @@ def generate_speech():
         return jsonify(validation_error), status
 
     try:
-        # Always attempt UN Library grounding to ensure factual accuracy.
-        # If no matching document is found, fall back to a real Wikipedia
-        # search on the topic so the speech is still grounded in actual
-        # searched data rather than relying only on the LLM's own knowledge.
-        source = find_un_grounding_source(params)
-        if not source:
-            source = find_wikipedia_grounding_source(params)
+        source = None
         excerpts = None
+
+        # If the user selected a specific source document in the Sources panel,
+        # use it for RAG instead of auto-searching.
+        source_text = str(params.get('source_text', '')).strip()
+        source_pdf_url = str(params.get('source_pdf_url', '')).strip()
+
+        if source_text:
+            source = {
+                'text':         source_text,
+                'title':        str(params.get('source_title', 'Selected UN Document')).strip(),
+                'un_id':        str(params.get('source_un_id', '')).strip(),
+                'web_url':      str(params.get('source_web_url', '')).strip(),
+                'pdf_url':      source_pdf_url,
+                'date':         str(params.get('source_date', '')).strip(),
+                'source_label': 'UN Digital Library',
+            }
+        elif source_pdf_url:
+            try:
+                raw = _clean_extracted_text(_download_and_extract(source_pdf_url, timeout=30))
+                if len(raw.split()) >= 40:
+                    source = {
+                        'text':         raw,
+                        'title':        str(params.get('source_title', 'Selected UN Document')).strip(),
+                        'un_id':        str(params.get('source_un_id', '')).strip(),
+                        'web_url':      str(params.get('source_web_url', '')).strip(),
+                        'pdf_url':      source_pdf_url,
+                        'date':         str(params.get('source_date', '')).strip(),
+                        'source_label': 'UN Digital Library',
+                    }
+                else:
+                    current_app.logger.warning('[Generate] Source PDF too short after extraction: %s', source_pdf_url)
+            except Exception as exc:
+                current_app.logger.warning('[Generate] Failed to fetch source PDF (%s): %s', source_pdf_url, exc)
+        else:
+            # No explicit source — auto-search UN library, then Wikipedia fallback.
+            source = find_un_grounding_source(params)
+            if not source:
+                source = find_wikipedia_grounding_source(params)
+
         if source:
             normalized_text = normalize_text(source['text'])
             chunks = chunk_text(normalized_text)
@@ -1384,3 +1438,110 @@ def generate_from_document():
         return jsonify({'error': str(exc)}), 400
     except Exception as exc:
         return jsonify({'error': str(exc)}), 500
+
+
+# ── Web page as grounding source ─────────────────────────────────────────────
+# Professor feedback (7 June 2026): "Add source: est-il possible d'ajouter
+# l'hyperlien d'une page web ?" — fetch any public web page, extract its
+# readable text, and return it so the frontend can attach it as a source.
+
+class _WebPageTextExtractor:
+    """Minimal readable-text extractor using only the standard library."""
+
+    SKIP_TAGS = {'script', 'style', 'noscript', 'header', 'footer', 'nav', 'aside', 'form', 'svg', 'button'}
+
+    def __init__(self):
+        from html.parser import HTMLParser
+
+        extractor = self
+
+        class _Parser(HTMLParser):
+            def __init__(self):
+                super().__init__(convert_charrefs=True)
+                self.skip_depth = 0
+                self.title_parts = []
+                self.in_title = False
+                self.text_parts = []
+
+            def handle_starttag(self, tag, attrs):
+                if tag in _WebPageTextExtractor.SKIP_TAGS:
+                    self.skip_depth += 1
+                if tag == 'title':
+                    self.in_title = True
+
+            def handle_endtag(self, tag):
+                if tag in _WebPageTextExtractor.SKIP_TAGS and self.skip_depth > 0:
+                    self.skip_depth -= 1
+                if tag == 'title':
+                    self.in_title = False
+                if tag in {'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'br', 'tr'}:
+                    self.text_parts.append('\n')
+
+            def handle_data(self, data):
+                if self.in_title:
+                    self.title_parts.append(data)
+                elif self.skip_depth == 0 and data.strip():
+                    self.text_parts.append(data)
+
+        self._parser = _Parser()
+
+    def extract(self, html: str) -> tuple[str, str]:
+        self._parser.feed(html)
+        title = ' '.join(''.join(self._parser.title_parts).split())
+        raw = ''.join(self._parser.text_parts)
+        lines = [' '.join(line.split()) for line in raw.split('\n')]
+        text = '\n'.join(line for line in lines if line)
+        return text, title
+
+
+@module_a_bp.route('/fetch-url', methods=['POST'])
+def fetch_web_page():
+    """
+    Download a public web page and return its readable text for grounding.
+
+    Request body (JSON):
+      url   str   http(s) URL of the page
+
+    Response (JSON):
+      text, title, url, word_count
+    """
+    payload = request.get_json(silent=True) or {}
+    url = str(payload.get('url', '')).strip()
+
+    if not url.lower().startswith(('http://', 'https://')):
+        return jsonify({'error': 'Please provide a valid web page URL starting with http:// or https://'}), 400
+
+    try:
+        import requests as _requests
+        resp = _requests.get(
+            url,
+            timeout=20,
+            headers={'User-Agent': 'Mozilla/5.0 (compatible; ETIB-Interpreter-Trainer/1.0; academic use)'},
+            allow_redirects=True,
+        )
+        resp.raise_for_status()
+
+        content_type = resp.headers.get('Content-Type', '')
+        if 'pdf' in content_type.lower() or url.lower().endswith('.pdf'):
+            # PDF link — reuse the existing PDF extraction pipeline
+            text = _clean_extracted_text(_download_and_extract(url, timeout=30))
+            title = url.rsplit('/', 1)[-1]
+        else:
+            resp.encoding = resp.apparent_encoding or resp.encoding
+            text, title = _WebPageTextExtractor().extract(resp.text)
+
+        text = text.strip()
+        word_count = len(text.split())
+        if word_count < 50:
+            return jsonify({'error': 'Could not extract enough readable text from this page. '
+                                     'Try another URL or copy/paste the text directly.'}), 422
+
+        return jsonify({
+            'text': text[:20000],
+            'title': title or url,
+            'url': url,
+            'word_count': word_count,
+        })
+
+    except Exception as exc:
+        return jsonify({'error': f'Could not fetch this page: {str(exc)[:200]}'}), 502
