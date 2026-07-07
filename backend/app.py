@@ -47,6 +47,15 @@ def add_cors(response):
 def options_handler(path):
     return add_cors(app.make_response(''))
 
+@app.route('/')
+def index():
+    """Root route — HF Spaces and browsers probe GET / (avoids 405/500 noise)."""
+    return jsonify({
+        'service': 'ETIB Interpreter Trainer API',
+        'status': 'ok',
+        'docs': 'Backend for https://etib-interpreter-trainer.vercel.app — see /health and /api/config',
+    })
+
 # Ensure output directories exist at startup
 os.makedirs(os.getenv('UPLOAD_FOLDER', './uploads'), exist_ok=True)
 os.makedirs(os.getenv('AUDIO_OUTPUT_FOLDER', './audio_outputs'), exist_ok=True)
