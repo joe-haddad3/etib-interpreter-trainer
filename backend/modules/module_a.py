@@ -185,6 +185,44 @@ FACTUAL ACCURACY RULES (no source document available):
 - When in doubt, use ranges rather than precise invented numbers.
 """
 
+    # ── Scenario / speaker-style profile ─────────────────────────────────────
+    # Each setting has a distinct register and format; without this the model
+    # writes the same UN-podium speech for every scenario (professor feedback).
+    scenario_styles = {
+        'UN General Assembly': (
+            'Formal multilateral address by a state representative at the UN podium: measured diplomatic '
+            'register, references to resolutions and member states, collective appeals to "the international community".'
+        ),
+        'EU Parliament': (
+            'Parliamentary address to fellow Members of the European Parliament: European institutional '
+            'vocabulary (the Commission, the Council, directives), civic-democratic appeals, direct address to colleagues.'
+        ),
+        'Arab League summit': (
+            'Pan-Arab summit address: solemn elevated register, appeals to Arab solidarity and joint action, '
+            'references to member states and Arab institutions.'
+        ),
+        'press conference': (
+            'Opening statement to journalists at a press conference: direct, short, quotable sentences; concrete '
+            'announcements and decisions stated up front; anticipates journalists\' concerns; closes by signalling '
+            'readiness to take questions. NOT a podium speech.'
+        ),
+        'diplomatic meeting': (
+            'Remarks in a closed bilateral working meeting, addressed directly to counterparts: pragmatic and '
+            'courteous, focused on shared interests, points of negotiation, and concrete next steps. No podium rhetoric.'
+        ),
+        'political debate': (
+            'Debate intervention: combative first-person argumentation, rebuts opposing positions explicitly, '
+            'rhetorical questions, sharp contrasts, direct appeals to the audience and the moderator.'
+        ),
+        'interview': (
+            'Extended spoken answers in a broadcast interview: first person singular, conversational yet '
+            'professional register, engages the interviewer\'s implicit questions ("You ask me whether..."), '
+            'personal framing of facts and experiences. ABSOLUTELY NOT a structured podium speech — it must '
+            'sound like someone talking to a journalist across a table.'
+        ),
+    }
+    scenario_style = scenario_styles.get(scenario, f'Style and register appropriate to: {scenario}.')
+
     # ── Mode instruction ─────────────────────────────────────────────────────
     mode_note = MODE_INSTRUCTIONS.get(mode, '')
 
@@ -218,6 +256,10 @@ Speech language:     {lang_name}
 Interpretation into: {target_name}
 Domain:              {domain}
 Scenario:            {scenario}
+Scenario style:      {scenario_style}
+                     The register and FORMAT must audibly match this scenario — an interview answer,
+                     a press statement, and a UN podium address must sound clearly different from
+                     each other even when built on the same facts.
 Difficulty:          {difficulty.upper()} — {diff_profile}
 Required length:     between {word_count_min} and {word_count_max} words in the "script" field (target about {word_count} words)
 Interpretation mode: {mode} — {mode_note}
@@ -247,7 +289,7 @@ SPEECH WRITING RULES
 
 2. Structure: Opening → Context/Background → Main Arguments (2–3) → Conclusion with call to action.
 
-3. Sound like a REAL SPEAKER at a {scenario}, not an essay writer:
+3. Sound like a REAL SPEAKER at a {scenario} ({scenario_style}), not an essay writer:
    - Vary sentence length (mix short punchy sentences with longer complex ones)
    - Avoid repetitive filler phrases like "يجب أن نعمل" / "il faut que"
    - Use rhetorical devices: questions, emphasis, direct address
