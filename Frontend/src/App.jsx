@@ -2298,11 +2298,6 @@ function ModuleA({ labels, onGenerated, isRtl }) {
                 <option value="long">{labels.wordRangeLongFull || 'Long — 400–550 words (≈3.5–4.5 min)'}</option>
                 <option value="extended">{labels.wordRangeExtendedFull || 'Extended — 650–800 words (≈5.5–6.5 min)'}</option>
               </SelectField>
-              <SelectField label={labels.mode} id="f-mode" name="mode" value={form.mode} onChange={updateField}>
-                <option value="consecutive">{labels.optConsecutive || 'Consecutive'}</option>
-                <option value="simultaneous">{labels.optSimultaneous || 'Simultaneous'}</option>
-                <option value="sight_translation">{labels.optSight || 'Sight translation'}</option>
-              </SelectField>
               <SelectField label={labels.domain} id="f-domain" name="domain" value={form.domain} onChange={updateField}>
                 <option value="politics">{labels.domPolitics || 'Politics'}</option>
                 <option value="diplomacy">{labels.domDiplomacy || 'Diplomacy'}</option>

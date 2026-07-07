@@ -6,6 +6,7 @@ grounding/retrieval from TXT, DOCX, and PDF uploads.
 """
 import ast
 import json
+import random
 import re
 
 from flask import Blueprint, current_app, jsonify, request
@@ -1097,10 +1098,13 @@ def find_un_grounding_source(params: dict) -> dict | None:
                 log.debug('[Grounding] UN search error (%s, %s): %s', query, un_lang, exc)
                 results = []
 
-            for result in results[:5]:
+            # Shuffle the candidates so the same topic + settings does not
+            # always ground in the exact same document (professor feedback:
+            # repeated generations should bring fresh material).
+            candidates = [r for r in results if r.get('pdf_url')]
+            random.shuffle(candidates)
+            for result in candidates[:5]:
                 pdf_url = result.get('pdf_url')
-                if not pdf_url:
-                    continue
                 try:
                     # Short timeout so one slow PDF doesn't block generation
                     text = _clean_extracted_text(_download_and_extract(pdf_url, timeout=20))
@@ -1164,7 +1168,8 @@ def find_wikipedia_grounding_source(params: dict) -> dict | None:
             if not hits:
                 continue
 
-            title = hits[0]['title']
+            # Random pick among the top hits so repeated generations vary
+            title = random.choice(hits[:3])['title']
             extract_resp = requests.get(
                 f'https://{wiki_lang}.wikipedia.org/w/api.php',
                 params={'action': 'query', 'prop': 'extracts', 'explaintext': 1,
