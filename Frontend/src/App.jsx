@@ -947,14 +947,12 @@ const UI = {
 };
 
 // ── Credits (professor request: ESIB + CINIA logos and developer names) ─────
-// TODO: put esib-logo.png and cinia-logo.png in Frontend/public/ to show real
-// logos, and complete the developer list below.
 const CREDITS = {
   developers: ['Joe Haddad', 'Christian Wehbe', 'Kevin'],   // ← complete/correct the team names here
   logos: [
-    { src: '/usj-etib-logo.png', alt: 'USJ — ETIB' },
-    // { src: '/esib-logo.png',  alt: 'ESIB' },
-    // { src: '/cinia-logo.png', alt: 'CINIA' },
+    { src: '/usj-etib-logo.png',  alt: 'USJ — ETIB' },
+    { src: '/usj-esib-logo.png',  alt: 'ESIB' },
+    { src: '/usj-cinia-logo.png', alt: 'CINIA' },
   ],
 };
 
