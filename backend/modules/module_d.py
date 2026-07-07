@@ -617,6 +617,19 @@ Give specific, actionable pronunciation feedback for {target_language}:
 - English: word stress, "th" sounds (θ/ð), vowel reduction in unstressed syllables
 For each low-confidence word above, explain the likely mispronunciation and give the correct way to say it.
 
+TASK 12 — PROPER NOUNS (people, organizations, places, treaties):
+{proper_nouns_block}
+For EVERY proper noun in the source, classify the student's rendering as one of:
+- "correct": the name is present and recognizably right in {target_language}. A legitimate
+  target-language form counts as correct (e.g. "United Nations" → "ONU" or "الأمم المتحدة";
+  transliteration into Arabic script is correct rendering, NOT distortion).
+- "distorted": the name appears but altered (e.g. "Mobuto Seko" instead of "Mobutu Sese Seko").
+  In a spoken exam a distorted name usually means the student MISPRONOUNCED it — quote exactly
+  what the recognizer heard so the student can compare.
+- "missing": the name was omitted entirely.
+Names are identity-critical in interpretation — a distorted head-of-state or organization name
+can be a diplomatic incident. Flag every distortion and omission.
+
 Give overall_score 0-10 and coverage_score 0-10. Be strict — most student interpretations score 4–7:
 - 9-10: Exceptional — virtually no errors, complete coverage, professional fluency
 - 7-8: Good — only 1-2 minor errors, no significant meaning loss
@@ -643,6 +656,9 @@ Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
   "false_starts": [{{"text": "incomplete phrase"}}],
   "lapsus_linguae": [{{"text": "slip", "likely_intended": "intended word"}}],
   "terminology_problems": [{{"source_term": "term in source language", "student_used": "what student said", "correct_equivalent": "correct target language term"}}],
+  "proper_nouns": [
+    {{"source_name": "name in the source", "student_said": "what the recognizer heard", "status": "correct", "note": "short comment; for distorted names explain the likely mispronunciation"}}
+  ],
   "information_loss": [{{"lost_content": "what was omitted", "importance": "high"}}],
   "fluency_score": 7.0,
   "pause_analysis": {{
@@ -664,6 +680,63 @@ Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
   "summary": "2-3 sentence overall assessment of interpretation quality."
 }}
 """
+
+_NAME_CONNECTORS = {'of', 'de', 'du', 'des', 'la', 'le', 'el', 'al', 'bin', 'ben', 'van', 'von', 'ibn'}
+
+
+def extract_proper_nouns(text: str, max_names: int = 15) -> list[str]:
+    """
+    Heuristic proper-noun extraction for Latin-script sources (EN/FR):
+    capitalized word runs (skipping sentence-initial words) and acronyms.
+    Arabic has no capitalization — for Arabic sources the LLM extracts
+    the names itself (the prompt instructs it to).
+    """
+    text = str(text or '')
+    if not re.search(r'[A-Za-z]', text):
+        return []
+
+    names: list[str] = []
+    seen = set()
+
+    def flush(run: list[str]):
+        while run and run[-1].lower() in _NAME_CONNECTORS:
+            run.pop()
+        if not run:
+            return
+        name = ' '.join(run)
+        key = name.casefold()
+        if key not in seen and len(name) > 2:
+            seen.add(key)
+            names.append(name)
+
+    for sentence in re.split(r'(?<=[.!?])\s+', text):
+        words = sentence.split()
+        run: list[str] = []
+        for index, raw in enumerate(words):
+            token = raw.strip('.,;:!?"“”«»()[]')
+            is_name_word = bool(re.fullmatch(r"[A-ZÀ-Þ][\w'’à-þ-]+|[A-Z]{2,}s?", token))
+            is_connector = token.lower() in _NAME_CONNECTORS
+            if is_name_word and (index > 0 or len(token) > 1 and token.isupper()):
+                run.append(token)
+            elif is_connector and run:
+                run.append(token)
+            else:
+                flush(run)
+                run = []
+        flush(run)
+
+    return names[:max_names]
+
+
+def build_proper_nouns_block(source_script: str) -> str:
+    """Feed the detected source names to the evaluator so each one is verified."""
+    names = extract_proper_nouns(source_script)
+    if names:
+        return ('\nPROPER NOUNS detected in the source — verify EVERY one of them in the '
+                'student\'s rendering (TASK 12): ' + '; '.join(names) + '\n')
+    return ('\nThe source may contain proper nouns (people, organizations, places, treaties) — '
+            'extract them yourself and verify each one in the student\'s rendering (TASK 12).\n')
+
 
 def build_glossary_block(glossary_raw: str) -> str:
     """
@@ -2115,6 +2188,7 @@ def generate_feedback():
             fluency_summary=format_fluency_for_prompt({}),
             uncertain_words='(not available in text-only mode)',
             glossary_block=glossary_block,
+            proper_nouns_block=build_proper_nouns_block(source_script),
         )
 
         response = client.chat.completions.create(
@@ -2314,6 +2388,7 @@ def full_evaluation():
             fluency_summary=format_fluency_for_prompt(fluency),
             uncertain_words=uncertain_str,
             glossary_block=glossary_block,
+            proper_nouns_block=build_proper_nouns_block(source_script),
         )
 
         response = client.chat.completions.create(

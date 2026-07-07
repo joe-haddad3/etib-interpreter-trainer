@@ -345,6 +345,10 @@ const UI = {
     modeSimulDesc: 'The source speech plays while you interpret and record at the same time.',
     modeConsecDesc: 'Listen to the source and take notes, then record your interpretation.',
     modeSightDesc: 'Read the scrolling text and translate aloud while recording yourself.',
+    pnTitle: 'Proper nouns (people, organizations, places)',
+    pnCorrect: 'Correct',
+    pnDistorted: 'Distorted — likely mispronounced',
+    pnMissing: 'Omitted',
   },
   ar: {
     uiLanguage: 'لغة الواجهة',
@@ -660,6 +664,10 @@ const UI = {
     modeSimulDesc: 'يُشغَّل الخطاب المصدر بينما تترجم وتسجّل في الوقت نفسه.',
     modeConsecDesc: 'استمع إلى المصدر ودوّن ملاحظاتك، ثم سجّل ترجمتك.',
     modeSightDesc: 'اقرأ النص المتحرك وترجم بصوت عالٍ أثناء تسجيل نفسك.',
+    pnTitle: 'أسماء الأعلام (أشخاص، منظمات، أماكن)',
+    pnCorrect: 'صحيح',
+    pnDistorted: 'محرَّف — نطق خاطئ على الأرجح',
+    pnMissing: 'محذوف',
   },
   fr: {
     uiLanguage: 'Langue de l’interface',
@@ -955,6 +963,10 @@ const UI = {
     modeSimulDesc: 'Le discours source est lu pendant que vous interprétez et vous enregistrez en même temps.',
     modeConsecDesc: 'Écoutez la source et prenez des notes, puis enregistrez votre interprétation.',
     modeSightDesc: 'Lisez le texte défilant et traduisez à voix haute en vous enregistrant.',
+    pnTitle: 'Noms propres (personnes, organisations, lieux)',
+    pnCorrect: 'Correct',
+    pnDistorted: 'Déformé — probablement mal prononcé',
+    pnMissing: 'Omis',
   }
 };
 
@@ -3938,6 +3950,35 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                   {item.explanation && <div className="eval-explanation">{item.explanation}</div>}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Proper nouns — names of people, organizations, places */}
+          {(report.proper_nouns || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">🏛️ {labels.pnTitle}</h3>
+              {report.proper_nouns.map((pn, i) => {
+                const status = String(pn.status || '').toLowerCase();
+                const color = status === 'correct' ? 'var(--sage)' : status === 'missing' ? 'var(--warm-gray)' : 'var(--sienna)';
+                const statusLabel = status === 'correct' ? labels.pnCorrect : status === 'missing' ? labels.pnMissing : labels.pnDistorted;
+                return (
+                  <div key={i} className="eval-item" style={{ borderLeft: `3px solid ${color}`, paddingLeft: '0.75rem', marginBottom: '0.6rem' }}>
+                    <div style={{ fontSize: '0.84rem' }}>
+                      <strong>{pn.source_name}</strong>
+                      {pn.student_said && status !== 'missing' && (
+                        <>
+                          <span style={{ color: 'var(--warm-gray)' }}> · {labels.studentSaidShort}: </span>
+                          <strong style={{ color }} className={isAr ? 'arabic' : ''}>{pn.student_said}</strong>
+                        </>
+                      )}
+                      <span className={`importance-badge importance-${status === 'correct' ? 'low' : 'high'}`} style={{ marginLeft: '0.5rem' }}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                    {pn.note && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{pn.note}</div>}
+                  </div>
+                );
+              })}
             </div>
           )}
 
