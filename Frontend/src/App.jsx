@@ -345,6 +345,44 @@ const UI = {
     modeSimulDesc: 'The source speech plays while you interpret and record at the same time.',
     modeConsecDesc: 'Listen to the source and take notes, then record your interpretation.',
     modeSightDesc: 'Read the scrolling text and translate aloud while recording yourself.',
+    heroTrainIn: 'Train in:',
+    heroTitlePre: 'Master interpretation with ',
+    heroTitleEm: 'AI-generated',
+    heroTitlePost: ' speeches',
+    heroParagraph: 'An adaptive training platform that generates realistic conference speeches, builds multilingual glossaries, and evaluates your interpretation performance across Arabic, French, and English.',
+    guestBtn: 'Continue as Guest',
+    orSep: '— or —',
+    srcPanelTitle: 'Add Source',
+    srcPanelSubtitle: 'Find a UN document, a web page, or upload your own file to ground the speech in real content.',
+    srcTabUN: 'UN Library',
+    srcTabUpload: 'Upload file',
+    srcUNHint: 'Search the UN Digital Library for your topic, download the PDF, then upload it below.',
+    srcUNSearchBtn: 'Search UN Library ↗',
+    srcUNUploadAfter: 'Once you have downloaded the PDF, upload it here:',
+    srcDropPdf: 'Drop the PDF here or',
+    srcDropFile: 'Drop a file here or',
+    srcBrowse: 'browse',
+    srcFileTypes: 'PDF, Word (.docx), or plain text',
+    audioFluencyTitle: 'Audio fluency from the recording',
+    coverageScoreLabel: 'Coverage score',
+    statSpeechRate: 'Speech rate',
+    statLongPauses: 'Long pauses',
+    statSilenceRatio: 'Silence ratio',
+    statWordConfidence: 'Word confidence',
+    verdictGood: 'Good',
+    verdictAcceptable: 'Acceptable',
+    verdictNeedsWork: 'Needs work',
+    nextHintPre: '→ Go to',
+    nextHintPost: 'to listen, review questions, and download the glossary.',
+    transcriptReady: 'Transcript ready',
+    chatGreeting: "Hi! I'm your ETIB assistant. Ask me anything about interpretation techniques, the platform, or terminology.",
+    chatPlaceholder: 'Ask anything…',
+    chatSend: 'Send',
+    chatThinking: 'Thinking…',
+    statAvgPerSession: 'avg / session',
+    statTotal: 'total',
+    statSessions: 'Sessions',
+    outsideRange: '(outside requested range)',
     pnTitle: 'Proper nouns (people, organizations, places)',
     pnCorrect: 'Correct',
     pnDistorted: 'Distorted — likely mispronounced',
@@ -664,6 +702,44 @@ const UI = {
     modeSimulDesc: 'يُشغَّل الخطاب المصدر بينما تترجم وتسجّل في الوقت نفسه.',
     modeConsecDesc: 'استمع إلى المصدر ودوّن ملاحظاتك، ثم سجّل ترجمتك.',
     modeSightDesc: 'اقرأ النص المتحرك وترجم بصوت عالٍ أثناء تسجيل نفسك.',
+    heroTrainIn: 'تدرّب بـ:',
+    heroTitlePre: 'أتقن الترجمة الفورية مع ',
+    heroTitleEm: 'خطابات مولّدة بالذكاء الاصطناعي',
+    heroTitlePost: '',
+    heroParagraph: 'منصة تدريب تكيفية تولّد خطابات مؤتمرات واقعية، وتبني مسارد متعددة اللغات، وتقيّم أداءك في الترجمة الفورية بين العربية والفرنسية والإنجليزية.',
+    guestBtn: 'المتابعة كضيف',
+    orSep: '— أو —',
+    srcPanelTitle: 'إضافة مصدر',
+    srcPanelSubtitle: 'ابحث عن وثيقة أممية أو صفحة ويب أو ارفع ملفك الخاص لتأسيس الخطاب على محتوى حقيقي.',
+    srcTabUN: 'مكتبة الأمم المتحدة',
+    srcTabUpload: 'رفع ملف',
+    srcUNHint: 'ابحث في مكتبة الأمم المتحدة الرقمية عن موضوعك، نزّل ملف PDF، ثم ارفعه أدناه.',
+    srcUNSearchBtn: '↗ البحث في مكتبة الأمم المتحدة',
+    srcUNUploadAfter: 'بعد تنزيل ملف PDF، ارفعه هنا:',
+    srcDropPdf: 'أسقط ملف PDF هنا أو',
+    srcDropFile: 'أسقط ملفاً هنا أو',
+    srcBrowse: 'تصفّح',
+    srcFileTypes: 'PDF أو Word (.docx) أو نص عادي',
+    audioFluencyTitle: 'طلاقة الصوت من التسجيل',
+    coverageScoreLabel: 'درجة التغطية',
+    statSpeechRate: 'سرعة الكلام',
+    statLongPauses: 'توقفات طويلة',
+    statSilenceRatio: 'نسبة الصمت',
+    statWordConfidence: 'وضوح الكلمات',
+    verdictGood: 'جيد',
+    verdictAcceptable: 'مقبول',
+    verdictNeedsWork: 'يحتاج عملاً',
+    nextHintPre: '← انتقل إلى',
+    nextHintPost: 'للاستماع ومراجعة الأسئلة وتنزيل المسرد.',
+    transcriptReady: 'النص المفرَّغ جاهز',
+    chatGreeting: 'مرحباً! أنا مساعد ETIB. اسألني عن تقنيات الترجمة الفورية أو المنصة أو المصطلحات.',
+    chatPlaceholder: 'اسأل أي شيء…',
+    chatSend: 'إرسال',
+    chatThinking: 'أفكر…',
+    statAvgPerSession: 'متوسط / جلسة',
+    statTotal: 'الإجمالي',
+    statSessions: 'الجلسات',
+    outsideRange: '(خارج النطاق المطلوب)',
     pnTitle: 'أسماء الأعلام (أشخاص، منظمات، أماكن)',
     pnCorrect: 'صحيح',
     pnDistorted: 'محرَّف — نطق خاطئ على الأرجح',
@@ -748,7 +824,27 @@ const UI = {
     ungroundedNote: 'Aucun document de l’ONU correspondant n’a été trouvé — ce discours a été généré sans source.',
     language: 'Langue du discours',
     targetLanguage: 'Langue cible',
+    topic: 'Sujet',
     domain: 'Domaine',
+    speedPressure: 'Pression de vitesse',
+    topicShifts: 'Changements de sujet',
+    pressureMode: 'Mode pression',
+    contextNoise: 'Bruit de contexte',
+    cognitiveLoad: 'Charge cognitive',
+    summary: 'Résumé',
+    mcq: 'QCM',
+    glossary: 'Glossaire',
+    documentGrounding: 'Génération depuis un document',
+    documentFile: 'Document source',
+    sharedSettings: 'Paramètres de génération',
+    sharedSettingsHint: 'Ces paramètres s\'appliquent à la génération par sujet ou par document.',
+    generationMethods: 'Choisir la source de génération',
+    topicOnlyGeneration: 'Génération par sujet',
+    topicOnlyHint: 'Générer à partir du sujet et des paramètres choisis.',
+    documentGenerationHint: 'Déposez un document source pour générer un discours ancré dans son contenu.',
+    generateFromDocument: 'Générer depuis le document',
+    retrieveContext: 'Prévisualiser le contexte extrait',
+    retrievedContext: 'Contexte extrait',
     wordCount: 'Longueur du discours',
     wordRangeShort: 'Court',
     wordRangeMedium: 'Moyen',
@@ -963,6 +1059,44 @@ const UI = {
     modeSimulDesc: 'Le discours source est lu pendant que vous interprétez et vous enregistrez en même temps.',
     modeConsecDesc: 'Écoutez la source et prenez des notes, puis enregistrez votre interprétation.',
     modeSightDesc: 'Lisez le texte défilant et traduisez à voix haute en vous enregistrant.',
+    heroTrainIn: 'Entraînez-vous en :',
+    heroTitlePre: "Maîtrisez l'interprétation avec des ",
+    heroTitleEm: 'discours générés par IA',
+    heroTitlePost: '',
+    heroParagraph: "Une plateforme d'entraînement adaptative qui génère des discours de conférence réalistes, construit des glossaires multilingues et évalue vos performances d'interprétation en arabe, français et anglais.",
+    guestBtn: 'Continuer en invité',
+    orSep: '— ou —',
+    srcPanelTitle: 'Ajouter une source',
+    srcPanelSubtitle: "Trouvez un document de l'ONU, une page web, ou déposez votre propre fichier pour ancrer le discours dans un contenu réel.",
+    srcTabUN: 'Bibliothèque ONU',
+    srcTabUpload: 'Déposer un fichier',
+    srcUNHint: "Cherchez votre sujet dans la Bibliothèque numérique de l'ONU, téléchargez le PDF, puis déposez-le ci-dessous.",
+    srcUNSearchBtn: 'Chercher dans la Bibliothèque ONU ↗',
+    srcUNUploadAfter: 'Une fois le PDF téléchargé, déposez-le ici :',
+    srcDropPdf: 'Déposez le PDF ici ou',
+    srcDropFile: 'Déposez un fichier ici ou',
+    srcBrowse: 'parcourir',
+    srcFileTypes: 'PDF, Word (.docx) ou texte brut',
+    audioFluencyTitle: "Fluidité audio de l'enregistrement",
+    coverageScoreLabel: 'Score de couverture',
+    statSpeechRate: 'Débit de parole',
+    statLongPauses: 'Pauses longues',
+    statSilenceRatio: 'Taux de silence',
+    statWordConfidence: 'Clarté des mots',
+    verdictGood: 'Bien',
+    verdictAcceptable: 'Acceptable',
+    verdictNeedsWork: 'À travailler',
+    nextHintPre: '→ Allez dans',
+    nextHintPost: 'pour écouter, réviser les questions et télécharger le glossaire.',
+    transcriptReady: 'Transcription prête',
+    chatGreeting: "Bonjour ! Je suis votre assistant ETIB. Posez-moi vos questions sur les techniques d'interprétation, la plateforme ou la terminologie.",
+    chatPlaceholder: 'Posez une question…',
+    chatSend: 'Envoyer',
+    chatThinking: 'Réflexion…',
+    statAvgPerSession: 'moy. / session',
+    statTotal: 'total',
+    statSessions: 'Sessions',
+    outsideRange: '(hors de la plage demandée)',
     pnTitle: 'Noms propres (personnes, organisations, lieux)',
     pnCorrect: 'Correct',
     pnDistorted: 'Déformé — probablement mal prononcé',
@@ -1278,12 +1412,12 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
         <div className="progress-stat-card">
           <div className="progress-stat-label">{labels.progressAvgNumbers}</div>
           <div className="progress-stat-value" style={{ color: avgNumbers <= 1 ? 'var(--sage)' : avgNumbers <= 3 ? 'var(--primary)' : 'var(--sienna)' }}>{avgNumbers ?? '—'}</div>
-          <div className="progress-stat-sub">avg / session</div>
+          <div className="progress-stat-sub">{labels.statAvgPerSession}</div>
         </div>
         <div className="progress-stat-card">
-          <div className="progress-stat-label">Sessions</div>
+          <div className="progress-stat-label">{labels.statSessions}</div>
           <div className="progress-stat-value" style={{ color: 'var(--primary)' }}>{n}</div>
-          <div className="progress-stat-sub">total</div>
+          <div className="progress-stat-sub">{labels.statTotal}</div>
         </div>
       </div>
 
@@ -1385,12 +1519,12 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
               <p style={{ fontSize: '0.85rem', color: 'var(--warm-gray)', marginBottom: '1rem' }}>{labels.progressAdaptiveSubtitle}</p>
               <div className="adaptive-grid">
                 {[
-                  ['Difficulty', adaptive.recommended_params.difficulty],
-                  ['Word count', adaptive.recommended_params.word_count + ' words'],
-                  ['Numbers', adaptive.recommended_params.number_density],
-                  ['Speed', adaptive.recommended_params.speed_pressure],
-                  ['Structure', adaptive.recommended_params.structure],
-                  ['Topic shifts', adaptive.recommended_params.topic_shifts],
+                  [labels.difficulty, adaptive.recommended_params.difficulty],
+                  [labels.wordCount, adaptive.recommended_params.word_count + ' ' + labels.wordsUnit],
+                  [labels.numbers, adaptive.recommended_params.number_density],
+                  [labels.speedPressure, adaptive.recommended_params.speed_pressure],
+                  [labels.structure, adaptive.recommended_params.structure],
+                  [labels.topicShifts, adaptive.recommended_params.topic_shifts],
                 ].map(([k, v]) => (
                   <div key={k} className="adaptive-param">
                     <div className="adaptive-param-label">{k}</div>
@@ -1585,15 +1719,15 @@ export default function App() {
       {showSettings && (
         <SettingsModal labels={L} onClose={() => setShowSettings(false)} />
       )}
-      {isAuthenticated && <ChatWidget />}
+      {isAuthenticated && <ChatWidget labels={L} />}
     </div>
   );
 }
 
-function ChatWidget() {
+function ChatWidget({ labels }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I\'m your ETIB assistant. Ask me anything about interpretation techniques, the platform, or terminology.' }
+    { role: 'assistant', content: labels.chatGreeting }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1661,7 +1795,7 @@ function ChatWidget() {
                 alignSelf: 'flex-start', background: 'var(--surface-raised, #f0f4f8)',
                 padding: '0.55rem 0.85rem', borderRadius: 12, fontSize: '0.875rem',
                 color: 'var(--warm-gray, #888)'
-              }}>Thinking…</div>
+              }}>{labels.chatThinking}</div>
             )}
             <div ref={bottomRef} />
           </div>
@@ -1670,7 +1804,7 @@ function ChatWidget() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-              placeholder="Ask anything…"
+              placeholder={labels.chatPlaceholder}
               style={{
                 flex: 1, padding: '0.5rem 0.75rem', borderRadius: 8,
                 border: '1px solid var(--border, #ddd)', fontSize: '0.875rem',
@@ -1682,7 +1816,7 @@ function ChatWidget() {
               background: 'var(--primary, #1a3a5c)', color: '#fff',
               cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem',
               opacity: loading || !input.trim() ? 0.5 : 1
-            }}>Send</button>
+            }}>{labels.chatSend}</button>
           </div>
         </div>
       )}
@@ -1865,13 +1999,13 @@ function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
       {/* Left: marketing copy */}
       <div className="hero-text">
         <div className="lang-tabs">
-          <span className="lang-tabs-label">Train in:</span>
+          <span className="lang-tabs-label">{labels.heroTrainIn}</span>
           <span className="lang-tab lang-tab-ar">عربي</span>
           <span className="lang-tab lang-tab-fr">Français</span>
           <span className="lang-tab lang-tab-en">English</span>
         </div>
-        <h1>Master interpretation with <em>AI-generated</em> speeches</h1>
-        <p>An adaptive training platform that generates realistic conference speeches, builds multilingual glossaries, and evaluates your interpretation performance across Arabic, French, and English.</p>
+        <h1>{labels.heroTitlePre}<em>{labels.heroTitleEm}</em>{labels.heroTitlePost}</h1>
+        <p>{labels.heroParagraph}</p>
       </div>
 
       {/* Right: auth form */}
@@ -1916,7 +2050,7 @@ function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
             </button>
           </div>
           <div style={{ textAlign: 'center', margin: '0.75rem 0 0' }}>
-            <span style={{ color: '#aaa', fontSize: '0.8rem' }}>— or —</span>
+            <span style={{ color: '#aaa', fontSize: '0.8rem' }}>{labels.orSep}</span>
           </div>
           <button
             type="button"
@@ -1928,7 +2062,7 @@ function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
               color: '#555', fontWeight: 500,
             }}
           >
-            Continue as Guest
+            {labels.guestBtn}
           </button>
         </form>
       </div>
@@ -1985,6 +2119,7 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
       <div style={{ display: activePanel === 'module-c' ? 'block' : 'none' }}>
         <ModuleC labels={labels} referenceAudioUrl={sharedAudioUrl}
           sourceScript={lastGeneratedScript?.script || ''}
+          targetLanguage={lastGeneratedScript?.target_language || ''}
           onTranscriptComplete={setLastTranscript}
           onRecordingComplete={setLastRecordingBlob} />
       </div>
@@ -2042,15 +2177,15 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
     <div className="library-overlay">
       <div className="library-panel">
         <div className="library-header">
-          <h2 className="library-title">Add Source</h2>
+          <h2 className="library-title">{labels?.srcPanelTitle || 'Add Source'}</h2>
           <button className="library-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <p className="library-subtitle">Find a UN document or upload your own file to ground the speech in real content.</p>
+        <p className="library-subtitle">{labels?.srcPanelSubtitle}</p>
 
         <div className="library-tabs">
-          <button className={`lib-tab ${tab === 'library' ? 'lib-tab-active' : ''}`} onClick={() => setTab('library')}>UN Library</button>
+          <button className={`lib-tab ${tab === 'library' ? 'lib-tab-active' : ''}`} onClick={() => setTab('library')}>{labels?.srcTabUN || 'UN Library'}</button>
           <button className={`lib-tab ${tab === 'webpage' ? 'lib-tab-active' : ''}`} onClick={() => setTab('webpage')}>🔗 {labels?.webPageTab || 'Web page'}</button>
-          <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>Upload file</button>
+          <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>{labels?.srcTabUpload || 'Upload file'}</button>
         </div>
 
         {tab === 'webpage' && (
@@ -2085,7 +2220,7 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
         {tab === 'library' && (
           <div style={{ padding: '1.2rem 0' }}>
             <p style={{ fontSize: '0.875rem', color: 'var(--warm-gray)', marginBottom: '1rem', lineHeight: 1.6 }}>
-              Search the UN Digital Library for your topic, download the PDF, then upload it below.
+              {labels?.srcUNHint}
             </p>
 
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.2rem' }}>
@@ -2103,13 +2238,13 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
                 className="btn-primary"
                 style={{ whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
               >
-                Search UN Library ↗
+                {labels?.srcUNSearchBtn || 'Search UN Library ↗'}
               </a>
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.1rem' }}>
               <p style={{ fontSize: '0.82rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>
-                Once you have downloaded the PDF, upload it here:
+                {labels?.srcUNUploadAfter}
               </p>
               <label className="upload-zone">
                 <input
@@ -2121,8 +2256,8 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
                 <svg className="upload-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <div className="upload-zone-label">Drop the PDF here or <span className="upload-zone-browse">browse</span></div>
-                <div className="upload-zone-hint">PDF, Word (.docx), or plain text</div>
+                <div className="upload-zone-label">{labels?.srcDropPdf} <span className="upload-zone-browse">{labels?.srcBrowse}</span></div>
+                <div className="upload-zone-hint">{labels?.srcFileTypes}</div>
               </label>
             </div>
           </div>
@@ -2140,8 +2275,8 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
               <svg className="upload-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
-              <div className="upload-zone-label">Drop a file here or <span className="upload-zone-browse">browse</span></div>
-              <div className="upload-zone-hint">PDF, Word (.docx), or plain text</div>
+              <div className="upload-zone-label">{labels?.srcDropFile} <span className="upload-zone-browse">{labels?.srcBrowse}</span></div>
+              <div className="upload-zone-hint">{labels?.srcFileTypes}</div>
             </label>
           </div>
         )}
@@ -2539,7 +2674,7 @@ function SpeechResult({ data, labels }) {
         <span>
           {data.word_count} {labels.wordsUnit}
           {requestedRange ? ` / ${requestedRange}` : ''}
-          {rangeMissed ? ' (outside requested range)' : ''}
+          {rangeMissed ? ` ${labels.outsideRange}` : ''}
         </span>
         {duration && <span>~{duration}</span>}
         {data.topic && <span>{data.topic}</span>}
@@ -2563,7 +2698,7 @@ function SpeechResult({ data, labels }) {
       <div className={`speech-text ${isArabic ? 'arabic' : ''}`}>
         {data.script}
       </div>
-      <p className="speech-next-hint">→ Go to <strong>Audio &amp; materials</strong> to listen, review questions, and download the glossary.</p>
+      <p className="speech-next-hint">{labels.nextHintPre} <strong>{labels.navB}</strong> {labels.nextHintPost}</p>
     </div>
   );
 }
@@ -2581,10 +2716,19 @@ function McqQuiz({ mcqs, labels, isArabic }) {
 
   function isCorrectOption(item, option) {
     const answer = String(item.answer || '').trim();
-    return option === answer
+    if (option === answer
       || option.startsWith(answer + '.')
       || option.startsWith(answer + ' ')
-      || optionLetter(option) === answer.toUpperCase();
+      || optionLetter(option) === answer.toUpperCase()) {
+      return true;
+    }
+    // Letter-index fallback: Arabic options have their Latin "A./B." prefixes
+    // stripped by the backend script cleaner, so match "A" -> 1st option, etc.
+    const letterIndex = { A: 0, B: 1, C: 2, D: 3 }[answer.toUpperCase()];
+    if (letterIndex !== undefined && Array.isArray(item.options)) {
+      return item.options[letterIndex] === option;
+    }
+    return false;
   }
 
   function select(qi, option) {
@@ -3104,8 +3248,16 @@ function NotesPad({ labels }) {
 
 // ── Module C — ASR Transcription + Browser Recording ────────────────────────
 
-function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete, onRecordingComplete }) {
+function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTranscriptComplete, onRecordingComplete }) {
   const [language, setLanguage] = useState('ar');
+
+  // The student interprets INTO the target language chosen in Module A —
+  // preselect it so the recognizer transcribes in the right language.
+  useEffect(() => {
+    if (targetLanguage && ['ar', 'fr', 'en'].includes(targetLanguage)) {
+      setLanguage(targetLanguage);
+    }
+  }, [targetLanguage]);
   const [status, setStatus] = useState('idle');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -3452,7 +3604,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
 
 // ── Module D — Full Evaluation Report ────────────────────────────────────────
 
-function ScoreBar({ score }) {
+function ScoreBar({ score, labels }) {
   const pct = Math.round((score / 10) * 100);
   const color = score >= 7 ? '#2D5A4E' : score >= 5 ? '#1B3A6B' : '#8B3A2A';
   const circumference = 188.5;
@@ -3465,7 +3617,7 @@ function ScoreBar({ score }) {
       </div>
       <div>
         <div className="score-bar-wrap"><div className="score-bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
-        <div style={{ fontSize: '0.74rem', color: 'var(--warm-gray)', marginTop: '0.3rem' }}>{pct}% — {score >= 7 ? 'Good' : score >= 5 ? 'Acceptable' : 'Needs work'}</div>
+        <div style={{ fontSize: '0.74rem', color: 'var(--warm-gray)', marginTop: '0.3rem' }}>{pct}% — {score >= 7 ? (labels?.verdictGood || 'Good') : score >= 5 ? (labels?.verdictAcceptable || 'Acceptable') : (labels?.verdictNeedsWork || 'Needs work')}</div>
       </div>
     </div>
   );
@@ -3545,7 +3697,7 @@ function PronunciationPanel({ labels, lastTranscript, lastGeneratedScript }) {
           {/* Scores */}
           <div style={{ display: 'flex', gap: '2rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             <div>
-              <p className="report-label">Coverage score</p>
+              <p className="report-label">{labels.coverageScoreLabel}</p>
               <div className="score-number" style={{ color: coverageColor }}>
                 {result.coverage_score?.toFixed(1)}<span>/10</span>
               </div>
@@ -3722,8 +3874,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
       <div className="card">
         <h2>{labels.moduleDTitle}</h2>
         <div className="info-tip" style={{ marginBottom: '1rem' }}>
-          📄 Transcript ready ({lastTranscript.duration_seconds}s · {(lastTranscript.language_detected || '').toUpperCase()})
-          {lastGeneratedScript && <> · Source: {lastGeneratedScript.domain}</>}
+          📄 {labels.transcriptReady} ({lastTranscript.duration_seconds}s · {(lastTranscript.language_detected || '').toUpperCase()})
+          {lastGeneratedScript && <> · {labels.source}: {lastGeneratedScript.domain}</>}
         </div>
         <button className="btn-primary" onClick={handleEvaluate} disabled={status === 'loading'}>
           {status === 'loading' ? labels.runningEvaluation : labels.runEvaluation}
@@ -3744,12 +3896,12 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="report-score-row">
               <div>
                 <p className="report-label">{labels.overallScore}</p>
-                <ScoreBar score={report.overall_score || 0} />
+                <ScoreBar score={report.overall_score || 0} labels={labels} />
               </div>
               {report.fluency_score !== undefined && (
                 <div>
                   <p className="report-label">{labels.fluencyScore}</p>
-                  <ScoreBar score={report.fluency_score || 0} />
+                  <ScoreBar score={report.fluency_score || 0} labels={labels} />
                 </div>
               )}
               {(report.strengths || []).length > 0 && (
@@ -3918,11 +4070,11 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           {/* Audio-based fluency */}
           {fluency && (
             <div className="card">
-              <h3 className="report-section-title">Audio fluency from recording</h3>
+              <h3 className="report-section-title">{labels.audioFluencyTitle}</h3>
               <div className="report-score-row">
                 <div>
-                  <p className="report-label">Fluency score</p>
-                  <ScoreBar score={fluency.fluency_score || 0} />
+                  <p className="report-label">{labels.fluencyScore}</p>
+                  <ScoreBar score={fluency.fluency_score || 0} labels={labels} />
                 </div>
                 <div className="report-summary">
                   <p>{fluency.summary}</p>
@@ -3938,10 +4090,10 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               </div>
               <div className="algo-grid" style={{ marginTop: '1rem' }}>
                 {[
-                  { label: 'Speech rate', value: `${fluency.speech_rate_wpm || 0} wpm` },
-                  { label: 'Long pauses', value: fluency.long_pause_count || 0 },
-                  { label: 'Silence ratio', value: `${Math.round((fluency.silence_ratio || 0) * 100)}%` },
-                  { label: 'Word confidence', value: `${Math.round((fluency.average_word_confidence || 0) * 100)}%` },
+                  { label: labels.statSpeechRate, value: `${fluency.speech_rate_wpm || 0} wpm` },
+                  { label: labels.statLongPauses, value: fluency.long_pause_count || 0 },
+                  { label: labels.statSilenceRatio, value: `${Math.round((fluency.silence_ratio || 0) * 100)}%` },
+                  { label: labels.statWordConfidence, value: `${Math.round((fluency.average_word_confidence || 0) * 100)}%` },
                 ].map(({ label, value }) => (
                   <div key={label} className="algo-card">
                     <span className="algo-count">{value}</span>
@@ -3956,7 +4108,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           {report.coverage_score !== undefined && (
             <div className="card">
               <h3 className="report-section-title">📊 {labels.coverageTitle}</h3>
-              <ScoreBar score={report.coverage_score} />
+              <ScoreBar score={report.coverage_score} labels={labels} />
               <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--warm-gray)' }}>
                 {labels.coverageHint}
               </p>
