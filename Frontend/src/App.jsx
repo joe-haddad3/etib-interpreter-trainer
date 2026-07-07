@@ -383,6 +383,7 @@ const UI = {
     statTotal: 'total',
     statSessions: 'Sessions',
     outsideRange: '(outside requested range)',
+    progressGuestNote: 'Progress tracking works with an account. Sign in (or create a free account) so your evaluations are saved and analyzed across sessions.',
     pnTitle: 'Proper nouns (people, organizations, places)',
     pnCorrect: 'Correct',
     pnDistorted: 'Distorted — likely mispronounced',
@@ -740,6 +741,7 @@ const UI = {
     statTotal: 'الإجمالي',
     statSessions: 'الجلسات',
     outsideRange: '(خارج النطاق المطلوب)',
+    progressGuestNote: 'يعمل تتبع التقدم مع حساب فقط. سجّل الدخول (أو أنشئ حساباً مجانياً) لتُحفظ تقييماتك وتُحلَّل عبر الجلسات.',
     pnTitle: 'أسماء الأعلام (أشخاص، منظمات، أماكن)',
     pnCorrect: 'صحيح',
     pnDistorted: 'محرَّف — نطق خاطئ على الأرجح',
@@ -1097,6 +1099,7 @@ const UI = {
     statTotal: 'total',
     statSessions: 'Sessions',
     outsideRange: '(hors de la plage demandée)',
+    progressGuestNote: 'Le suivi de progression fonctionne avec un compte. Connectez-vous (ou créez un compte gratuit) pour que vos évaluations soient enregistrées et analysées.',
     pnTitle: 'Noms propres (personnes, organisations, lieux)',
     pnCorrect: 'Correct',
     pnDistorted: 'Déformé — probablement mal prononcé',
@@ -1691,6 +1694,7 @@ export default function App() {
     <div className="shell">
       <Header
         isAuthenticated={isAuthenticated}
+        isGuest={currentUser?.id === 'guest'}
         activePanel={activePanel}
         labels={L}
         onPanelChange={setActivePanel}
@@ -1925,8 +1929,10 @@ function SettingsModal({ labels, onClose }) {
   );
 }
 
-function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, onLanguageChange, onOpenSettings }) {
+function Header({ isAuthenticated, isGuest, activePanel, labels, onPanelChange, uiLang, onLanguageChange, onOpenSettings }) {
   const hasKey = Boolean(getStoredGroqKey());
+  // Progress needs an account — guests have no saved history to show.
+  const navItems = NAV_ITEMS.filter(item => item.id !== 'module-e' || !isGuest);
   return (
     <header className="fade-up">
       <div className="header-logos">
@@ -1938,7 +1944,7 @@ function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, o
       </div>
       {isAuthenticated && (
         <nav aria-label="Training modules">
-          {NAV_ITEMS.map(item => (
+          {navItems.map(item => (
             <button
               key={item.id}
               type="button"
@@ -2130,6 +2136,12 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
           onEvaluationSaved={() => setProgressRefresh(n => n + 1)} />
       </div>
       <div style={{ display: activePanel === 'module-e' ? 'block' : 'none' }}>
+        {currentUser?.id === 'guest' ? (
+          <div className="card coming-soon">
+            <p className="eyebrow">{labels.navE}</p>
+            <p>{labels.progressGuestNote}</p>
+          </div>
+        ) : (
         <ModuleProgress labels={labels} refresh={progressRefresh}
           onApplyParams={(params) => {
             // Adaptive difficulty (cahier D12): apply the recommended
@@ -2137,6 +2149,7 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
             setAdaptiveParams({ ...params, _appliedAt: Date.now() });
             onPanelChange('module-a');
           }} />
+        )}
       </div>
 
     </section>

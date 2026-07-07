@@ -2429,14 +2429,17 @@ def full_evaluation():
         llm_result = filter_french_silent_plural_errors(llm_result, language)
         llm_result['transcript'] = transcript
 
-        # Step 5: Persist session for history / adaptive difficulty (D11-D12)
+        # Step 5: Persist session for history / adaptive difficulty (D11-D12).
+        # Guests have no account: their sessions are NOT saved, otherwise all
+        # guests would share one "anonymous" history and see each other's data.
         user_id = _current_user_id()
-        _save_session(user_id, {
-            **llm_result,
-            'language':        language,
-            'source_language': source_language,
-            'domain':          request.form.get('domain', ''),
-        })
+        if user_id != 'anonymous':
+            _save_session(user_id, {
+                **llm_result,
+                'language':        language,
+                'source_language': source_language,
+                'domain':          request.form.get('domain', ''),
+            })
 
         return jsonify(llm_result)
 
@@ -2625,6 +2628,9 @@ def pronunciation_report():
 def list_sessions():
     """Return the last N evaluation sessions for the current user (D11)."""
     user_id = _current_user_id()
+    if user_id == 'anonymous':
+        # Guests have no account — no history (and no shared anonymous pool).
+        return jsonify({'sessions': [], 'count': 0, 'guest': True})
     limit = min(int(request.args.get('limit', 20)), 50)
     sessions = _load_sessions(user_id, limit=limit)
     return jsonify({'sessions': sessions, 'count': len(sessions)})
@@ -2634,6 +2640,8 @@ def list_sessions():
 def adaptive_params():
     """Analyse recent sessions and return recommended Module A parameters + trend + problems (D12)."""
     user_id = _current_user_id()
+    if user_id == 'anonymous':
+        return jsonify(_compute_adaptive_params([]))
     sessions = _load_sessions(user_id, limit=20)
     return jsonify(_compute_adaptive_params(sessions))
 
