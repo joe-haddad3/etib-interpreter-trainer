@@ -341,6 +341,10 @@ const UI = {
     aboutEvalReliability: 'Reliability: the transcript is an estimate, not ground truth — especially for Arabic. Unclear audio regions are treated as clarity issues, not automatically as translation errors. Use this report as a training aid, not a final grade.',
     aboutEvalStorage: 'Storage: your audio recording is processed and then deleted from the server — it is not kept. Only the evaluation summary (scores, error counts, recommendations) is saved to your account history to power the Progress page. Generated speeches and transcripts are not stored permanently.',
     creditsLine: 'Final Year Project — ESIB · CINIA · USJ Beirut',
+    modeChoose: 'Practice mode',
+    modeSimulDesc: 'The source speech plays while you interpret and record at the same time.',
+    modeConsecDesc: 'Listen to the source and take notes, then record your interpretation.',
+    modeSightDesc: 'Read the scrolling text and translate aloud while recording yourself.',
   },
   ar: {
     uiLanguage: 'لغة الواجهة',
@@ -652,6 +656,10 @@ const UI = {
     aboutEvalReliability: 'الموثوقية: النص المفرَّغ تقدير وليس حقيقة مطلقة — خصوصاً للعربية. المقاطع غير الواضحة تُعامل كمشاكل وضوح، لا كأخطاء ترجمة تلقائياً. استخدم هذا التقرير كأداة تدريب، لا كعلامة نهائية.',
     aboutEvalStorage: 'التخزين: يُعالَج تسجيلك الصوتي ثم يُحذف من الخادم — لا يُحتفظ به. يُحفظ فقط ملخص التقييم (الدرجات، عدد الأخطاء، التوصيات) في سجل حسابك لتغذية صفحة التقدم. لا تُخزَّن الخطابات المولَّدة والنصوص المفرَّغة بشكل دائم.',
     creditsLine: 'مشروع تخرج — ESIB · CINIA · جامعة القديس يوسف بيروت',
+    modeChoose: 'وضع التدريب',
+    modeSimulDesc: 'يُشغَّل الخطاب المصدر بينما تترجم وتسجّل في الوقت نفسه.',
+    modeConsecDesc: 'استمع إلى المصدر ودوّن ملاحظاتك، ثم سجّل ترجمتك.',
+    modeSightDesc: 'اقرأ النص المتحرك وترجم بصوت عالٍ أثناء تسجيل نفسك.',
   },
   fr: {
     uiLanguage: 'Langue de l’interface',
@@ -943,6 +951,10 @@ const UI = {
     aboutEvalReliability: 'Fiabilité : la transcription est une estimation, pas une vérité absolue — surtout en arabe. Les passages peu clairs sont traités comme des problèmes de clarté, pas automatiquement comme des erreurs de traduction. Utilisez ce rapport comme outil d\'entraînement, pas comme note finale.',
     aboutEvalStorage: 'Stockage : votre enregistrement audio est traité puis supprimé du serveur — il n\'est pas conservé. Seul le résumé de l\'évaluation (scores, nombre d\'erreurs, recommandations) est enregistré dans l\'historique de votre compte pour alimenter la page Progression. Les discours générés et transcriptions ne sont pas stockés de façon permanente.',
     creditsLine: 'Projet de fin d\'études — ESIB · CINIA · USJ Beyrouth',
+    modeChoose: 'Mode d\'entraînement',
+    modeSimulDesc: 'Le discours source est lu pendant que vous interprétez et vous enregistrez en même temps.',
+    modeConsecDesc: 'Écoutez la source et prenez des notes, puis enregistrez votre interprétation.',
+    modeSightDesc: 'Lisez le texte défilant et traduisez à voix haute en vous enregistrant.',
   }
 };
 
@@ -2628,6 +2640,8 @@ function McqQuiz({ mcqs, labels, isArabic }) {
 }
 
 // ── Sight translation scroller (professor request, cf. scroller.dipintra.it) ─
+// Continuous vertical scroll at a words/min pace with a live dashboard
+// (elapsed / remaining), like the University of Bologna Scroller tool.
 
 function SightScroller({ script, isArabic, labels }) {
   const [playing, setPlaying] = useState(false);
@@ -2635,11 +2649,14 @@ function SightScroller({ script, isArabic, labels }) {
   const [fontSize, setFontSize] = useState(1.15);   // rem
   const [columns, setColumns] = useState(1);
   const [spacing, setSpacing] = useState(1.9);      // line-height
-  const boxRef = useRef(null);
+  const [progress, setProgress] = useState(0);      // 0..1 of the scrollable area
+  const wrapRef = useRef(null);
   const rafRef = useRef(null);
   const lastTsRef = useRef(null);
+  const lastUiUpdateRef = useRef(0);
 
   const wordCount = useMemo(() => String(script || '').split(/\s+/).filter(Boolean).length, [script]);
+  const totalSeconds = (wordCount / Math.max(40, wpm)) * 60;
 
   useEffect(() => {
     if (!playing) {
@@ -2648,16 +2665,21 @@ function SightScroller({ script, isArabic, labels }) {
       return;
     }
     function step(ts) {
-      const box = boxRef.current;
-      if (!box) return;
+      const wrap = wrapRef.current;
+      if (!wrap) return;
       if (lastTsRef.current != null) {
         const dt = (ts - lastTsRef.current) / 1000;
-        // Total reading time at the chosen wpm determines the scroll speed.
-        const totalSeconds = (wordCount / Math.max(40, wpm)) * 60;
-        const scrollable = box.scrollHeight - box.clientHeight;
+        const scrollable = wrap.scrollHeight - wrap.clientHeight;
         if (scrollable > 0 && totalSeconds > 0) {
-          box.scrollTop += (scrollable / totalSeconds) * dt;
-          if (box.scrollTop >= scrollable - 1) setPlaying(false);
+          wrap.scrollTop += (scrollable / totalSeconds) * dt;
+          if (ts - lastUiUpdateRef.current > 250) {
+            lastUiUpdateRef.current = ts;
+            setProgress(Math.min(1, wrap.scrollTop / scrollable));
+          }
+          if (wrap.scrollTop >= scrollable - 1) {
+            setProgress(1);
+            setPlaying(false);
+          }
         }
       }
       lastTsRef.current = ts;
@@ -2665,24 +2687,33 @@ function SightScroller({ script, isArabic, labels }) {
     }
     rafRef.current = requestAnimationFrame(step);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [playing, wpm, wordCount]);
+  }, [playing, wpm, totalSeconds]);
 
   function reset() {
     setPlaying(false);
-    if (boxRef.current) boxRef.current.scrollTop = 0;
+    setProgress(0);
+    if (wrapRef.current) wrapRef.current.scrollTop = 0;
   }
+
+  function fmtTime(seconds) {
+    const s = Math.max(0, Math.round(seconds));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  const elapsed = progress * totalSeconds;
+  const wordsRead = Math.round(progress * wordCount);
 
   return (
     <div>
       <p style={{ fontSize: '0.83rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>{labels.scrollerHint}</p>
 
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '0.9rem' }}>
-        <div className="field" style={{ minWidth: 150 }}>
+        <div className="field" style={{ minWidth: 160 }}>
           <label>{labels.scrollerSpeed}: <strong>{wpm}</strong></label>
-          <input type="range" min="60" max="200" step="10" value={wpm}
+          <input type="range" min="80" max="240" step="10" value={wpm}
             onChange={e => setWpm(Number(e.target.value))} className="rate-slider" />
         </div>
-        <div className="field" style={{ minWidth: 120 }}>
+        <div className="field" style={{ minWidth: 100 }}>
           <label>{labels.scrollerFontSize}</label>
           <select value={fontSize} onChange={e => setFontSize(Number(e.target.value))}>
             <option value={0.95}>A</option>
@@ -2691,14 +2722,14 @@ function SightScroller({ script, isArabic, labels }) {
             <option value={1.8}>A+++</option>
           </select>
         </div>
-        <div className="field" style={{ minWidth: 100 }}>
+        <div className="field" style={{ minWidth: 90 }}>
           <label>{labels.scrollerColumns}</label>
           <select value={columns} onChange={e => setColumns(Number(e.target.value))}>
             <option value={1}>1</option>
             <option value={2}>2</option>
           </select>
         </div>
-        <div className="field" style={{ minWidth: 110 }}>
+        <div className="field" style={{ minWidth: 100 }}>
           <label>{labels.scrollerSpacing}</label>
           <select value={spacing} onChange={e => setSpacing(Number(e.target.value))}>
             <option value={1.55}>1</option>
@@ -2714,18 +2745,40 @@ function SightScroller({ script, isArabic, labels }) {
         </div>
       </div>
 
+      {/* Live dashboard — elapsed / remaining / words, like the Bologna tool */}
+      <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginBottom: '0.6rem',
+        fontSize: '0.8rem', color: 'var(--warm-gray)', fontVariantNumeric: 'tabular-nums' }}>
+        <span>⏱ {fmtTime(elapsed)} / {fmtTime(totalSeconds)}</span>
+        <span>⏳ −{fmtTime(totalSeconds - elapsed)}</span>
+        <span>📖 {wordsRead} / {wordCount} {labels.wordsUnit}</span>
+        <span style={{ flex: 1, alignSelf: 'center', height: 4, background: 'rgba(27,58,107,0.12)', borderRadius: 2, minWidth: 120 }}>
+          <span style={{ display: 'block', height: '100%', width: `${Math.round(progress * 100)}%`,
+            background: 'var(--primary, #1a3a5c)', borderRadius: 2, transition: 'width 0.25s linear' }} />
+        </span>
+      </div>
+
+      {/* Outer wrapper owns the fixed height + vertical scrollbar; the inner
+          block owns the column layout with natural height — putting both on
+          one element makes CSS columns overflow horizontally (no scrolling). */}
       <div
-        ref={boxRef}
-        className={isArabic ? 'arabic' : ''}
-        dir={isArabic ? 'rtl' : 'ltr'}
+        ref={wrapRef}
         style={{
-          height: 320, overflowY: 'auto', border: '1px solid var(--border, #ddd)',
-          borderRadius: 10, padding: '1.25rem 1.5rem', background: 'var(--surface, #fff)',
-          fontSize: `${fontSize}rem`, lineHeight: spacing,
-          columnCount: columns, columnGap: '2.5rem', whiteSpace: 'pre-wrap',
+          height: 340, overflowY: 'auto', overflowX: 'hidden',
+          border: '1px solid var(--border, #ddd)', borderRadius: 10,
+          background: 'var(--surface, #fff)',
         }}
       >
-        {script}
+        <div
+          className={isArabic ? 'arabic' : ''}
+          dir={isArabic ? 'rtl' : 'ltr'}
+          style={{
+            padding: '1.25rem 1.5rem',
+            fontSize: `${fontSize}rem`, lineHeight: spacing,
+            columnCount: columns, columnGap: '2.5rem', whiteSpace: 'pre-wrap',
+          }}
+        >
+          {script}
+        </div>
       </div>
     </div>
   );
@@ -2838,14 +2891,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
         <div className="card">
           <h2 className="b-section-title">❓ {labels.mcqTitle}</h2>
           <McqQuiz mcqs={mcqs} labels={labels} isArabic={isArabic} />
-        </div>
-      )}
-
-      {/* ── Sight translation scroller ── */}
-      {lastGeneratedScript.script && (
-        <div className="card">
-          <h2 className="b-section-title">📜 {labels.scrollerTitle}</h2>
-          <SightScroller script={lastGeneratedScript.script} isArabic={isArabic} labels={labels} />
         </div>
       )}
 
@@ -3026,6 +3071,9 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
   const fileInputRef = useRef(null);
   const referenceAudioRef = useRef(null);
   const [simultaneousActive, setSimultaneousActive] = useState(false);
+  // 3 practice modes (professor request): simultaneous | consecutive | sight
+  const [interpMode, setInterpMode] = useState('consecutive');
+  const sourceIsArabic = /[؀-ۿ]/.test(sourceScript || '');
 
   const lowConfWords = useMemo(() =>
     (result?.segments || []).flatMap(seg =>
@@ -3159,32 +3207,76 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
           </SelectField>
         </div>
 
-        {/* Reference audio from Module B */}
-        {referenceAudioUrl && (
+        {/* ── Practice mode selector: simultaneous | consecutive | sight ── */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <p className="record-section-label" style={{ marginBottom: '0.5rem' }}>{labels.modeChoose}</p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {[
+              { id: 'simultaneous', name: labels.optSimultaneous, icon: '🎧' },
+              { id: 'consecutive',  name: labels.optConsecutive,  icon: '📝' },
+              { id: 'sight',        name: labels.optSight,        icon: '📜' },
+            ].map(m => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setInterpMode(m.id)}
+                style={{
+                  flex: '1 1 140px', padding: '0.65rem 0.9rem', borderRadius: 10, cursor: 'pointer',
+                  border: interpMode === m.id ? '2px solid var(--primary, #1a3a5c)' : '1.5px solid var(--border, #ddd)',
+                  background: interpMode === m.id ? 'rgba(27,58,107,0.07)' : 'transparent',
+                  fontWeight: interpMode === m.id ? 700 : 500, fontSize: '0.9rem',
+                }}
+              >
+                {m.icon} {m.name}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginTop: '0.5rem' }}>
+            {interpMode === 'simultaneous' && labels.modeSimulDesc}
+            {interpMode === 'consecutive' && labels.modeConsecDesc}
+            {interpMode === 'sight' && labels.modeSightDesc}
+          </p>
+        </div>
+
+        {/* Reference audio from Module B — for simultaneous & consecutive */}
+        {interpMode !== 'sight' && referenceAudioUrl && (
           <div className="reference-audio-box">
             <p className="ref-audio-label">🔊 {labels.sourceAudio}</p>
             <audio ref={referenceAudioRef} controls src={referenceAudioUrl} style={{ width: '100%' }} />
           </div>
         )}
 
-        {/* Simultaneous mode — source plays while the student records */}
-        <div className="record-section" style={{ borderLeft: '3px solid var(--primary, #1a3a5c)', paddingLeft: '0.9rem', marginBottom: '1rem' }}>
-          <p className="record-section-label">{labels.simulTitle}</p>
-          <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', margin: '0.3rem 0 0.6rem' }}>
-            {referenceAudioUrl ? labels.simulHint : labels.simulNeedsAudio}
-          </p>
-          {referenceAudioUrl && (
-            !simultaneousActive ? (
-              <button className="btn-primary" onClick={startSimultaneous} disabled={isRecording}>
-                {labels.simulStart}
-              </button>
+        {/* Simultaneous — source plays while the student records */}
+        {interpMode === 'simultaneous' && (
+          <div className="record-section" style={{ borderLeft: '3px solid var(--primary, #1a3a5c)', paddingLeft: '0.9rem', marginBottom: '1rem' }}>
+            <p className="record-section-label">{labels.simulTitle}</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', margin: '0.3rem 0 0.6rem' }}>
+              {referenceAudioUrl ? labels.simulHint : labels.simulNeedsAudio}
+            </p>
+            {referenceAudioUrl && (
+              !simultaneousActive ? (
+                <button className="btn-primary" onClick={startSimultaneous} disabled={isRecording}>
+                  {labels.simulStart}
+                </button>
+              ) : (
+                <button className="btn-record recording-active" onClick={stopSimultaneous}>
+                  <span className="rec-dot" /> {labels.simulStop} — {formatTime(recordingTime)}
+                </button>
+              )
+            )}
+          </div>
+        )}
+
+        {/* Sight translation — scrolling source text, record while translating */}
+        {interpMode === 'sight' && (
+          <div className="record-section" style={{ marginBottom: '1rem' }}>
+            {sourceScript ? (
+              <SightScroller script={sourceScript} isArabic={sourceIsArabic} labels={labels} />
             ) : (
-              <button className="btn-record recording-active" onClick={stopSimultaneous}>
-                <span className="rec-dot" /> {labels.simulStop} — {formatTime(recordingTime)}
-              </button>
-            )
-          )}
-        </div>
+              <div className="info-tip">ℹ️ {labels.needsSource}</div>
+            )}
+          </div>
+        )}
 
         {/* Recording section */}
         <div className="record-section">
@@ -3241,8 +3333,8 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
           )}
         </div>
 
-        {/* Note-taking space for consecutive interpretation */}
-        <NotesPad labels={labels} />
+        {/* Note-taking space — consecutive mode only */}
+        {interpMode === 'consecutive' && <NotesPad labels={labels} />}
 
         {/* Upload fallback */}
         <details className="upload-fallback">
