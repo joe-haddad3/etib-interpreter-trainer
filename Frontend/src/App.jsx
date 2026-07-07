@@ -2654,6 +2654,11 @@ function SightScroller({ script, isArabic, labels }) {
   const rafRef = useRef(null);
   const lastTsRef = useRef(null);
   const lastUiUpdateRef = useRef(0);
+  // Fractional scroll position accumulator. At slow speeds the advance is
+  // well under 1px per frame, and browsers round element.scrollTop to whole
+  // pixels — read-modify-write (`scrollTop += 0.2`) rounds back to 0 every
+  // frame and the text never moves. Accumulate in a float, then assign.
+  const posRef = useRef(0);
 
   const wordCount = useMemo(() => String(script || '').split(/\s+/).filter(Boolean).length, [script]);
   const totalSeconds = (wordCount / Math.max(40, wpm)) * 60;
@@ -2664,6 +2669,8 @@ function SightScroller({ script, isArabic, labels }) {
       lastTsRef.current = null;
       return;
     }
+    // Re-sync with the real position (user may have dragged the scrollbar).
+    posRef.current = wrapRef.current ? wrapRef.current.scrollTop : 0;
     function step(ts) {
       const wrap = wrapRef.current;
       if (!wrap) return;
@@ -2671,12 +2678,13 @@ function SightScroller({ script, isArabic, labels }) {
         const dt = (ts - lastTsRef.current) / 1000;
         const scrollable = wrap.scrollHeight - wrap.clientHeight;
         if (scrollable > 0 && totalSeconds > 0) {
-          wrap.scrollTop += (scrollable / totalSeconds) * dt;
+          posRef.current = Math.min(scrollable, posRef.current + (scrollable / totalSeconds) * dt);
+          wrap.scrollTop = posRef.current;
           if (ts - lastUiUpdateRef.current > 250) {
             lastUiUpdateRef.current = ts;
-            setProgress(Math.min(1, wrap.scrollTop / scrollable));
+            setProgress(Math.min(1, posRef.current / scrollable));
           }
-          if (wrap.scrollTop >= scrollable - 1) {
+          if (posRef.current >= scrollable - 0.5) {
             setProgress(1);
             setPlaying(false);
           }
@@ -2692,6 +2700,7 @@ function SightScroller({ script, isArabic, labels }) {
   function reset() {
     setPlaying(false);
     setProgress(0);
+    posRef.current = 0;
     if (wrapRef.current) wrapRef.current.scrollTop = 0;
   }
 
