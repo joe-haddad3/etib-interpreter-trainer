@@ -1541,6 +1541,32 @@ class _WebPageTextExtractor:
         return text, title
 
 
+def _is_public_http_url(url: str) -> bool:
+    """
+    SSRF guard: only allow http(s) URLs that resolve to PUBLIC IP addresses.
+    Blocks localhost, private ranges (10/8, 172.16/12, 192.168/16), link-local
+    (169.254/16 — cloud metadata), and other non-global destinations.
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https') or not parsed.hostname:
+            return False
+        if parsed.port not in (None, 80, 443, 8080):
+            return False
+        infos = socket.getaddrinfo(parsed.hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)
+        for info in infos:
+            ip = ipaddress.ip_address(info[4][0])
+            if not ip.is_global or ip.is_multicast:
+                return False
+        return bool(infos)
+    except (ValueError, OSError):
+        return False
+
+
 @module_a_bp.route('/fetch-url', methods=['POST'])
 def fetch_web_page():
     """
@@ -1558,15 +1584,30 @@ def fetch_web_page():
     if not url.lower().startswith(('http://', 'https://')):
         return jsonify({'error': 'Please provide a valid web page URL starting with http:// or https://'}), 400
 
+    if not _is_public_http_url(url):
+        return jsonify({'error': 'This URL cannot be fetched. Only public web pages are allowed.'}), 400
+
     try:
         import requests as _requests
-        resp = _requests.get(
-            url,
-            timeout=20,
-            headers={'User-Agent': 'Mozilla/5.0 (compatible; ETIB-Interpreter-Trainer/1.0; academic use)'},
-            allow_redirects=True,
-        )
+        # Follow redirects manually so every hop is re-validated against the
+        # SSRF guard (a public URL may redirect to an internal address).
+        headers = {'User-Agent': 'Mozilla/5.0 (compatible; ETIB-Interpreter-Trainer/1.0; academic use)'}
+        current_url = url
+        resp = None
+        for _hop in range(4):
+            resp = _requests.get(current_url, timeout=20, headers=headers, allow_redirects=False)
+            if resp.status_code in (301, 302, 303, 307, 308):
+                next_url = resp.headers.get('Location', '')
+                if next_url.startswith('/'):
+                    from urllib.parse import urljoin
+                    next_url = urljoin(current_url, next_url)
+                if not _is_public_http_url(next_url):
+                    return jsonify({'error': 'This URL cannot be fetched. Only public web pages are allowed.'}), 400
+                current_url = next_url
+                continue
+            break
         resp.raise_for_status()
+        url = current_url
 
         content_type = resp.headers.get('Content-Type', '')
         if 'pdf' in content_type.lower() or url.lower().endswith('.pdf'):

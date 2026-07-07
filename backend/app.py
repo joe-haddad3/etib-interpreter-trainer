@@ -16,7 +16,9 @@ load_dotenv(override=True)
 from config import LLM_PROVIDER, LOCAL_MODEL_ID, REMOTE_AYA_URL
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-change-in-prod')
+# Random fallback instead of a fixed public string — sessions are not used
+# (token-in-body auth), but a predictable secret key is never acceptable.
+app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.urandom(32)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB — audio files can be large
 
 _ALLOWED_ORIGINS = {

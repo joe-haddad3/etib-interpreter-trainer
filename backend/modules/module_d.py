@@ -793,6 +793,91 @@ def format_silences_for_prompt(silences: list) -> str:
     return (parts or 'none found automatically') + note
 
 
+def transcribe_eval_with_groq(audio_path: str, language: str, prompt: str):
+    """
+    Transcribe with Groq whisper-large-v3 requesting WORD-level timestamps
+    (timestamp_granularities) — large-v3 recognizes Arabic far better than the
+    local medium model and returns in seconds instead of minutes. Calls the
+    REST API directly so the installed SDK version does not matter.
+    Returns None on any failure so the caller falls back to local ASR.
+    """
+    try:
+        from utils.groq_client import get_groq_key
+        key = get_groq_key()
+        if not key:
+            return None
+
+        import requests as _requests
+        with open(audio_path, 'rb') as fh:
+            resp = _requests.post(
+                'https://api.groq.com/openai/v1/audio/transcriptions',
+                headers={'Authorization': f'Bearer {key}'},
+                files={'file': (os.path.basename(audio_path), fh)},
+                data=[
+                    ('model', 'whisper-large-v3'),
+                    ('language', language),
+                    ('response_format', 'verbose_json'),
+                    ('timestamp_granularities[]', 'word'),
+                    ('timestamp_granularities[]', 'segment'),
+                    ('prompt', prompt[:400]),
+                ],
+                timeout=120,
+            )
+        if not resp.ok:
+            print(f'[Module D] Groq eval ASR failed ({resp.status_code}: {resp.text[:120]}) — using local model')
+            return None
+
+        data = resp.json()
+        raw_segments = data.get('segments') or []
+        raw_words = data.get('words') or []
+
+        segments = []
+        for seg in raw_segments:
+            seg_text = str(seg.get('text', '')).strip()
+            if not seg_text or seg_text[0] in '[(':
+                continue
+            segments.append({
+                'start': round(float(seg.get('start', 0) or 0), 2),
+                'end':   round(float(seg.get('end', 0) or 0), 2),
+                'text':  seg_text,
+                'words': [],
+            })
+
+        # Words arrive as a flat list; attach each to its segment by time so
+        # the silence/repetition/hesitation detectors work unchanged.
+        # The cloud API gives no per-word confidence → 1.0 neutral score.
+        word_scores = []
+        for w in raw_words:
+            token = str(w.get('word', '')).strip()
+            if not token:
+                continue
+            start = round(float(w.get('start', 0) or 0), 2)
+            end = round(float(w.get('end', 0) or 0), 2)
+            entry = {'word': token, 'start': start, 'end': end, 'probability': 1.0}
+            for seg in segments:
+                if seg['start'] - 0.05 <= start < seg['end'] + 0.05:
+                    seg['words'].append(entry)
+                    break
+            else:
+                if segments:
+                    segments[-1]['words'].append(entry)
+            word_scores.append({'word': token, 'start': start, 'end': end, 'score': 1.0, 'grade': 'good'})
+
+        if not segments and not word_scores:
+            return None
+
+        return {
+            'segments': segments,
+            'word_scores': word_scores,
+            'segment_text': ' '.join(s['text'] for s in segments).strip(),
+            'language': str(data.get('language', language) or language),
+            'duration': round(float(data.get('duration', 0) or 0), 1),
+        }
+    except Exception as exc:
+        print(f'[Module D] Groq eval ASR error: {exc} — using local model')
+        return None
+
+
 module_d_bp = Blueprint('module_d', __name__)
 
 
@@ -2263,68 +2348,89 @@ def full_evaluation():
     # Avoid telling the LLM source==target (monolingual confusion) when not explicitly set
     source_language  = _raw_src_lang if _raw_src_lang and _raw_src_lang != language else 'unknown'
 
-    ext       = os.path.splitext(audio_file.filename)[1] or '.webm'
+    from modules.module_c import _safe_audio_ext
+    ext       = _safe_audio_ext(audio_file.filename)
     temp_path = os.path.join(UPLOAD_FOLDER, f'eval_{uuid.uuid4().hex[:8]}{ext}')
     audio_file.save(temp_path)
 
     try:
-        # Use local faster-whisper: gives real segment timestamps (silence detection)
-        # and word-level probabilities. Groq normalizes silence/repetitions away.
-        from modules.module_c import _get_local_model, DISFLUENCY_PROMPTS
-        model = _get_local_model()
+        from modules.module_c import DISFLUENCY_PROMPTS
         disfluency_prompt = DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en'])
         verbatim_prompt = f"{disfluency_prompt} {build_verbatim_asr_prompt(language)}"
-        repetition_hotwords = build_repetition_hotwords(source_script, language)
 
-        segments_iter, info = model.transcribe(
-            temp_path,
-            language=language,
-            task='transcribe',
-            word_timestamps=True,
-            vad_filter=False,               # disabled: preserves silence gaps between segments
-            suppress_tokens=[],             # preserve fillers/repetitions, no normalization
-            suppress_blank=False,
-            condition_on_previous_text=False,
-            compression_ratio_threshold=100.0,  # disable repetition fallback — keeps repeated words
-            log_prob_threshold=-100.0,          # disable low-prob fallback — keeps hesitations
-            no_speech_threshold=0.95,
-            temperature=0.0,                    # greedy decoding — no randomness
-            beam_size=1,                        # greedy: prevents beam search from collapsing repetitions
-            repetition_penalty=1.0,
-            no_repeat_ngram_size=0,
-            initial_prompt=verbatim_prompt,      # language-specific filler + repetition priming
-            hotwords=repetition_hotwords,
-        )
+        # ASR strategy: Groq whisper-large-v3 with WORD timestamps first —
+        # far better recognition (especially Arabic) and seconds instead of
+        # minutes. Local faster-whisper (medium) is the fallback; it also
+        # provides per-word confidence, which the cloud API does not.
+        asr_method = 'local_faster_whisper_medium'
+        groq_asr = transcribe_eval_with_groq(temp_path, language, verbatim_prompt)
 
-        full_text = ''
-        all_segments = []
-        all_word_scores = []
+        if groq_asr is not None:
+            asr_method = 'groq_whisper_large_v3'
+            all_segments = groq_asr['segments']
+            all_word_scores = groq_asr['word_scores']
+            segment_text = groq_asr['segment_text']
+            detected_language = groq_asr['language']
+            language_confidence = 1.0
+            duration_value = groq_asr['duration']
+        else:
+            from modules.module_c import _get_local_model
+            model = _get_local_model()
+            repetition_hotwords = build_repetition_hotwords(source_script, language)
 
-        for seg in segments_iter:
-            if _is_noise_segment(seg.text):
-                continue
-            seg_data = {
-                'start': round(seg.start, 2),
-                'end':   round(seg.end, 2),
-                'text':  seg.text.strip(),
-                'words': []
-            }
-            for w in (seg.words or []):
-                seg_data['words'].append({
-                    'word': w.word, 'start': round(w.start, 2),
-                    'end': round(w.end, 2), 'probability': round(w.probability, 3)
-                })
-                all_word_scores.append({
-                    'word':  w.word.strip(),
-                    'start': round(w.start, 2),
-                    'end':   round(w.end, 2),
-                    'score': round(w.probability, 3),
-                    'grade': 'good' if w.probability >= 0.8 else ('warn' if w.probability >= 0.65 else 'poor')
-                })
-            all_segments.append(seg_data)
-            full_text += seg.text + ' '
+            segments_iter, info = model.transcribe(
+                temp_path,
+                language=language,
+                task='transcribe',
+                word_timestamps=True,
+                vad_filter=False,               # disabled: preserves silence gaps between segments
+                suppress_tokens=[],             # preserve fillers/repetitions, no normalization
+                suppress_blank=False,
+                condition_on_previous_text=False,
+                compression_ratio_threshold=100.0,  # disable repetition fallback — keeps repeated words
+                log_prob_threshold=-100.0,          # disable low-prob fallback — keeps hesitations
+                no_speech_threshold=0.95,
+                temperature=0.0,                    # greedy decoding — no randomness
+                beam_size=1,                        # greedy: prevents beam search from collapsing repetitions
+                repetition_penalty=1.0,
+                no_repeat_ngram_size=0,
+                initial_prompt=verbatim_prompt,      # language-specific filler + repetition priming
+                hotwords=repetition_hotwords,
+            )
 
-        segment_text = full_text.strip()
+            full_text = ''
+            all_segments = []
+            all_word_scores = []
+
+            for seg in segments_iter:
+                if _is_noise_segment(seg.text):
+                    continue
+                seg_data = {
+                    'start': round(seg.start, 2),
+                    'end':   round(seg.end, 2),
+                    'text':  seg.text.strip(),
+                    'words': []
+                }
+                for w in (seg.words or []):
+                    seg_data['words'].append({
+                        'word': w.word, 'start': round(w.start, 2),
+                        'end': round(w.end, 2), 'probability': round(w.probability, 3)
+                    })
+                    all_word_scores.append({
+                        'word':  w.word.strip(),
+                        'start': round(w.start, 2),
+                        'end':   round(w.end, 2),
+                        'score': round(w.probability, 3),
+                        'grade': 'good' if w.probability >= 0.8 else ('warn' if w.probability >= 0.65 else 'poor')
+                    })
+                all_segments.append(seg_data)
+                full_text += seg.text + ' '
+
+            segment_text = full_text.strip()
+            detected_language = info.language
+            language_confidence = round(info.language_probability, 3)
+            duration_value = round(info.duration, 1)
+
         word_timestamp_text = build_transcript_from_word_timestamps(all_segments)
         full_text = word_timestamp_text or segment_text
         # Strip ASR hallucination artifacts (e.g. one character stretched dozens
@@ -2335,9 +2441,9 @@ def full_evaluation():
             'segment_text':        segment_text,
             'word_timestamp_text': word_timestamp_text,
             'segments':            all_segments,
-            'language_detected':   info.language,
-            'language_confidence': round(info.language_probability, 3),
-            'duration_seconds':    round(info.duration, 1),
+            'language_detected':   detected_language,
+            'language_confidence': language_confidence,
+            'duration_seconds':    duration_value,
         }
 
         # Step 2: Full algorithmic analysis (now WITH word timestamps)
@@ -2367,10 +2473,14 @@ def full_evaluation():
         hes_examples     = ', '.join(f'"{h.get("word","")}"' for h in algo.get('hesitation_words', [])[:3])
         sil_examples     = format_silences_for_prompt(algo.get('long_silences', []))
         uncertain_words  = [w for w in all_word_scores if w['grade'] == 'poor']
-        uncertain_str    = ', '.join(
-            f'"{w["word"]}" (confidence {w["score"]})'
-            for w in uncertain_words[:10]
-        ) or 'none flagged'
+        if asr_method.startswith('groq'):
+            uncertain_str = ('(per-word confidence is not provided by the cloud recognizer — '
+                             'judge pronunciation only from the audio metrics and clear evidence in the transcript)')
+        else:
+            uncertain_str = ', '.join(
+                f'"{w["word"]}" (confidence {w["score"]})'
+                for w in uncertain_words[:10]
+            ) or 'none flagged'
         coverage_diagnostics = estimate_length_coverage(source_script, full_text)
 
         prompt = LLM_ANALYSIS_PROMPT.format(
@@ -2422,6 +2532,7 @@ def full_evaluation():
             'summary':          s
         }
         llm_result['fluency'] = fluency
+        llm_result['asr_method'] = asr_method
 
         # Step 4: Pronunciation report (whisper confidence + language-specific patterns)
         pronun_report = build_pronunciation_report(all_word_scores, language=language)

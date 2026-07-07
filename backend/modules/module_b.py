@@ -103,8 +103,11 @@ def text_to_speech():
 
 @module_b_bp.route('/audio/<filename>')
 def serve_audio(filename: str):
-    """Serve a generated audio file."""
-    path = os.path.join(AUDIO_OUTPUT_FOLDER, filename)
+    """Serve a generated audio file (basename only — no path traversal)."""
+    safe_name = os.path.basename(filename)
+    if not safe_name.endswith('.mp3'):
+        return jsonify({'error': 'File not found'}), 404
+    path = os.path.join(AUDIO_OUTPUT_FOLDER, safe_name)
     if not os.path.exists(path):
         return jsonify({'error': 'File not found'}), 404
     return send_file(path, mimetype='audio/mpeg')
