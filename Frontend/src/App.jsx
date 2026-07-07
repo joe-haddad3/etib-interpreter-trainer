@@ -2649,16 +2649,16 @@ function SightScroller({ script, isArabic, labels }) {
   const [fontSize, setFontSize] = useState(1.15);   // rem
   const [columns, setColumns] = useState(1);
   const [spacing, setSpacing] = useState(1.9);      // line-height
-  const [progress, setProgress] = useState(0);      // 0..1 of the scrollable area
+  const [progress, setProgress] = useState(0);      // 0..1 of the exercise
   const wrapRef = useRef(null);
   const rafRef = useRef(null);
   const lastTsRef = useRef(null);
   const lastUiUpdateRef = useRef(0);
-  // Fractional scroll position accumulator. At slow speeds the advance is
-  // well under 1px per frame, and browsers round element.scrollTop to whole
-  // pixels — read-modify-write (`scrollTop += 0.2`) rounds back to 0 every
-  // frame and the text never moves. Accumulate in a float, then assign.
-  const posRef = useRef(0);
+  // Time-driven engine (like scroller.dipintra.it): progress is a fraction of
+  // elapsed exercise TIME, and the scroll position is derived from it each
+  // frame. Timer and scroll can never disagree, and the float accumulator
+  // avoids the whole-pixel scrollTop rounding that froze slow speeds.
+  const progressRef = useRef(0);
 
   const wordCount = useMemo(() => String(script || '').split(/\s+/).filter(Boolean).length, [script]);
   const totalSeconds = (wordCount / Math.max(40, wpm)) * 60;
@@ -2669,25 +2669,31 @@ function SightScroller({ script, isArabic, labels }) {
       lastTsRef.current = null;
       return;
     }
-    // Re-sync with the real position (user may have dragged the scrollbar).
-    posRef.current = wrapRef.current ? wrapRef.current.scrollTop : 0;
+    // Re-sync with the scrollbar (the user may have dragged it while paused).
+    const wrapAtStart = wrapRef.current;
+    if (wrapAtStart) {
+      const scrollable = wrapAtStart.scrollHeight - wrapAtStart.clientHeight;
+      if (scrollable > 0 && wrapAtStart.scrollTop > 0) {
+        progressRef.current = wrapAtStart.scrollTop / scrollable;
+      }
+    }
     function step(ts) {
       const wrap = wrapRef.current;
       if (!wrap) return;
-      if (lastTsRef.current != null) {
+      if (lastTsRef.current != null && totalSeconds > 0) {
         const dt = (ts - lastTsRef.current) / 1000;
+        progressRef.current = Math.min(1, progressRef.current + dt / totalSeconds);
         const scrollable = wrap.scrollHeight - wrap.clientHeight;
-        if (scrollable > 0 && totalSeconds > 0) {
-          posRef.current = Math.min(scrollable, posRef.current + (scrollable / totalSeconds) * dt);
-          wrap.scrollTop = posRef.current;
-          if (ts - lastUiUpdateRef.current > 250) {
-            lastUiUpdateRef.current = ts;
-            setProgress(Math.min(1, posRef.current / scrollable));
-          }
-          if (posRef.current >= scrollable - 0.5) {
-            setProgress(1);
-            setPlaying(false);
-          }
+        if (scrollable > 0) {
+          wrap.scrollTop = progressRef.current * scrollable;
+        }
+        if (ts - lastUiUpdateRef.current > 200) {
+          lastUiUpdateRef.current = ts;
+          setProgress(progressRef.current);
+        }
+        if (progressRef.current >= 1) {
+          setProgress(1);
+          setPlaying(false);
         }
       }
       lastTsRef.current = ts;
@@ -2695,12 +2701,12 @@ function SightScroller({ script, isArabic, labels }) {
     }
     rafRef.current = requestAnimationFrame(step);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [playing, wpm, totalSeconds]);
+  }, [playing, totalSeconds]);
 
   function reset() {
     setPlaying(false);
     setProgress(0);
-    posRef.current = 0;
+    progressRef.current = 0;
     if (wrapRef.current) wrapRef.current.scrollTop = 0;
   }
 
@@ -2768,7 +2774,9 @@ function SightScroller({ script, isArabic, labels }) {
 
       {/* Outer wrapper owns the fixed height + vertical scrollbar; the inner
           block owns the column layout with natural height — putting both on
-          one element makes CSS columns overflow horizontally (no scrolling). */}
+          one element makes CSS columns overflow horizontally (no scrolling).
+          Spacer divs make the text enter from the bottom and exit through the
+          top, teleprompter-style, like the Bologna Scroller tool. */}
       <div
         ref={wrapRef}
         style={{
@@ -2777,17 +2785,19 @@ function SightScroller({ script, isArabic, labels }) {
           background: 'var(--surface, #fff)',
         }}
       >
+        <div aria-hidden="true" style={{ height: 300 }} />
         <div
           className={isArabic ? 'arabic' : ''}
           dir={isArabic ? 'rtl' : 'ltr'}
           style={{
-            padding: '1.25rem 1.5rem',
+            padding: '0 1.5rem',
             fontSize: `${fontSize}rem`, lineHeight: spacing,
             columnCount: columns, columnGap: '2.5rem', whiteSpace: 'pre-wrap',
           }}
         >
           {script}
         </div>
+        <div aria-hidden="true" style={{ height: 280 }} />
       </div>
     </div>
   );
