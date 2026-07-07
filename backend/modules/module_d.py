@@ -256,21 +256,23 @@ def _compute_adaptive_params(sessions: list) -> dict:
     elif avg_numbers <= 0.5 and avg_overall >= 7.0:
         params['number_density'] = 'medium'
 
-    # Fluency (pauses/repetitions) → slow down
+    # Fluency (pauses/repetitions) → adjust pace (values must exist in the
+    # Module A form: normal | fast | very_fast)
     if avg_fluency < 6.0 or avg_silences >= 2 or avg_reps >= 5:
-        params['speed_pressure'] = 'slow'
-        tips.append('Fluency needs work — slowing speech pace to reduce cognitive overload.')
+        params['speed_pressure'] = 'normal'
+        tips.append('Fluency needs work — keeping a normal pace; also try slowing the audio playback rate in Audio & Materials.')
     elif avg_fluency >= 8.0:
         params['speed_pressure'] = 'fast'
         tips.append('Strong fluency — increasing speaking pace.')
 
-    # Content coverage / information loss → structure help
+    # Content coverage / information loss → structure help (valid values:
+    # well-organized | semi-structured | deliberately disorganized)
     if avg_info_loss >= 2 or avg_coverage < 6.0:
         params['structure'] = 'well-organized'
         tips.append('Missing content regularly — keeping well-organized speeches to aid note-taking.')
     elif avg_overall >= 7.5 and avg_info_loss <= 0:
-        params['structure'] = 'meandering'
-        params['topic_shifts'] = 'occasional'
+        params['structure'] = 'semi-structured'
+        params['topic_shifts'] = 'mild'
         tips.append('Strong coverage — introducing slight topic shifts to challenge anticipation.')
 
     return {

@@ -1002,7 +1002,7 @@ const NAV_ITEMS = [
   { id: 'module-b', labelKey: 'navB' },
   { id: 'module-c', labelKey: 'navC' },
   { id: 'module-d', labelKey: 'navD' },
-  // { id: 'module-e', labelKey: 'navE' },
+  { id: 'module-e', labelKey: 'navE' },
 ];
 
 // MARC 041 language codes -> UI language codes / display labels
@@ -1941,6 +1941,7 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
   const [lastTranscript, setLastTranscript] = useState(null);
   const [lastRecordingBlob, setLastRecordingBlob] = useState(null);
   const [progressRefresh, setProgressRefresh] = useState(0);
+  const [adaptiveParams, setAdaptiveParams] = useState(null);
   const hasKey = Boolean(getStoredGroqKey());
 
   return (
@@ -1975,7 +1976,7 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
 
       {/* Keep all panels mounted — state persists when switching tabs */}
       <div style={{ display: activePanel === 'module-a' ? 'block' : 'none' }}>
-        <ModuleA labels={labels} onGenerated={onGenerated} isRtl={isRtl} />
+        <ModuleA labels={labels} onGenerated={onGenerated} isRtl={isRtl} adaptiveParams={adaptiveParams} />
       </div>
       <div style={{ display: activePanel === 'module-b' ? 'block' : 'none' }}>
         <ModuleB labels={labels} lastGeneratedScript={lastGeneratedScript}
@@ -1995,7 +1996,12 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
       </div>
       <div style={{ display: activePanel === 'module-e' ? 'block' : 'none' }}>
         <ModuleProgress labels={labels} refresh={progressRefresh}
-          onApplyParams={(params) => { onGenerated && onGenerated(null); onPanelChange('module-a'); }} />
+          onApplyParams={(params) => {
+            // Adaptive difficulty (cahier D12): apply the recommended
+            // parameters to the generation form, then jump to Module A.
+            setAdaptiveParams({ ...params, _appliedAt: Date.now() });
+            onPanelChange('module-a');
+          }} />
       </div>
 
     </section>
@@ -2144,8 +2150,26 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
   );
 }
 
-function ModuleA({ labels, onGenerated, isRtl }) {
+function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
   const [form, setForm] = useState(initialSpeechForm);
+
+  // Adaptive difficulty (cahier D12): merge the recommended parameters from
+  // the Progress page into the generation form whenever the student clicks
+  // "Apply these settings".
+  useEffect(() => {
+    if (!adaptiveParams) return;
+    const wc = Number(adaptiveParams.word_count || 0);
+    const word_count_range = wc <= 180 ? 'short' : wc <= 320 ? 'medium' : wc <= 550 ? 'long' : 'extended';
+    setForm(current => ({
+      ...current,
+      difficulty: adaptiveParams.difficulty || current.difficulty,
+      word_count_range: wc ? word_count_range : current.word_count_range,
+      number_density: adaptiveParams.number_density || current.number_density,
+      speed_pressure: adaptiveParams.speed_pressure || current.speed_pressure,
+      structure: adaptiveParams.structure || current.structure,
+      topic_shifts: adaptiveParams.topic_shifts || current.topic_shifts,
+    }));
+  }, [adaptiveParams]);
   const [documentFile, setDocumentFile] = useState(null);
   const [retrievalResult, setRetrievalResult] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(true);
