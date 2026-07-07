@@ -2916,7 +2916,9 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
       {mcqs.length > 0 && (
         <div className="card">
           <h2 className="b-section-title">❓ {labels.mcqTitle}</h2>
-          <McqQuiz mcqs={mcqs} labels={labels} isArabic={isArabic} />
+          {/* key = speech fingerprint: a new speech mounts a fresh quiz,
+              otherwise answers from the previous text stay selected */}
+          <McqQuiz key={speechId} mcqs={mcqs} labels={labels} isArabic={isArabic} />
         </div>
       )}
 
@@ -3297,7 +3299,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
         {interpMode === 'sight' && (
           <div className="record-section" style={{ marginBottom: '1rem' }}>
             {sourceScript ? (
-              <SightScroller script={sourceScript} isArabic={sourceIsArabic} labels={labels} />
+              <SightScroller key={sourceScript.slice(0, 50)} script={sourceScript} isArabic={sourceIsArabic} labels={labels} />
             ) : (
               <div className="info-tip">ℹ️ {labels.needsSource}</div>
             )}
