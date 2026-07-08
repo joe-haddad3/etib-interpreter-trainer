@@ -1272,7 +1272,7 @@ def build_transcript_from_word_timestamps(segments: list) -> str:
     return re.sub(r'\s+', ' ', ' '.join(words)).strip()
 
 
-def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds: float = 0.18, max_gap_seconds: float = 1.4) -> list:
+def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds: float = 0.08, max_gap_seconds: float = 1.4) -> list:
     """
     Detect likely filled pauses from the recording when ASR omits fillers.
     A short gap between recognized words that still contains voiced audio is
@@ -1319,6 +1319,91 @@ def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds:
         return candidates
     except Exception as exc:
         print(f'[Module D] Audio filled-pause detection failed: {exc}')
+        return []
+
+
+def detect_false_starts_from_audio(audio_path: str,
+                                    min_burst_ms: int = 40,
+                                    max_burst_ms: int = 380,
+                                    min_gap_ms: int = 40,
+                                    max_gap_ms: int = 700) -> list:
+    """
+    Detect mid-word stops (false starts) directly from audio energy.
+
+    Pattern looked for:
+      SHORT voiced burst (40–380 ms)  →  silence gap (40–700 ms)  →  longer voiced segment
+
+    This catches the case where the student starts a word, stops mid-syllable,
+    and restarts — even when the ASR removes the partial word entirely from the
+    transcript (which Groq whisper-large-v3 almost always does).
+
+    Returns items in the same shape as hesitation_words so they merge cleanly.
+    """
+    try:
+        import numpy as np
+
+        samples, sample_rate = decode_audio_mono(audio_path)
+        if samples is None or len(samples) == 0:
+            return []
+
+        global_db = audio_dbfs(samples)
+        if global_db == float('-inf'):
+            return []
+
+        voiced_thresh = max(global_db - 14, -42)
+        window_ms  = 10
+        win_size   = max(1, int(sample_rate * window_ms / 1000))
+
+        # Label each 10-ms window as voiced/silent
+        voiced_flags = [
+            audio_dbfs(samples[s:s + win_size]) >= voiced_thresh
+            for s in range(0, len(samples), win_size)
+        ]
+
+        # Merge consecutive same-label windows into segments
+        segs: list[tuple[str, int, int]] = []   # (kind, start_ms, end_ms)
+        if not voiced_flags:
+            return []
+        kind   = 'voiced' if voiced_flags[0] else 'silent'
+        t_start = 0
+        for i, v in enumerate(voiced_flags[1:], start=1):
+            cur = 'voiced' if v else 'silent'
+            if cur != kind:
+                segs.append((kind, t_start * window_ms, i * window_ms))
+                kind    = cur
+                t_start = i
+        segs.append((kind, t_start * window_ms, len(voiced_flags) * window_ms))
+
+        false_starts = []
+        # Look for: voiced(short) → silent → voiced(longer)
+        for i in range(len(segs) - 2):
+            s0, s1, s2 = segs[i], segs[i + 1], segs[i + 2]
+            if s0[0] != 'voiced' or s1[0] != 'silent' or s2[0] != 'voiced':
+                continue
+
+            burst_ms = s0[2] - s0[1]
+            gap_ms   = s1[2] - s1[1]
+            next_ms  = s2[2] - s2[1]
+
+            if not (min_burst_ms <= burst_ms <= max_burst_ms):
+                continue
+            if not (min_gap_ms <= gap_ms <= max_gap_ms):
+                continue
+            # The restart must be meaningfully longer than the false start burst
+            if next_ms <= burst_ms * 0.8:
+                continue
+
+            false_starts.append({
+                'word':             '[false start]',
+                'at_seconds':       round(s0[1] / 1000, 1),
+                'duration_seconds': round(burst_ms / 1000, 3),
+                'confidence':       1.0,
+                'source':           'audio_false_start',
+            })
+
+        return false_starts
+    except Exception as exc:
+        print(f'[Module D] Audio false-start detection failed: {exc}')
         return []
 
 
@@ -2608,11 +2693,13 @@ def full_evaluation():
             algo['audio_silences'] = audio_silences
             algo.setdefault('summary', {})['silence_count'] = len(algo['long_silences'])
         audio_hesitations = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
-        if audio_hesitations:
-            algo['audio_hesitations'] = audio_hesitations
+        audio_false_starts = detect_false_starts_from_audio(temp_path)
+        all_audio_hes = (audio_hesitations or []) + (audio_false_starts or [])
+        if all_audio_hes:
+            algo['audio_hesitations'] = all_audio_hes
             algo['hesitation_words'] = merge_hesitation_reports(
                 algo.get('hesitation_words', []),
-                audio_hesitations,
+                all_audio_hes,
             )
             algo.setdefault('summary', {})['hesitation_count'] = len(algo['hesitation_words'])
         s    = algo.get('summary', {})
