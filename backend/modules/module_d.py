@@ -536,8 +536,9 @@ Flag ALL of the following as translation_errors:
 - A vague or weakened rendering (e.g. "problem" when source said "crisis")
 - A term from the wrong domain (e.g. "durable" vs "développement durable")
 - An opposite meaning (e.g. "approve" vs "reject")
-- A number that is wrong or approximate (e.g. "about 50%" when source said "exactly 47%")
 - A concept rendered in a way a listener would understand differently
+
+IMPORTANT: Do NOT put number, percentage, statistic, or date errors here — those are handled exclusively in TASK 10 (number_accuracy). translation_errors is only for meaning/wording errors.
 
 Do NOT accept these excuses:
 - "close enough" — if meaning shifted, it is an error
@@ -2088,6 +2089,52 @@ def clean_translation_error_items(result: dict) -> dict:
     return result
 
 
+_NUMBER_IN_TEXT_RE = re.compile(r'\b\d+(?:[.,]\d+)?%?\b')
+_NUMBER_EXPLANATION_TERMS = {
+    'percentage', 'pourcentage', 'percent', 'number error', 'wrong number',
+    'incorrect percentage', 'nombre incorrect', 'faux pourcentage', 'chiffre incorrect',
+    'statistique', 'statistic', 'wrong figure', 'faux chiffre', 'nombre erron',
+    'wrong statistic', 'nombre faux', 'chiffre faux', 'chiffre erron',
+    'wrong percentage', 'incorrect number', 'incorrect figure',
+}
+
+
+def filter_number_only_translation_errors(result: dict) -> dict:
+    """
+    Remove items from translation_errors where the sole discrepancy is a
+    number/percentage/statistic difference — those are already in number_accuracy.
+    """
+    if not isinstance(result, dict):
+        return result
+
+    cleaned = []
+    for item in result.get('translation_errors', []) or []:
+        if not isinstance(item, dict):
+            cleaned.append(item)
+            continue
+
+        explanation = normalize_eval_text(item.get('explanation', ''))
+        is_number_error = any(term in explanation for term in _NUMBER_EXPLANATION_TERMS)
+
+        if not is_number_error:
+            source_text = str(item.get('source_text', '') or '')
+            student_said = str(item.get('student_said', '') or '')
+            if source_text and student_said:
+                src_nums = _NUMBER_IN_TEXT_RE.findall(source_text)
+                std_nums = _NUMBER_IN_TEXT_RE.findall(student_said)
+                if src_nums and std_nums and src_nums != std_nums:
+                    src_stripped = normalize_eval_text(_NUMBER_IN_TEXT_RE.sub('NUM', source_text))
+                    std_stripped = normalize_eval_text(_NUMBER_IN_TEXT_RE.sub('NUM', student_said))
+                    if src_stripped == std_stripped:
+                        is_number_error = True
+
+        if not is_number_error:
+            cleaned.append(item)
+
+    result['translation_errors'] = cleaned
+    return result
+
+
 def is_french_silent_plural_s_error(item: dict) -> bool:
     """French final plural -s is silent; ASR spelling alone cannot prove omission."""
     text = ' '.join(
@@ -2299,6 +2346,7 @@ def generate_feedback():
         llm_result = filter_french_silent_plural_errors(llm_result, language)
         llm_result = remove_false_missing_translation_errors(llm_result, transcript_text)
         llm_result = clean_translation_error_items(llm_result)
+        llm_result = filter_number_only_translation_errors(llm_result)
         llm_result = reclassify_garbage_translation_errors(llm_result)
         llm_result = filter_equivalent_number_renderings(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, transcript_text)
@@ -2519,6 +2567,7 @@ def full_evaluation():
         llm_result = strip_foreign_script_chars(llm_result)
         llm_result = remove_false_missing_translation_errors(llm_result, full_text)
         llm_result = clean_translation_error_items(llm_result)
+        llm_result = filter_number_only_translation_errors(llm_result)
         llm_result = reclassify_garbage_translation_errors(llm_result)
         llm_result = filter_equivalent_number_renderings(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, full_text)

@@ -2782,6 +2782,7 @@ function McqQuiz({ mcqs, labels, isArabic }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               {(item.options || []).map((opt, oi) => {
+                const letter = 'ABCD'[oi] || String(oi + 1);
                 const isSelected = state.selected === opt;
                 const optionCorrect = isCorrectOption(item, opt);
                 let border = '1.5px solid var(--border, #ddd)';
@@ -2799,10 +2800,11 @@ function McqQuiz({ mcqs, labels, isArabic }) {
                       textAlign: 'start', padding: '0.5rem 0.75rem', borderRadius: 8,
                       border, background, cursor: revealed ? 'default' : 'pointer',
                       fontSize: '0.86rem', lineHeight: 1.45,
+                      display: 'flex', gap: '0.55rem', alignItems: 'flex-start',
                     }}
                   >
-                    {opt}
-                    {revealed && optionCorrect && ' ✓'}
+                    <span style={{ fontWeight: 700, minWidth: '1.1rem', color: 'var(--warm-gray)' }}>{letter}.</span>
+                    <span style={{ flex: 1 }}>{opt}{revealed && optionCorrect && ' ✓'}</span>
                   </button>
                 );
               })}
@@ -3942,7 +3944,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="algo-grid">
               {[
                 { label: labels.longSilences,  icon: '🔇', items: algo.long_silences || [] },
-                { label: labels.repetitions,   icon: '🔁', items: algo.repetitions || [] },
                 { label: labels.hesitations,   icon: '🗣️', items: algo.hesitation_words || [] },
                 { label: labels.numberErrors,  icon: '🔢', items: displayNumberErrors },
               ].map(({ label, icon, items }) => (
@@ -3970,21 +3971,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                     </div>
                   );
                 })}
-              </div>
-            )}
-            {(algo.repetitions || []).length > 0 && (
-              <div className="algo-detail-block">
-                <p className="algo-detail-title">🔁 {labels.repetitions}</p>
-                {algo.repetitions.map((r, i) => (
-                  <div key={i} className="algo-detail-row">
-                    <span className="algo-detail-badge algo-badge-gold">"{r.word}"</span>
-                    <span className="algo-detail-text">
-                      {r.at_seconds !== undefined
-                        ? `at ${r.at_seconds}s · repeated at ${r.second_occurrence}s`
-                        : `repeated near word ${r.position ?? i}`}
-                    </span>
-                  </div>
-                ))}
               </div>
             )}
             {(algo.hesitation_words || []).length > 0 && (
