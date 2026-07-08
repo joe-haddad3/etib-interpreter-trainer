@@ -454,7 +454,7 @@ def normalize_mcqs(mcqs: list) -> list:
         if index is None:
             answer_text = _MCQ_PREFIX_RE.sub('', answer_raw).strip()
             for i, opt in enumerate(options):
-                if opt == answer_text or (answer_text and answer_text in opt):
+                if opt == answer_text:
                     index = i
                     break
         if index is None:
@@ -486,6 +486,13 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
     def clean(s: str) -> str:
         return _clean_arabic_script(str(s).strip()) if language == 'ar' else str(s).strip()
 
+    def clean_mcq_option(s: str) -> str:
+        # MCQ options may contain mixed Arabic+Latin (e.g. "GDP نمو 5%").
+        # Only strip extra whitespace and convert digits; never strip Latin chars.
+        import re as _re
+        cleaned = _re.sub(r'\s{2,}', ' ', str(s).strip())
+        return _to_arabic_indic(cleaned) if language == 'ar' else cleaned
+
     script = clean(data.get('script', ''))
 
     # Clean MCQ text to remove stray foreign characters
@@ -496,7 +503,7 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
             continue
         mcqs.append({
             'question': clean(item.get('question', '')),
-            'options':  [clean(opt) for opt in (item.get('options') or [])],
+            'options':  [clean_mcq_option(opt) for opt in (item.get('options') or [])],
             # Answer is a short option label/letter (e.g. "A" or "32") — never
             # run it through the Arabic-only filter, which would strip Latin
             # letters used as MCQ choice labels.

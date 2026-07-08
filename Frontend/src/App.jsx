@@ -144,7 +144,7 @@ const UI = {
     generating: 'Generating - please wait...',
     wordsUnit: 'words',
     moduleBTitle: 'Audio & Pedagogical Materials',
-    moduleBBody: 'Will produce: audio playback, key terms, glossary, MCQ, and flashcards.',
+    moduleBBody: 'Will produce: audio playback, key terms, glossary, and MCQ.',
     moduleCTitle: 'Record & Transcribe',
     moduleCBody: 'Will allow: in-browser recording, ASR transcription, timestamped transcript, and playback.',
     moduleDTitle: 'Performance Evaluation',
@@ -862,7 +862,7 @@ const UI = {
     generating: 'Génération en cours...',
     wordsUnit: 'mots',
     moduleBTitle: 'Audio et supports pédagogiques',
-    moduleBBody: 'Produira : lecture audio, termes clés, glossaire, QCM et flashcards.',
+    moduleBBody: 'Produira : lecture audio, termes clés, glossaire et QCM.',
     moduleCTitle: 'Enregistrer et transcrire',
     moduleCBody: 'Permettra : enregistrement dans le navigateur, transcription ASR, horodatage et lecture.',
     moduleDTitle: 'Évaluation des performances',
@@ -4187,7 +4187,56 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
+          {/* Language errors (grammar / syntax) */}
+          {(report.language_errors || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">⚠️ {labels.languageErrors}</h3>
+              {report.language_errors.map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.6rem' }}>
+                  <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
+                  {item.explanation && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{item.explanation}</div>}
+                  {item.correction && <div className="eval-correction">✓ {labels.correction}: <strong className={isAr ? 'arabic' : ''}>{item.correction}</strong></div>}
+                </div>
+              ))}
+            </div>
+          )}
 
+          {/* Auto-corrections (self-corrections the student made mid-speech) */}
+          {(report.auto_corrections || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">✏️ {labels.autoCorrections}</h3>
+              {report.auto_corrections.map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sage)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                  <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* False starts (incomplete phrases abandoned mid-sentence) */}
+          {(report.false_starts || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">↩️ {labels.falseStarts}</h3>
+              {report.false_starts.map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                  <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Lapsus linguae (slips of the tongue) */}
+          {(report.lapsus_linguae || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">👅 {labels.lapsusLinguae}</h3>
+              {report.lapsus_linguae.map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                  <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
+                  {item.likely_intended && <div className="eval-correction">→ {labels.correction}: <strong className={isAr ? 'arabic' : ''}>{item.likely_intended}</strong></div>}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Recommendations */}
           {(report.recommendations || []).length > 0 && (
