@@ -305,6 +305,7 @@ const UI = {
     mcqShowAnswer: 'Show answer',
     mcqCorrectMsg: '✓ Correct!',
     mcqWrongMsg: '✗ Not quite. Correct answer:',
+    mcqShowAnswerLabel: 'ℹ️ Correct answer:',
     mcqYourScore: 'Your score',
     glossaryEdit: '✏️ Edit glossary',
     glossaryEditDone: '✓ Done editing',
@@ -663,6 +664,7 @@ const UI = {
     mcqShowAnswer: 'أظهر الإجابة',
     mcqCorrectMsg: '✓ صحيح!',
     mcqWrongMsg: '✗ غير صحيح. الإجابة الصحيحة:',
+    mcqShowAnswerLabel: 'ℹ️ الإجابة الصحيحة:',
     mcqYourScore: 'نتيجتك',
     glossaryEdit: '✏️ تعديل المسرد',
     glossaryEditDone: '✓ إنهاء التعديل',
@@ -1021,6 +1023,7 @@ const UI = {
     mcqShowAnswer: 'Afficher la réponse',
     mcqCorrectMsg: '✓ Correct !',
     mcqWrongMsg: '✗ Incorrect. Bonne réponse :',
+    mcqShowAnswerLabel: 'ℹ️ Bonne réponse :',
     mcqYourScore: 'Votre score',
     glossaryEdit: '✏️ Modifier le glossaire',
     glossaryEditDone: '✓ Terminer la modification',
@@ -2719,33 +2722,22 @@ function SpeechResult({ data, labels }) {
 // ── Interactive MCQ quiz — answers hidden until the student answers ─────────
 
 function McqQuiz({ mcqs, labels, isArabic }) {
-  // Per-question state: { selected: 'A. …', revealed: bool }
   const [answers, setAnswers] = useState({});
 
-  function optionLetter(option) {
-    const match = String(option || '').match(/^([A-D])[.)\s]/i);
-    return match ? match[1].toUpperCase() : String(option || '').trim();
+  function getCorrectText(item) {
+    if (item.answer_text) return item.answer_text;
+    if (Number.isInteger(item.answer_index) && Array.isArray(item.options))
+      return item.options[item.answer_index] || '';
+    const letter = String(item.answer || '').trim().toUpperCase();
+    const idx = { A: 0, B: 1, C: 2, D: 3 }[letter];
+    if (idx !== undefined && Array.isArray(item.options)) return item.options[idx] || '';
+    return item.answer || '';
   }
 
   function isCorrectOption(item, option) {
-    // Server-resolved index (new format) — unambiguous in every language.
-    if (Number.isInteger(item.answer_index) && Array.isArray(item.options)) {
+    if (Number.isInteger(item.answer_index) && Array.isArray(item.options))
       return item.options[item.answer_index] === option;
-    }
-    const answer = String(item.answer || '').trim();
-    if (option === answer
-      || option.startsWith(answer + '.')
-      || option.startsWith(answer + ' ')
-      || optionLetter(option) === answer.toUpperCase()) {
-      return true;
-    }
-    // Letter-index fallback: Arabic options have their Latin "A./B." prefixes
-    // stripped by the backend script cleaner, so match "A" -> 1st option, etc.
-    const letterIndex = { A: 0, B: 1, C: 2, D: 3 }[answer.toUpperCase()];
-    if (letterIndex !== undefined && Array.isArray(item.options)) {
-      return item.options[letterIndex] === option;
-    }
-    return false;
+    return option === getCorrectText(item);
   }
 
   function select(qi, option) {
@@ -2775,6 +2767,7 @@ function McqQuiz({ mcqs, labels, isArabic }) {
         const state = answers[qi] || {};
         const revealed = Boolean(state.revealed);
         const selectedIsCorrect = state.selected ? isCorrectOption(item, state.selected) : false;
+        const correctText = getCorrectText(item);
         return (
           <div key={qi} className="eval-item" style={{ marginBottom: '1.1rem', paddingBottom: '0.9rem', borderBottom: '1px solid var(--border, #eee)' }}>
             <div className={`mcq-q ${isArabic ? 'arabic' : ''}`} style={{ fontWeight: 600, marginBottom: '0.55rem' }}>
@@ -2820,10 +2813,12 @@ function McqQuiz({ mcqs, labels, isArabic }) {
               </div>
             ) : (
               <p style={{ marginTop: '0.55rem', fontSize: '0.84rem', fontWeight: 600,
-                color: state.selected && selectedIsCorrect ? '#2D5A4E' : '#8B3A2A' }}>
-                {state.selected && selectedIsCorrect
-                  ? labels.mcqCorrectMsg
-                  : <>{labels.mcqWrongMsg} <strong>{item.answer_text || item.answer}</strong></>}
+                color: state.selected ? (selectedIsCorrect ? '#2D5A4E' : '#8B3A2A') : 'var(--warm-gray)' }}>
+                {state.selected
+                  ? (selectedIsCorrect
+                    ? labels.mcqCorrectMsg
+                    : <>{labels.mcqWrongMsg} <strong>{correctText}</strong></>)
+                  : <>{labels.mcqShowAnswerLabel} <strong>{correctText}</strong></>}
               </p>
             )}
           </div>
