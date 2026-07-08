@@ -2180,6 +2180,99 @@ def filter_french_silent_plural_errors(result: dict, language: str) -> dict:
     return result
 
 
+_SHORT_PARTICLES = {
+    'en': {'a', 'an', 'the', 'i', 'to', 'of', 'in', 'is', 'it', 'as', 'at', 'by', 'or', 'if', 'up', 'do', 'so', 'we', 'he', 'my', 'on'},
+    'fr': {'a', 'à', 'au', 'le', 'la', 'de', 'du', 'je', 'il', 'un', 'ou', 'et', 'en', 'on', 'y', 'tu', 'ce', 'se', 'sa'},
+    'ar': set(),
+}
+
+
+def detect_repetitions_timing_window(segments: list, language: str = 'ar',
+                                      max_gap_seconds: float = 1.5) -> list:
+    """
+    Detect word repetitions using timing: if the same word appears twice within
+    max_gap_seconds in the word timestamp list, it's a repetition — even when
+    the ASR segment text has already been deduplicated (Groq and faster-whisper
+    both normalize consecutive repeated words in the text output).
+    """
+    words = get_word_timing_sequence(segments)
+    repetitions = []
+    seen_keys = set()
+
+    for i, w in enumerate(words):
+        word = normalize_repetition_word(w['word'])
+        if len(word) < 2:
+            continue
+        for j in range(i + 1, len(words)):
+            nw = words[j]
+            gap = nw['start'] - w['end']
+            if gap > max_gap_seconds:
+                break
+            next_word = normalize_repetition_word(nw['word'])
+            if words_are_repetition_equivalent(word, next_word, language):
+                key = (word, round(w['start'], 1))
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    repetitions.append({
+                        'word': w['word'],
+                        'at_seconds': round(w['start'], 1),
+                        'second_occurrence': round(nw['start'], 1),
+                        'gap_words': j - i,
+                        'source': 'timing_window',
+                    })
+                break
+
+    return repetitions
+
+
+def detect_false_starts_from_words(segments: list, language: str = 'ar') -> list:
+    """
+    Detect false starts and mid-word stops from word-level timestamps.
+    A word is a likely false start when:
+      - Its duration is very short (< 0.15 s), AND
+      - It is immediately followed (gap < 0.5 s) by a word that begins with the
+        same first 2+ characters — the student started the word, stopped, then
+        restarted it.
+    These are returned in hesitation-compatible format so they appear in the
+    hesitation_words list under a 'false_start' source label.
+    """
+    words = get_word_timing_sequence(segments)
+    particles = _SHORT_PARTICLES.get(language, set())
+    false_starts = []
+
+    for i, w in enumerate(words[:-1]):
+        word = normalize_repetition_word(w['word'])
+        if not word or word in particles:
+            continue
+        duration = w['end'] - w['start']
+        if duration >= 0.18:
+            continue
+        nw = words[i + 1]
+        gap = nw['start'] - w['end']
+        if gap > 0.6:
+            continue
+        next_word = normalize_repetition_word(nw['word'])
+        # Short word is a prefix of the next word → false start
+        prefix_len = min(len(word), 3)
+        if len(word) >= 2 and len(next_word) >= len(word) and next_word.startswith(word[:prefix_len]):
+            false_starts.append({
+                'word': w['word'],
+                'at_seconds': round(w['start'], 1),
+                'confidence': 1.0,
+                'source': 'false_start',
+            })
+        # Word is extremely short (<0.10 s) regardless of next word → truncated utterance
+        elif duration < 0.10 and gap < 0.35:
+            false_starts.append({
+                'word': w['word'],
+                'at_seconds': round(w['start'], 1),
+                'confidence': 1.0,
+                'source': 'false_start',
+            })
+
+    return false_starts
+
+
 def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar') -> dict:
     """
     Run all error detection — combines word-level (when available) and text-based detection.
@@ -2195,14 +2288,27 @@ def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar'
     low_conf        = detect_low_confidence_words(segments)
     number_errs     = detect_number_errors(source_script, full_text)
 
+    # Timing-window repetition: catches words the ASR deduplicated in text but
+    # kept as separate entries in the word-timestamp list (Groq and faster-whisper).
+    timing_reps = detect_repetitions_timing_window(segments, language)
+
+    # False starts / mid-word stops — appear in hesitation list since they are
+    # the same disfluency category (D5 in cahier des charges).
+    false_starts = detect_false_starts_from_words(segments, language)
+
     # Text-based detection (always works, even with Groq transcript)
     text_hesitations = detect_hesitations_from_text(full_text, language)
     text_repetitions = detect_repetitions_from_text(full_text, language)
 
-    # Merge word-level timestamps with transcript-text fillers, because ASR word
-    # timestamps can miss or normalize fillers such as "uhhh".
+    # Merge: timing-window reps win over word-level (more reliable for Groq),
+    # text reps fill remaining gaps.
     all_hesitations = merge_hesitation_reports(word_hesitations, text_hesitations)
-    all_repetitions = merge_repetition_reports(word_reps, text_repetitions)
+    # Add false starts to the hesitation list (they are disfluency D5)
+    for fs in false_starts:
+        if not any(abs(float(h.get('at_seconds') or 0) - float(fs['at_seconds'])) < 0.3
+                   for h in all_hesitations):
+            all_hesitations.append(fs)
+    all_repetitions = merge_repetition_reports(timing_reps, word_reps, text_repetitions)
 
     return {
         'long_silences':        silences,

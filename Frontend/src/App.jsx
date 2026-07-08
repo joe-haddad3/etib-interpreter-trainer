@@ -3939,6 +3939,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="algo-grid">
               {[
                 { label: labels.longSilences,  icon: '🔇', items: algo.long_silences || [] },
+                { label: labels.repetitions,   icon: '🔁', items: algo.repetitions || [] },
                 { label: labels.hesitations,   icon: '🗣️', items: algo.hesitation_words || [] },
                 { label: labels.numberErrors,  icon: '🔢', items: displayNumberErrors },
               ].map(({ label, icon, items }) => (
@@ -3966,6 +3967,21 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {(algo.repetitions || []).length > 0 && (
+              <div className="algo-detail-block">
+                <p className="algo-detail-title">🔁 {labels.repetitions}</p>
+                {algo.repetitions.map((r, i) => (
+                  <div key={i} className="algo-detail-row">
+                    <span className="algo-detail-badge algo-badge-gold">"{r.word}"</span>
+                    <span className="algo-detail-text">
+                      {r.at_seconds !== undefined
+                        ? `at ${r.at_seconds}s${r.second_occurrence !== undefined ? ` · again at ${r.second_occurrence}s` : ''}`
+                        : `near word ${r.position ?? i}`}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
             {(algo.hesitation_words || []).length > 0 && (
