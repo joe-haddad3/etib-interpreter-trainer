@@ -2728,6 +2728,10 @@ function McqQuiz({ mcqs, labels, isArabic }) {
   }
 
   function isCorrectOption(item, option) {
+    // Server-resolved index (new format) — unambiguous in every language.
+    if (Number.isInteger(item.answer_index) && Array.isArray(item.options)) {
+      return item.options[item.answer_index] === option;
+    }
     const answer = String(item.answer || '').trim();
     if (option === answer
       || option.startsWith(answer + '.')
@@ -2817,7 +2821,7 @@ function McqQuiz({ mcqs, labels, isArabic }) {
                 color: state.selected && selectedIsCorrect ? '#2D5A4E' : '#8B3A2A' }}>
                 {state.selected && selectedIsCorrect
                   ? labels.mcqCorrectMsg
-                  : <>{labels.mcqWrongMsg} <strong>{item.answer}</strong></>}
+                  : <>{labels.mcqWrongMsg} <strong>{item.answer_text || item.answer}</strong></>}
               </p>
             )}
           </div>

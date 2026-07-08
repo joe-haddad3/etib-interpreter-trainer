@@ -305,7 +305,13 @@ SPEECH WRITING RULES
 
 5. The "script" field MUST stay between {word_count_min} and {word_count_max} words. Expand with concrete examples, data, and elaboration until it is close to {word_count} words.
 
-6. MCQ rules: Write 5 questions that test SPECIFIC content from the speech — exact numbers, named organisations, specific policy positions, cause-effect relationships. NEVER ask "what is the topic?" or "who gave this speech?".
+6. MCQ rules: Write 5 questions that test SPECIFIC content from the speech.
+   - Mix the question types: AT LEAST 2 questions about ideas, arguments, positions, or cause-effect
+     relationships from the speech, and AT MOST 2 questions about numbers/statistics.
+   - Every question MUST be answerable from the speech text alone. NEVER ask about a fact that is
+     not explicitly stated in the speech — that is a critical error.
+   - The 3 wrong options must be plausible but clearly contradicted by the speech.
+   - NEVER ask "what is the topic?" or "who gave this speech?".
 
 7. Glossary: 8–12 key terms, each with Arabic, French, English, and a brief definition.
 
@@ -413,6 +419,62 @@ def _clean_arabic_script(text: str) -> str:
     return _to_arabic_indic(cleaned)
 
 
+_MCQ_PREFIX_RE = re.compile(r'^\s*[A-Da-dأ-د]\s*[.)\-:،]\s*')
+_ARABIC_ANSWER_LETTERS = {'أ': 0, 'ا': 0, 'ب': 1, 'ج': 2, 'د': 3}
+
+
+def normalize_mcqs(mcqs: list) -> list:
+    """
+    Make MCQs unambiguous and fair:
+    - strip "A." / "ب)" prefixes from options,
+    - resolve the correct answer to an INDEX (letter- or text-based), dropping
+      questions whose answer cannot be resolved,
+    - shuffle the options so the correct answer is not always the same letter.
+    The frontend matches on answer_index — no more letter/text guessing.
+    """
+    normalized = []
+    for item in mcqs or []:
+        if not isinstance(item, dict):
+            continue
+        question = str(item.get('question', '')).strip()
+        raw_options = [str(opt).strip() for opt in (item.get('options') or []) if str(opt).strip()]
+        if not question or len(raw_options) < 2:
+            continue
+
+        options = [_MCQ_PREFIX_RE.sub('', opt).strip() or opt for opt in raw_options]
+        answer_raw = str(item.get('answer', '')).strip()
+
+        index = None
+        if re.fullmatch(r'[A-Da-d]', answer_raw):
+            index = 'ABCD'.index(answer_raw.upper())
+        elif answer_raw in _ARABIC_ANSWER_LETTERS:
+            index = _ARABIC_ANSWER_LETTERS[answer_raw]
+        if index is not None and index >= len(options):
+            index = None
+        if index is None:
+            answer_text = _MCQ_PREFIX_RE.sub('', answer_raw).strip()
+            for i, opt in enumerate(options):
+                if opt == answer_text or (answer_text and answer_text in opt):
+                    index = i
+                    break
+        if index is None:
+            continue  # unresolvable answer → drop rather than mislead the student
+
+        order = list(range(len(options)))
+        random.shuffle(order)
+        shuffled = [options[i] for i in order]
+        new_index = order.index(index)
+
+        normalized.append({
+            'question': question,
+            'options': shuffled,
+            'answer_index': new_index,
+            'answer': 'ABCD'[new_index] if new_index < 4 else str(new_index + 1),
+            'answer_text': shuffled[new_index],
+        })
+    return normalized
+
+
 def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
     """Parse model JSON and fall back to treating the output as script text."""
     text = clean_model_json_text(raw_output)
@@ -448,7 +510,7 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
     return {
         'script':   script,
         'summary':  summary,
-        'mcqs':     mcqs,
+        'mcqs':     normalize_mcqs(mcqs),
         'glossary': normalize_glossary(data.get('glossary')),
         'metadata': data.get('metadata') if isinstance(data.get('metadata'), dict) else {},
     }
