@@ -256,21 +256,23 @@ def _compute_adaptive_params(sessions: list) -> dict:
     elif avg_numbers <= 0.5 and avg_overall >= 7.0:
         params['number_density'] = 'medium'
 
-    # Fluency (pauses/repetitions) → slow down
+    # Fluency (pauses/repetitions) → adjust pace (values must exist in the
+    # Module A form: normal | fast | very_fast)
     if avg_fluency < 6.0 or avg_silences >= 2 or avg_reps >= 5:
-        params['speed_pressure'] = 'slow'
-        tips.append('Fluency needs work — slowing speech pace to reduce cognitive overload.')
+        params['speed_pressure'] = 'normal'
+        tips.append('Fluency needs work — keeping a normal pace; also try slowing the audio playback rate in Audio & Materials.')
     elif avg_fluency >= 8.0:
         params['speed_pressure'] = 'fast'
         tips.append('Strong fluency — increasing speaking pace.')
 
-    # Content coverage / information loss → structure help
+    # Content coverage / information loss → structure help (valid values:
+    # well-organized | semi-structured | deliberately disorganized)
     if avg_info_loss >= 2 or avg_coverage < 6.0:
         params['structure'] = 'well-organized'
         tips.append('Missing content regularly — keeping well-organized speeches to aid note-taking.')
     elif avg_overall >= 7.5 and avg_info_loss <= 0:
-        params['structure'] = 'meandering'
-        params['topic_shifts'] = 'occasional'
+        params['structure'] = 'semi-structured'
+        params['topic_shifts'] = 'mild'
         tips.append('Strong coverage — introducing slight topic shifts to challenge anticipation.')
 
     return {
@@ -302,6 +304,185 @@ def _extract_json(text: str) -> dict:
     return json.loads(text)
 
 
+# ── ASR artifact / garbage-token filtering ────────────────────────────────────
+# Whisper sometimes hallucinates one character stretched dozens of times over
+# unclear or noisy audio (e.g. "ڨيييييييييييييي"). These are not student speech
+# and must never be shown as "what the student said" in a translation error.
+
+_ELONGATED_RUN_RE = re.compile(r'(.)\1{4,}', flags=re.UNICODE)
+
+
+def is_asr_garbage_token(token: str) -> bool:
+    """True if a token is an ASR hallucination artifact, not real speech."""
+    t = str(token or '').strip()
+    if len(t) < 6:
+        return False
+    if not _ELONGATED_RUN_RE.search(t):
+        return False
+    from collections import Counter
+    most_common_count = Counter(t).most_common(1)[0][1]
+    return (most_common_count / len(t)) >= 0.5
+
+
+def remove_asr_artifacts(text: str) -> tuple[str, list[str]]:
+    """Strip garbage tokens from a transcript. Returns (clean_text, artifacts)."""
+    artifacts = []
+    kept = []
+    for token in str(text or '').split():
+        if is_asr_garbage_token(token):
+            artifacts.append(token[:40])
+        else:
+            kept.append(token)
+    return ' '.join(kept), artifacts
+
+
+def contains_asr_garbage(text: str) -> bool:
+    return any(is_asr_garbage_token(token) for token in str(text or '').split())
+
+
+def reclassify_garbage_translation_errors(result: dict) -> dict:
+    """
+    Move translation errors whose "student said" is an ASR artifact into
+    missing_content as unclear audio — the audio was unintelligible there,
+    which is a coverage/clarity problem, not a mistranslation.
+    """
+    if not isinstance(result, dict):
+        return result
+
+    kept = []
+    missing = result.setdefault('missing_content', [])
+    if not isinstance(missing, list):
+        missing = []
+        result['missing_content'] = missing
+
+    for item in result.get('translation_errors', []) or []:
+        if isinstance(item, dict) and contains_asr_garbage(item.get('student_said', '')):
+            source_text = str(item.get('source_text', '')).strip()
+            if source_text:
+                missing.append({
+                    'content': f'{source_text} — the recording was unclear at this point '
+                               '(the recognizer could not identify real words)',
+                    'importance': 'high',
+                })
+            continue
+        kept.append(item)
+    result['translation_errors'] = kept
+
+    # Same cleanup for number accuracy: garbage "student said" means unclear
+    # audio, and the number should be reported as missing, not substituted.
+    for item in result.get('number_accuracy', []) or []:
+        if isinstance(item, dict) and contains_asr_garbage(item.get('student_said', '')):
+            item['student_said'] = '[unclear audio]'
+            item['note'] = (str(item.get('note', '')).strip() + ' '
+                            'The recording was unclear here — the number could not be recognized.').strip()
+    return result
+
+
+# ── Cross-language date/number equivalence (fixes false positives) ───────────
+# "29 June 2026", "June 29, 2026" and "٢٩ يونيو ٢٠٢٦" are the SAME date.
+# "8.8" and "8,8" are the same value (decimal separator differs by language).
+
+_MONTH_NUMBERS = {
+    # English
+    'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+    'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6, 'jul': 7, 'aug': 8,
+    'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    # French
+    'janvier': 1, 'fevrier': 2, 'février': 2, 'mars': 3, 'avril': 4, 'mai': 5,
+    'juin': 6, 'juillet': 7, 'aout': 8, 'août': 8, 'septembre': 9,
+    'octobre': 10, 'novembre': 11, 'decembre': 12, 'décembre': 12,
+    # Arabic (Levantine/MSA + transliterated Western months)
+    'يناير': 1, 'فبراير': 2, 'مارس': 3, 'أبريل': 4, 'ابريل': 4, 'مايو': 5,
+    'يونيو': 6, 'يوليو': 7, 'أغسطس': 8, 'اغسطس': 8, 'سبتمبر': 9,
+    'أكتوبر': 10, 'اكتوبر': 10, 'نوفمبر': 11, 'ديسمبر': 12,
+    'كانون الثاني': 1, 'شباط': 2, 'آذار': 3, 'اذار': 3, 'نيسان': 4, 'أيار': 5, 'ايار': 5,
+    'حزيران': 6, 'تموز': 7, 'آب': 8, 'اب': 8, 'أيلول': 9, 'ايلول': 9,
+    'تشرين الأول': 10, 'تشرين الاول': 10, 'تشرين الثاني': 11, 'كانون الأول': 12, 'كانون الاول': 12,
+}
+
+_ARABIC_INDIC_TO_WESTERN = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+
+
+def extract_numeric_fingerprint(text: str) -> list[float]:
+    """
+    Extract every numeric value in a text (digits in any script, decimal comma
+    or point, and month names) as a sorted list — a format-independent
+    fingerprint. Two renderings of the same date/number produce equal lists.
+    """
+    normalized = str(text or '').translate(_ARABIC_INDIC_TO_WESTERN).lower()
+    values: list[float] = []
+
+    for phrase, month_number in _MONTH_NUMBERS.items():
+        if phrase in normalized:
+            values.append(float(month_number))
+            normalized = normalized.replace(phrase, ' ')
+
+    for match in re.finditer(r'\d+(?:[.,]\d+)?', normalized):
+        raw = match.group(0)
+        # A comma followed by exactly 3 digits is a thousands separator;
+        # otherwise treat both , and . as decimal separators.
+        if re.fullmatch(r'\d+,\d{3}', raw):
+            raw = raw.replace(',', '')
+        else:
+            raw = raw.replace(',', '.')
+        try:
+            values.append(float(raw))
+        except ValueError:
+            continue
+
+    return sorted(values)
+
+
+def filter_equivalent_number_renderings(result: dict) -> dict:
+    """
+    Un-flag number_accuracy items where the student said the same values in a
+    different valid format: date word-order across languages, Arabic-Indic vs
+    Western digits, or decimal comma vs point.
+    """
+    items = result.get('number_accuracy') if isinstance(result, dict) else None
+    if not isinstance(items, list):
+        return result
+
+    for item in items:
+        if not isinstance(item, dict) or item.get('correct'):
+            continue
+        source_values = extract_numeric_fingerprint(
+            item.get('source_value', '') or item.get('expected_in_target', '')
+        )
+        student_values = extract_numeric_fingerprint(item.get('student_said', ''))
+        if source_values and source_values == student_values:
+            item['correct'] = True
+            item['note'] = (
+                'Same value in a different valid format (date order, digit script, '
+                'or decimal separator differ between languages) — not an error.'
+            )
+    return result
+
+
+# ── Foreign-script cleanup in LLM output ──────────────────────────────────────
+# The LLM occasionally emits stray CJK or other foreign-script characters
+# inside Arabic corrections (e.g. "官ة شؤون السكان"). Those characters are
+# never legitimate in this trilingual AR/FR/EN context.
+
+_FOREIGN_SCRIPT_RE = re.compile(
+    '[⺀-⿿　-〿぀-ヿ㄀-ㄯ㄰-㆏'
+    '㐀-䶿一-鿿ꀀ-꓏가-힯豈-﫿'
+    '\U00020000-\U0002EBEF]+'
+)
+
+
+def strip_foreign_script_chars(value):
+    """Recursively remove CJK/foreign-script characters from all result strings."""
+    if isinstance(value, str):
+        return _FOREIGN_SCRIPT_RE.sub('', value)
+    if isinstance(value, list):
+        return [strip_foreign_script_chars(item) for item in value]
+    if isinstance(value, dict):
+        return {key: strip_foreign_script_chars(item) for key, item in value.items()}
+    return value
+
+
 LLM_ANALYSIS_PROMPT = """You are a professional interpreter training evaluator at ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).
 
 THIS IS AN INTERPRETATION TASK — NOT A READING TASK.
@@ -319,7 +500,7 @@ SOURCE SPEECH (in {source_language}):
 
 STUDENT INTERPRETATION TRANSCRIPT (in {target_language}, raw ASR output):
 {transcript}
-
+{glossary_block}
 AUTOMATICALLY DETECTED ISSUES (algorithmic):
 - Long silences (> 1.0s gaps): {silence_count} detected → details: {silence_examples}
 - Word repetitions: {repetition_count} detected → examples: {repetition_examples}
@@ -355,8 +536,9 @@ Flag ALL of the following as translation_errors:
 - A vague or weakened rendering (e.g. "problem" when source said "crisis")
 - A term from the wrong domain (e.g. "durable" vs "développement durable")
 - An opposite meaning (e.g. "approve" vs "reject")
-- A number that is wrong or approximate (e.g. "about 50%" when source said "exactly 47%")
 - A concept rendered in a way a listener would understand differently
+
+IMPORTANT: Do NOT put number, percentage, statistic, or date errors here — those are handled exclusively in TASK 10 (number_accuracy). translation_errors is only for meaning/wording errors.
 
 Do NOT accept these excuses:
 - "close enough" — if meaning shifted, it is an error
@@ -421,6 +603,12 @@ For each one, find what the student actually said in {target_language} (numbers 
 or spelled out words — both count). Mark each as correct or incorrect.
 A wrong number, date, or statistic is a SERIOUS interpretation error — it can mislead an entire
 negotiation — so flag it clearly even if the rest of the sentence was fine.
+CRITICAL — do NOT flag format-only differences as errors:
+- Date word order differs between languages: "29 June 2026", "June 29, 2026" and "٢٩ يونيو ٢٠٢٦"
+  are the SAME date → correct.
+- Decimal separators differ: "8.8 billion" (EN) = "8,8 milliards" (FR) → correct.
+- Arabic-Indic digits (٢٠٢٦) and Western digits (2026) are the same number → correct.
+Only flag a number/date when the VALUE the listener hears is actually different.
 
 TASK 11 — PRONUNCIATION IN {target_language}:
 LOW-CONFIDENCE WORDS the speech recognizer was unsure about (often a sign of unclear or incorrect
@@ -431,6 +619,19 @@ Give specific, actionable pronunciation feedback for {target_language}:
 - French: nasal vowels, liaison, silent final letters, gender-driven endings affecting sound
 - English: word stress, "th" sounds (θ/ð), vowel reduction in unstressed syllables
 For each low-confidence word above, explain the likely mispronunciation and give the correct way to say it.
+
+TASK 12 — PROPER NOUNS (people, organizations, places, treaties):
+{proper_nouns_block}
+For EVERY proper noun in the source, classify the student's rendering as one of:
+- "correct": the name is present and recognizably right in {target_language}. A legitimate
+  target-language form counts as correct (e.g. "United Nations" → "ONU" or "الأمم المتحدة";
+  transliteration into Arabic script is correct rendering, NOT distortion).
+- "distorted": the name appears but altered (e.g. "Mobuto Seko" instead of "Mobutu Sese Seko").
+  In a spoken exam a distorted name usually means the student MISPRONOUNCED it — quote exactly
+  what the recognizer heard so the student can compare.
+- "missing": the name was omitted entirely.
+Names are identity-critical in interpretation — a distorted head-of-state or organization name
+can be a diplomatic incident. Flag every distortion and omission.
 
 Give overall_score 0-10 and coverage_score 0-10. Be strict — most student interpretations score 4–7:
 - 9-10: Exceptional — virtually no errors, complete coverage, professional fluency
@@ -458,6 +659,9 @@ Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
   "false_starts": [{{"text": "incomplete phrase"}}],
   "lapsus_linguae": [{{"text": "slip", "likely_intended": "intended word"}}],
   "terminology_problems": [{{"source_term": "term in source language", "student_used": "what student said", "correct_equivalent": "correct target language term"}}],
+  "proper_nouns": [
+    {{"source_name": "name in the source", "student_said": "what the recognizer heard", "status": "correct", "note": "short comment; for distorted names explain the likely mispronunciation"}}
+  ],
   "information_loss": [{{"lost_content": "what was omitted", "importance": "high"}}],
   "fluency_score": 7.0,
   "pause_analysis": {{
@@ -479,6 +683,201 @@ Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
   "summary": "2-3 sentence overall assessment of interpretation quality."
 }}
 """
+
+_NAME_CONNECTORS = {'of', 'de', 'du', 'des', 'la', 'le', 'el', 'al', 'bin', 'ben', 'van', 'von', 'ibn'}
+
+
+def extract_proper_nouns(text: str, max_names: int = 15) -> list[str]:
+    """
+    Heuristic proper-noun extraction for Latin-script sources (EN/FR):
+    capitalized word runs (skipping sentence-initial words) and acronyms.
+    Arabic has no capitalization — for Arabic sources the LLM extracts
+    the names itself (the prompt instructs it to).
+    """
+    text = str(text or '')
+    if not re.search(r'[A-Za-z]', text):
+        return []
+
+    names: list[str] = []
+    seen = set()
+
+    def flush(run: list[str]):
+        while run and run[-1].lower() in _NAME_CONNECTORS:
+            run.pop()
+        if not run:
+            return
+        name = ' '.join(run)
+        key = name.casefold()
+        if key not in seen and len(name) > 2:
+            seen.add(key)
+            names.append(name)
+
+    for sentence in re.split(r'(?<=[.!?])\s+', text):
+        words = sentence.split()
+        run: list[str] = []
+        for index, raw in enumerate(words):
+            token = raw.strip('.,;:!?"“”«»()[]')
+            is_name_word = bool(re.fullmatch(r"[A-ZÀ-Þ][\w'’à-þ-]+|[A-Z]{2,}s?", token))
+            is_connector = token.lower() in _NAME_CONNECTORS
+            if is_name_word and (index > 0 or len(token) > 1 and token.isupper()):
+                run.append(token)
+            elif is_connector and run:
+                run.append(token)
+            else:
+                flush(run)
+                run = []
+        flush(run)
+
+    return names[:max_names]
+
+
+def build_proper_nouns_block(source_script: str) -> str:
+    """Feed the detected source names to the evaluator so each one is verified."""
+    names = extract_proper_nouns(source_script)
+    if names:
+        return ('\nPROPER NOUNS detected in the source — verify EVERY one of them in the '
+                'student\'s rendering (TASK 12): ' + '; '.join(names) + '\n')
+    return ('\nThe source may contain proper nouns (people, organizations, places, treaties) — '
+            'extract them yourself and verify each one in the student\'s rendering (TASK 12).\n')
+
+
+def build_glossary_block(glossary_raw: str) -> str:
+    """
+    Build the approved-glossary section of the evaluation prompt (cahier des
+    charges request: the student reviews/corrects the glossary BEFORE recording
+    so terminology errors are judged against the approved equivalents).
+    """
+    if not glossary_raw:
+        return ''
+    try:
+        entries = json.loads(glossary_raw)
+    except (ValueError, TypeError):
+        return ''
+    if not isinstance(entries, list) or not entries:
+        return ''
+
+    lines = []
+    for entry in entries[:30]:
+        if not isinstance(entry, dict):
+            continue
+        term = str(entry.get('term', '') or '').strip()
+        ar = str(entry.get('arabic', '') or entry.get('ar', '') or '').strip()
+        fr = str(entry.get('french', '') or entry.get('fr', '') or '').strip()
+        en = str(entry.get('english', '') or entry.get('en', '') or '').strip()
+        parts = [p for p in [term, f'AR: {ar}' if ar else '', f'FR: {fr}' if fr else '', f'EN: {en}' if en else ''] if p]
+        if parts:
+            lines.append('- ' + ' | '.join(parts))
+    if not lines:
+        return ''
+
+    return (
+        '\nAPPROVED GLOSSARY (reviewed by the student BEFORE recording — these are the '
+        'REQUIRED terminology equivalents; in TASK 7 judge the student\'s terminology '
+        'against these exact equivalents and flag every deviation):\n'
+        + '\n'.join(lines) + '\n'
+    )
+
+
+def format_silences_for_prompt(silences: list) -> str:
+    """Format silence examples for the LLM, excluding leading preparation time."""
+    delivery_silences = [s for s in (silences or []) if not is_leading_silence(s)]
+    leading = [s for s in (silences or []) if is_leading_silence(s)]
+    parts = '; '.join(
+        f'{sl["duration_seconds"]}s' + (f' after "{sl["after_text"]}"' if sl.get('after_text') else '')
+        for sl in delivery_silences[:5]
+    )
+    note = ''
+    if leading:
+        lead_secs = max(float(s.get('duration_seconds', 0) or 0) for s in leading)
+        note = (f' (note: the student also took {lead_secs}s of preparation time before '
+                'starting to speak — this is normal and must NOT be judged as a delivery pause)')
+    return (parts or 'none found automatically') + note
+
+
+def transcribe_eval_with_groq(audio_path: str, language: str, prompt: str):
+    """
+    Transcribe with Groq whisper-large-v3 requesting WORD-level timestamps
+    (timestamp_granularities) — large-v3 recognizes Arabic far better than the
+    local medium model and returns in seconds instead of minutes. Calls the
+    REST API directly so the installed SDK version does not matter.
+    Returns None on any failure so the caller falls back to local ASR.
+    """
+    try:
+        from utils.groq_client import get_groq_key
+        key = get_groq_key()
+        if not key:
+            return None
+
+        import requests as _requests
+        with open(audio_path, 'rb') as fh:
+            resp = _requests.post(
+                'https://api.groq.com/openai/v1/audio/transcriptions',
+                headers={'Authorization': f'Bearer {key}'},
+                files={'file': (os.path.basename(audio_path), fh)},
+                data=[
+                    ('model', 'whisper-large-v3'),
+                    ('language', language),
+                    ('response_format', 'verbose_json'),
+                    ('timestamp_granularities[]', 'word'),
+                    ('timestamp_granularities[]', 'segment'),
+                    ('prompt', prompt[:400]),
+                ],
+                timeout=120,
+            )
+        if not resp.ok:
+            print(f'[Module D] Groq eval ASR failed ({resp.status_code}: {resp.text[:120]}) — using local model')
+            return None
+
+        data = resp.json()
+        raw_segments = data.get('segments') or []
+        raw_words = data.get('words') or []
+
+        segments = []
+        for seg in raw_segments:
+            seg_text = str(seg.get('text', '')).strip()
+            if not seg_text or seg_text[0] in '[(':
+                continue
+            segments.append({
+                'start': round(float(seg.get('start', 0) or 0), 2),
+                'end':   round(float(seg.get('end', 0) or 0), 2),
+                'text':  seg_text,
+                'words': [],
+            })
+
+        # Words arrive as a flat list; attach each to its segment by time so
+        # the silence/repetition/hesitation detectors work unchanged.
+        # The cloud API gives no per-word confidence → 1.0 neutral score.
+        word_scores = []
+        for w in raw_words:
+            token = str(w.get('word', '')).strip()
+            if not token:
+                continue
+            start = round(float(w.get('start', 0) or 0), 2)
+            end = round(float(w.get('end', 0) or 0), 2)
+            entry = {'word': token, 'start': start, 'end': end, 'probability': 1.0}
+            for seg in segments:
+                if seg['start'] - 0.05 <= start < seg['end'] + 0.05:
+                    seg['words'].append(entry)
+                    break
+            else:
+                if segments:
+                    segments[-1]['words'].append(entry)
+            word_scores.append({'word': token, 'start': start, 'end': end, 'score': 1.0, 'grade': 'good'})
+
+        if not segments and not word_scores:
+            return None
+
+        return {
+            'segments': segments,
+            'word_scores': word_scores,
+            'segment_text': ' '.join(s['text'] for s in segments).strip(),
+            'language': str(data.get('language', language) or language),
+            'duration': round(float(data.get('duration', 0) or 0), 1),
+        }
+    except Exception as exc:
+        print(f'[Module D] Groq eval ASR error: {exc} — using local model')
+        return None
+
 
 module_d_bp = Blueprint('module_d', __name__)
 
@@ -873,7 +1272,7 @@ def build_transcript_from_word_timestamps(segments: list) -> str:
     return re.sub(r'\s+', ' ', ' '.join(words)).strip()
 
 
-def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds: float = 0.18, max_gap_seconds: float = 1.4) -> list:
+def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds: float = 0.08, max_gap_seconds: float = 1.4) -> list:
     """
     Detect likely filled pauses from the recording when ASR omits fillers.
     A short gap between recognized words that still contains voiced audio is
@@ -920,6 +1319,91 @@ def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds:
         return candidates
     except Exception as exc:
         print(f'[Module D] Audio filled-pause detection failed: {exc}')
+        return []
+
+
+def detect_false_starts_from_audio(audio_path: str,
+                                    min_burst_ms: int = 40,
+                                    max_burst_ms: int = 380,
+                                    min_gap_ms: int = 40,
+                                    max_gap_ms: int = 700) -> list:
+    """
+    Detect mid-word stops (false starts) directly from audio energy.
+
+    Pattern looked for:
+      SHORT voiced burst (40–380 ms)  →  silence gap (40–700 ms)  →  longer voiced segment
+
+    This catches the case where the student starts a word, stops mid-syllable,
+    and restarts — even when the ASR removes the partial word entirely from the
+    transcript (which Groq whisper-large-v3 almost always does).
+
+    Returns items in the same shape as hesitation_words so they merge cleanly.
+    """
+    try:
+        import numpy as np
+
+        samples, sample_rate = decode_audio_mono(audio_path)
+        if samples is None or len(samples) == 0:
+            return []
+
+        global_db = audio_dbfs(samples)
+        if global_db == float('-inf'):
+            return []
+
+        voiced_thresh = max(global_db - 14, -42)
+        window_ms  = 10
+        win_size   = max(1, int(sample_rate * window_ms / 1000))
+
+        # Label each 10-ms window as voiced/silent
+        voiced_flags = [
+            audio_dbfs(samples[s:s + win_size]) >= voiced_thresh
+            for s in range(0, len(samples), win_size)
+        ]
+
+        # Merge consecutive same-label windows into segments
+        segs: list[tuple[str, int, int]] = []   # (kind, start_ms, end_ms)
+        if not voiced_flags:
+            return []
+        kind   = 'voiced' if voiced_flags[0] else 'silent'
+        t_start = 0
+        for i, v in enumerate(voiced_flags[1:], start=1):
+            cur = 'voiced' if v else 'silent'
+            if cur != kind:
+                segs.append((kind, t_start * window_ms, i * window_ms))
+                kind    = cur
+                t_start = i
+        segs.append((kind, t_start * window_ms, len(voiced_flags) * window_ms))
+
+        false_starts = []
+        # Look for: voiced(short) → silent → voiced(longer)
+        for i in range(len(segs) - 2):
+            s0, s1, s2 = segs[i], segs[i + 1], segs[i + 2]
+            if s0[0] != 'voiced' or s1[0] != 'silent' or s2[0] != 'voiced':
+                continue
+
+            burst_ms = s0[2] - s0[1]
+            gap_ms   = s1[2] - s1[1]
+            next_ms  = s2[2] - s2[1]
+
+            if not (min_burst_ms <= burst_ms <= max_burst_ms):
+                continue
+            if not (min_gap_ms <= gap_ms <= max_gap_ms):
+                continue
+            # The restart must be meaningfully longer than the false start burst
+            if next_ms <= burst_ms * 0.8:
+                continue
+
+            false_starts.append({
+                'word':             '[false start]',
+                'at_seconds':       round(s0[1] / 1000, 1),
+                'duration_seconds': round(burst_ms / 1000, 3),
+                'confidence':       1.0,
+                'source':           'audio_false_start',
+            })
+
+        return false_starts
+    except Exception as exc:
+        print(f'[Module D] Audio false-start detection failed: {exc}')
         return []
 
 
@@ -1123,6 +1607,13 @@ def detect_low_confidence_words(segments: list, threshold: float = 0.6) -> list:
     return low_conf
 
 
+def is_leading_silence(silence: dict) -> bool:
+    """Silence before the student starts speaking — preparation/reading time."""
+    if 'leading' in str(silence.get('type', '')):
+        return True
+    return float(silence.get('at_seconds', 1) or 1) <= 0.2
+
+
 def build_audio_fluency_report(transcript: dict, all_word_scores: list, silence_report: list | None = None) -> dict:
     """Cheap recording-based fluency metrics from local ASR timings."""
     segments = transcript.get('segments', []) or []
@@ -1135,7 +1626,17 @@ def build_audio_fluency_report(transcript: dict, all_word_scores: list, silence_
         max(0.0, float(seg.get('end', 0) or 0) - float(seg.get('start', 0) or 0))
         for seg in segments
     )
-    silences = silence_report if silence_report is not None else detect_long_silences(segments)
+    all_silences = silence_report if silence_report is not None else detect_long_silences(segments)
+    # Leading silence is preparation time (reading the source, collecting
+    # thoughts before starting) — it must NOT count against fluency. Only
+    # pauses DURING delivery reflect delivery quality.
+    leading_silences = [s for s in all_silences if is_leading_silence(s)]
+    silences = [s for s in all_silences if not is_leading_silence(s)]
+    leading_seconds = sum(float(s.get('duration_seconds', 0) or 0) for s in leading_silences)
+    # Remove preparation time from the effective duration so speech rate and
+    # silence ratio measure the delivery itself.
+    if leading_seconds and duration > leading_seconds:
+        duration = duration - leading_seconds
     long_pause_seconds = sum(float(s.get('duration_seconds', 0) or 0) for s in silences)
 
     if duration > 0:
@@ -1178,6 +1679,7 @@ def build_audio_fluency_report(transcript: dict, all_word_scores: list, silence_
 
     return {
         'duration_seconds': round(duration, 1),
+        'preparation_seconds': round(leading_seconds, 1),
         'word_count': word_count,
         'speech_rate_wpm': speech_rate_wpm,
         'long_pause_count': len(silences),
@@ -1672,6 +2174,52 @@ def clean_translation_error_items(result: dict) -> dict:
     return result
 
 
+_NUMBER_IN_TEXT_RE = re.compile(r'\b\d+(?:[.,]\d+)?%?\b')
+_NUMBER_EXPLANATION_TERMS = {
+    'percentage', 'pourcentage', 'percent', 'number error', 'wrong number',
+    'incorrect percentage', 'nombre incorrect', 'faux pourcentage', 'chiffre incorrect',
+    'statistique', 'statistic', 'wrong figure', 'faux chiffre', 'nombre erron',
+    'wrong statistic', 'nombre faux', 'chiffre faux', 'chiffre erron',
+    'wrong percentage', 'incorrect number', 'incorrect figure',
+}
+
+
+def filter_number_only_translation_errors(result: dict) -> dict:
+    """
+    Remove items from translation_errors where the sole discrepancy is a
+    number/percentage/statistic difference — those are already in number_accuracy.
+    """
+    if not isinstance(result, dict):
+        return result
+
+    cleaned = []
+    for item in result.get('translation_errors', []) or []:
+        if not isinstance(item, dict):
+            cleaned.append(item)
+            continue
+
+        explanation = normalize_eval_text(item.get('explanation', ''))
+        is_number_error = any(term in explanation for term in _NUMBER_EXPLANATION_TERMS)
+
+        if not is_number_error:
+            source_text = str(item.get('source_text', '') or '')
+            student_said = str(item.get('student_said', '') or '')
+            if source_text and student_said:
+                src_nums = _NUMBER_IN_TEXT_RE.findall(source_text)
+                std_nums = _NUMBER_IN_TEXT_RE.findall(student_said)
+                if src_nums and std_nums and src_nums != std_nums:
+                    src_stripped = normalize_eval_text(_NUMBER_IN_TEXT_RE.sub('NUM', source_text))
+                    std_stripped = normalize_eval_text(_NUMBER_IN_TEXT_RE.sub('NUM', student_said))
+                    if src_stripped == std_stripped:
+                        is_number_error = True
+
+        if not is_number_error:
+            cleaned.append(item)
+
+    result['translation_errors'] = cleaned
+    return result
+
+
 def is_french_silent_plural_s_error(item: dict) -> bool:
     """French final plural -s is silent; ASR spelling alone cannot prove omission."""
     text = ' '.join(
@@ -1717,6 +2265,99 @@ def filter_french_silent_plural_errors(result: dict, language: str) -> dict:
     return result
 
 
+_SHORT_PARTICLES = {
+    'en': {'a', 'an', 'the', 'i', 'to', 'of', 'in', 'is', 'it', 'as', 'at', 'by', 'or', 'if', 'up', 'do', 'so', 'we', 'he', 'my', 'on'},
+    'fr': {'a', 'à', 'au', 'le', 'la', 'de', 'du', 'je', 'il', 'un', 'ou', 'et', 'en', 'on', 'y', 'tu', 'ce', 'se', 'sa'},
+    'ar': set(),
+}
+
+
+def detect_repetitions_timing_window(segments: list, language: str = 'ar',
+                                      max_gap_seconds: float = 1.5) -> list:
+    """
+    Detect word repetitions using timing: if the same word appears twice within
+    max_gap_seconds in the word timestamp list, it's a repetition — even when
+    the ASR segment text has already been deduplicated (Groq and faster-whisper
+    both normalize consecutive repeated words in the text output).
+    """
+    words = get_word_timing_sequence(segments)
+    repetitions = []
+    seen_keys = set()
+
+    for i, w in enumerate(words):
+        word = normalize_repetition_word(w['word'])
+        if len(word) < 2:
+            continue
+        for j in range(i + 1, len(words)):
+            nw = words[j]
+            gap = nw['start'] - w['end']
+            if gap > max_gap_seconds:
+                break
+            next_word = normalize_repetition_word(nw['word'])
+            if words_are_repetition_equivalent(word, next_word, language):
+                key = (word, round(w['start'], 1))
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    repetitions.append({
+                        'word': w['word'],
+                        'at_seconds': round(w['start'], 1),
+                        'second_occurrence': round(nw['start'], 1),
+                        'gap_words': j - i,
+                        'source': 'timing_window',
+                    })
+                break
+
+    return repetitions
+
+
+def detect_false_starts_from_words(segments: list, language: str = 'ar') -> list:
+    """
+    Detect false starts and mid-word stops from word-level timestamps.
+    A word is a likely false start when:
+      - Its duration is very short (< 0.15 s), AND
+      - It is immediately followed (gap < 0.5 s) by a word that begins with the
+        same first 2+ characters — the student started the word, stopped, then
+        restarted it.
+    These are returned in hesitation-compatible format so they appear in the
+    hesitation_words list under a 'false_start' source label.
+    """
+    words = get_word_timing_sequence(segments)
+    particles = _SHORT_PARTICLES.get(language, set())
+    false_starts = []
+
+    for i, w in enumerate(words[:-1]):
+        word = normalize_repetition_word(w['word'])
+        if not word or word in particles:
+            continue
+        duration = w['end'] - w['start']
+        if duration >= 0.18:
+            continue
+        nw = words[i + 1]
+        gap = nw['start'] - w['end']
+        if gap > 0.6:
+            continue
+        next_word = normalize_repetition_word(nw['word'])
+        # Short word is a prefix of the next word → false start
+        prefix_len = min(len(word), 3)
+        if len(word) >= 2 and len(next_word) >= len(word) and next_word.startswith(word[:prefix_len]):
+            false_starts.append({
+                'word': w['word'],
+                'at_seconds': round(w['start'], 1),
+                'confidence': 1.0,
+                'source': 'false_start',
+            })
+        # Word is extremely short (<0.10 s) regardless of next word → truncated utterance
+        elif duration < 0.10 and gap < 0.35:
+            false_starts.append({
+                'word': w['word'],
+                'at_seconds': round(w['start'], 1),
+                'confidence': 1.0,
+                'source': 'false_start',
+            })
+
+    return false_starts
+
+
 def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar') -> dict:
     """
     Run all error detection — combines word-level (when available) and text-based detection.
@@ -1732,14 +2373,27 @@ def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar'
     low_conf        = detect_low_confidence_words(segments)
     number_errs     = detect_number_errors(source_script, full_text)
 
+    # Timing-window repetition: catches words the ASR deduplicated in text but
+    # kept as separate entries in the word-timestamp list (Groq and faster-whisper).
+    timing_reps = detect_repetitions_timing_window(segments, language)
+
+    # False starts / mid-word stops — appear in hesitation list since they are
+    # the same disfluency category (D5 in cahier des charges).
+    false_starts = detect_false_starts_from_words(segments, language)
+
     # Text-based detection (always works, even with Groq transcript)
     text_hesitations = detect_hesitations_from_text(full_text, language)
     text_repetitions = detect_repetitions_from_text(full_text, language)
 
-    # Merge word-level timestamps with transcript-text fillers, because ASR word
-    # timestamps can miss or normalize fillers such as "uhhh".
+    # Merge: timing-window reps win over word-level (more reliable for Groq),
+    # text reps fill remaining gaps.
     all_hesitations = merge_hesitation_reports(word_hesitations, text_hesitations)
-    all_repetitions = merge_repetition_reports(word_reps, text_repetitions)
+    # Add false starts to the hesitation list (they are disfluency D5)
+    for fs in false_starts:
+        if not any(abs(float(h.get('at_seconds') or 0) - float(fs['at_seconds'])) < 0.3
+                   for h in all_hesitations):
+            all_hesitations.append(fs)
+    all_repetitions = merge_repetition_reports(timing_reps, word_reps, text_repetitions)
 
     return {
         'long_silences':        silences,
@@ -1813,9 +2467,15 @@ def generate_feedback():
     transcript_text = data.get('transcript_text', '')
     transcript_obj  = data.get('transcript', {})
     language        = data.get('language', 'ar')
+    glossary_block  = build_glossary_block(json.dumps(data.get('glossary'))
+                                           if isinstance(data.get('glossary'), list)
+                                           else str(data.get('glossary', '') or ''))
 
     if not transcript_text:
         return jsonify({'error': 'transcript_text is required'}), 400
+
+    # Strip ASR hallucination artifacts (elongated garbage tokens) before analysis
+    transcript_text, asr_artifacts = remove_asr_artifacts(transcript_text)
 
     # Run algorithmic analysis on segments
     algo = run_full_analysis(source_script, transcript_obj, language) if transcript_obj else {
@@ -1830,10 +2490,7 @@ def generate_feedback():
 
         rep_examples  = ', '.join(f'"{r["word"]}"' for r in (algo.get('repetitions', [])[:3]))
         hes_examples  = ', '.join(f'"{h["word"]}"' for h in (algo.get('hesitation_words', [])[:3]))
-        sil_examples  = '; '.join(
-            f'{sl["duration_seconds"]}s' + (f' after "{sl["after_text"]}"' if sl.get('after_text') else '')
-            for sl in algo.get('long_silences', [])[:5]
-        )
+        sil_examples  = format_silences_for_prompt(algo.get('long_silences', []))
         coverage_diagnostics = estimate_length_coverage(source_script, transcript_text)
 
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English', 'unknown': 'an unknown language'}
@@ -1855,6 +2512,8 @@ def generate_feedback():
             coverage_diagnostics=coverage_diagnostics,
             fluency_summary=format_fluency_for_prompt({}),
             uncertain_words='(not available in text-only mode)',
+            glossary_block=glossary_block,
+            proper_nouns_block=build_proper_nouns_block(source_script),
         )
 
         response = client.chat.completions.create(
@@ -1874,10 +2533,16 @@ def generate_feedback():
         )
 
         llm_result = _extract_json(response.choices[0].message.content)
+        llm_result = strip_foreign_script_chars(llm_result)
         llm_result = filter_french_silent_plural_errors(llm_result, language)
         llm_result = remove_false_missing_translation_errors(llm_result, transcript_text)
         llm_result = clean_translation_error_items(llm_result)
+        llm_result = filter_number_only_translation_errors(llm_result)
+        llm_result = reclassify_garbage_translation_errors(llm_result)
+        llm_result = filter_equivalent_number_renderings(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, transcript_text)
+        if asr_artifacts:
+            llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = {
             'long_silences':    algo.get('long_silences', []),
             'repetitions':      algo.get('repetitions', []),
@@ -1917,82 +2582,107 @@ def full_evaluation():
     audio_file       = request.files['audio']
     source_script    = request.form.get('source_script', '')
     language         = request.form.get('language', 'ar')
+    glossary_block   = build_glossary_block(request.form.get('glossary', ''))
     _raw_src_lang    = request.form.get('source_language', '')
     # Avoid telling the LLM source==target (monolingual confusion) when not explicitly set
     source_language  = _raw_src_lang if _raw_src_lang and _raw_src_lang != language else 'unknown'
 
-    ext       = os.path.splitext(audio_file.filename)[1] or '.webm'
+    from modules.module_c import _safe_audio_ext
+    ext       = _safe_audio_ext(audio_file.filename)
     temp_path = os.path.join(UPLOAD_FOLDER, f'eval_{uuid.uuid4().hex[:8]}{ext}')
     audio_file.save(temp_path)
 
     try:
-        # Use local faster-whisper: gives real segment timestamps (silence detection)
-        # and word-level probabilities. Groq normalizes silence/repetitions away.
-        from modules.module_c import _get_local_model, DISFLUENCY_PROMPTS
-        model = _get_local_model()
+        from modules.module_c import DISFLUENCY_PROMPTS
         disfluency_prompt = DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en'])
         verbatim_prompt = f"{disfluency_prompt} {build_verbatim_asr_prompt(language)}"
-        repetition_hotwords = build_repetition_hotwords(source_script, language)
 
-        segments_iter, info = model.transcribe(
-            temp_path,
-            language=language,
-            task='transcribe',
-            word_timestamps=True,
-            vad_filter=False,               # disabled: preserves silence gaps between segments
-            suppress_tokens=[],             # preserve fillers/repetitions, no normalization
-            suppress_blank=False,
-            condition_on_previous_text=False,
-            compression_ratio_threshold=100.0,  # disable repetition fallback — keeps repeated words
-            log_prob_threshold=-100.0,          # disable low-prob fallback — keeps hesitations
-            no_speech_threshold=0.95,
-            temperature=0.0,                    # greedy decoding — no randomness
-            beam_size=1,                        # greedy: prevents beam search from collapsing repetitions
-            repetition_penalty=1.0,
-            no_repeat_ngram_size=0,
-            initial_prompt=verbatim_prompt,      # language-specific filler + repetition priming
-            hotwords=repetition_hotwords,
-        )
+        # ASR strategy: Groq whisper-large-v3 with WORD timestamps first —
+        # far better recognition (especially Arabic) and seconds instead of
+        # minutes. Local faster-whisper (medium) is the fallback; it also
+        # provides per-word confidence, which the cloud API does not.
+        asr_method = 'local_faster_whisper_medium'
+        groq_asr = transcribe_eval_with_groq(temp_path, language, verbatim_prompt)
 
-        full_text = ''
-        all_segments = []
-        all_word_scores = []
+        if groq_asr is not None:
+            asr_method = 'groq_whisper_large_v3'
+            all_segments = groq_asr['segments']
+            all_word_scores = groq_asr['word_scores']
+            segment_text = groq_asr['segment_text']
+            detected_language = groq_asr['language']
+            language_confidence = 1.0
+            duration_value = groq_asr['duration']
+        else:
+            from modules.module_c import _get_local_model
+            model = _get_local_model()
+            repetition_hotwords = build_repetition_hotwords(source_script, language)
 
-        for seg in segments_iter:
-            if _is_noise_segment(seg.text):
-                continue
-            seg_data = {
-                'start': round(seg.start, 2),
-                'end':   round(seg.end, 2),
-                'text':  seg.text.strip(),
-                'words': []
-            }
-            for w in (seg.words or []):
-                seg_data['words'].append({
-                    'word': w.word, 'start': round(w.start, 2),
-                    'end': round(w.end, 2), 'probability': round(w.probability, 3)
-                })
-                all_word_scores.append({
-                    'word':  w.word.strip(),
-                    'start': round(w.start, 2),
-                    'end':   round(w.end, 2),
-                    'score': round(w.probability, 3),
-                    'grade': 'good' if w.probability >= 0.8 else ('warn' if w.probability >= 0.65 else 'poor')
-                })
-            all_segments.append(seg_data)
-            full_text += seg.text + ' '
+            segments_iter, info = model.transcribe(
+                temp_path,
+                language=language,
+                task='transcribe',
+                word_timestamps=True,
+                vad_filter=False,               # disabled: preserves silence gaps between segments
+                suppress_tokens=[],             # preserve fillers/repetitions, no normalization
+                suppress_blank=False,
+                condition_on_previous_text=False,
+                compression_ratio_threshold=100.0,  # disable repetition fallback — keeps repeated words
+                log_prob_threshold=-100.0,          # disable low-prob fallback — keeps hesitations
+                no_speech_threshold=0.95,
+                temperature=0.0,                    # greedy decoding — no randomness
+                beam_size=1,                        # greedy: prevents beam search from collapsing repetitions
+                repetition_penalty=1.0,
+                no_repeat_ngram_size=0,
+                initial_prompt=verbatim_prompt,      # language-specific filler + repetition priming
+                hotwords=repetition_hotwords,
+            )
 
-        segment_text = full_text.strip()
+            full_text = ''
+            all_segments = []
+            all_word_scores = []
+
+            for seg in segments_iter:
+                if _is_noise_segment(seg.text):
+                    continue
+                seg_data = {
+                    'start': round(seg.start, 2),
+                    'end':   round(seg.end, 2),
+                    'text':  seg.text.strip(),
+                    'words': []
+                }
+                for w in (seg.words or []):
+                    seg_data['words'].append({
+                        'word': w.word, 'start': round(w.start, 2),
+                        'end': round(w.end, 2), 'probability': round(w.probability, 3)
+                    })
+                    all_word_scores.append({
+                        'word':  w.word.strip(),
+                        'start': round(w.start, 2),
+                        'end':   round(w.end, 2),
+                        'score': round(w.probability, 3),
+                        'grade': 'good' if w.probability >= 0.8 else ('warn' if w.probability >= 0.65 else 'poor')
+                    })
+                all_segments.append(seg_data)
+                full_text += seg.text + ' '
+
+            segment_text = full_text.strip()
+            detected_language = info.language
+            language_confidence = round(info.language_probability, 3)
+            duration_value = round(info.duration, 1)
+
         word_timestamp_text = build_transcript_from_word_timestamps(all_segments)
         full_text = word_timestamp_text or segment_text
+        # Strip ASR hallucination artifacts (e.g. one character stretched dozens
+        # of times over unclear audio) so they are never treated as student speech.
+        full_text, asr_artifacts = remove_asr_artifacts(full_text)
         transcript = {
             'full_text':           full_text,
             'segment_text':        segment_text,
             'word_timestamp_text': word_timestamp_text,
             'segments':            all_segments,
-            'language_detected':   info.language,
-            'language_confidence': round(info.language_probability, 3),
-            'duration_seconds':    round(info.duration, 1),
+            'language_detected':   detected_language,
+            'language_confidence': language_confidence,
+            'duration_seconds':    duration_value,
         }
 
         # Step 2: Full algorithmic analysis (now WITH word timestamps)
@@ -2003,11 +2693,13 @@ def full_evaluation():
             algo['audio_silences'] = audio_silences
             algo.setdefault('summary', {})['silence_count'] = len(algo['long_silences'])
         audio_hesitations = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
-        if audio_hesitations:
-            algo['audio_hesitations'] = audio_hesitations
+        audio_false_starts = detect_false_starts_from_audio(temp_path)
+        all_audio_hes = (audio_hesitations or []) + (audio_false_starts or [])
+        if all_audio_hes:
+            algo['audio_hesitations'] = all_audio_hes
             algo['hesitation_words'] = merge_hesitation_reports(
                 algo.get('hesitation_words', []),
-                audio_hesitations,
+                all_audio_hes,
             )
             algo.setdefault('summary', {})['hesitation_count'] = len(algo['hesitation_words'])
         s    = algo.get('summary', {})
@@ -2020,15 +2712,16 @@ def full_evaluation():
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English', 'unknown': 'an unknown language'}
         rep_examples     = ', '.join(f'"{r.get("word","")}"' for r in algo.get('repetitions', [])[:3])
         hes_examples     = ', '.join(f'"{h.get("word","")}"' for h in algo.get('hesitation_words', [])[:3])
-        sil_examples     = '; '.join(
-            f'{sl["duration_seconds"]}s' + (f' after "{sl["after_text"]}"' if sl.get('after_text') else '')
-            for sl in algo.get('long_silences', [])[:5]
-        )
+        sil_examples     = format_silences_for_prompt(algo.get('long_silences', []))
         uncertain_words  = [w for w in all_word_scores if w['grade'] == 'poor']
-        uncertain_str    = ', '.join(
-            f'"{w["word"]}" (confidence {w["score"]})'
-            for w in uncertain_words[:10]
-        ) or 'none flagged'
+        if asr_method.startswith('groq'):
+            uncertain_str = ('(per-word confidence is not provided by the cloud recognizer — '
+                             'judge pronunciation only from the audio metrics and clear evidence in the transcript)')
+        else:
+            uncertain_str = ', '.join(
+                f'"{w["word"]}" (confidence {w["score"]})'
+                for w in uncertain_words[:10]
+            ) or 'none flagged'
         coverage_diagnostics = estimate_length_coverage(source_script, full_text)
 
         prompt = LLM_ANALYSIS_PROMPT.format(
@@ -2047,6 +2740,8 @@ def full_evaluation():
             coverage_diagnostics=coverage_diagnostics,
             fluency_summary=format_fluency_for_prompt(fluency),
             uncertain_words=uncertain_str,
+            glossary_block=glossary_block,
+            proper_nouns_block=build_proper_nouns_block(source_script),
         )
 
         response = client.chat.completions.create(
@@ -2062,9 +2757,15 @@ def full_evaluation():
         )
 
         llm_result = _extract_json(response.choices[0].message.content)
+        llm_result = strip_foreign_script_chars(llm_result)
         llm_result = remove_false_missing_translation_errors(llm_result, full_text)
         llm_result = clean_translation_error_items(llm_result)
+        llm_result = filter_number_only_translation_errors(llm_result)
+        llm_result = reclassify_garbage_translation_errors(llm_result)
+        llm_result = filter_equivalent_number_renderings(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, full_text)
+        if asr_artifacts:
+            llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = {
             'long_silences':    algo.get('long_silences', []),
             'repetitions':      algo.get('repetitions', []),
@@ -2073,6 +2774,7 @@ def full_evaluation():
             'summary':          s
         }
         llm_result['fluency'] = fluency
+        llm_result['asr_method'] = asr_method
 
         # Step 4: Pronunciation report (whisper confidence + language-specific patterns)
         pronun_report = build_pronunciation_report(all_word_scores, language=language)
@@ -2080,14 +2782,17 @@ def full_evaluation():
         llm_result = filter_french_silent_plural_errors(llm_result, language)
         llm_result['transcript'] = transcript
 
-        # Step 5: Persist session for history / adaptive difficulty (D11-D12)
+        # Step 5: Persist session for history / adaptive difficulty (D11-D12).
+        # Guests have no account: their sessions are NOT saved, otherwise all
+        # guests would share one "anonymous" history and see each other's data.
         user_id = _current_user_id()
-        _save_session(user_id, {
-            **llm_result,
-            'language':        language,
-            'source_language': source_language,
-            'domain':          request.form.get('domain', ''),
-        })
+        if user_id != 'anonymous':
+            _save_session(user_id, {
+                **llm_result,
+                'language':        language,
+                'source_language': source_language,
+                'domain':          request.form.get('domain', ''),
+            })
 
         return jsonify(llm_result)
 
@@ -2276,6 +2981,9 @@ def pronunciation_report():
 def list_sessions():
     """Return the last N evaluation sessions for the current user (D11)."""
     user_id = _current_user_id()
+    if user_id == 'anonymous':
+        # Guests have no account — no history (and no shared anonymous pool).
+        return jsonify({'sessions': [], 'count': 0, 'guest': True})
     limit = min(int(request.args.get('limit', 20)), 50)
     sessions = _load_sessions(user_id, limit=limit)
     return jsonify({'sessions': sessions, 'count': len(sessions)})
@@ -2285,6 +2993,8 @@ def list_sessions():
 def adaptive_params():
     """Analyse recent sessions and return recommended Module A parameters + trend + problems (D12)."""
     user_id = _current_user_id()
+    if user_id == 'anonymous':
+        return jsonify(_compute_adaptive_params([]))
     sessions = _load_sessions(user_id, limit=20)
     return jsonify(_compute_adaptive_params(sessions))
 

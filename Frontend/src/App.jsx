@@ -26,6 +26,7 @@ import {
   validateGroqKey,
   saveAuthToken,
   sendChatMessage,
+  fetchWebPage,
   SERVER_BASE,
 } from './api.js';
 
@@ -119,7 +120,7 @@ const UI = {
     structure: 'Discourse structure',
     mode: 'Interpretation mode',
     numbers: 'Number density',
-    hesitations: 'Simulate hesitations',
+    hesitationsSim: 'Simulate hesitations',
     pressureMode: 'Pressure mode',
     speedPressure: 'Speed pressure',
     topicShifts: 'Topic shifts',
@@ -143,7 +144,7 @@ const UI = {
     generating: 'Generating - please wait...',
     wordsUnit: 'words',
     moduleBTitle: 'Audio & Pedagogical Materials',
-    moduleBBody: 'Will produce: audio playback, key terms, glossary, MCQ, and flashcards.',
+    moduleBBody: 'Will produce: audio playback, key terms, glossary, and MCQ.',
     moduleCTitle: 'Record & Transcribe',
     moduleCBody: 'Will allow: in-browser recording, ASR transcription, timestamped transcript, and playback.',
     moduleDTitle: 'Performance Evaluation',
@@ -277,6 +278,117 @@ const UI = {
     diffBeginner: 'Beginner',
     diffIntermediate: 'Intermediate',
     diffAdvanced: 'Advanced',
+    diffHint: 'Beginner: simple vocabulary, short sentences, 1–2 numbers, slow pace. Intermediate: moderate terminology, several statistics, mixed sentences. Advanced: dense terminology, frequent numbers and names, complex syntax, fast pace.',
+    demoKeyBanner: 'This platform uses a free AI service (Groq) to generate and evaluate speeches. Right now you are using the platform\'s shared demonstration key, which works but is slower and has shared daily limits. Creating your own free key (2 minutes, no credit card) gives you faster responses and your own quota.',
+    demoKeyBtn: 'Add my free key in Settings',
+    wordRangeShortFull: 'Short — 120–180 words (≈ 1–1.5 min at 120 wpm)',
+    wordRangeMediumFull: 'Medium — 220–320 words (≈ 2–2.5 min)',
+    wordRangeLongFull: 'Long — 400–550 words (≈ 3.5–4.5 min)',
+    wordRangeExtendedFull: 'Extended — 650–800 words (≈ 5.5–6.5 min)',
+    optSemiStructured: 'Semi-structured',
+    optDisorganizedFull: 'Deliberately disorganized',
+    scenarioLabel: 'Speaker style / setting',
+    scenUNGA: 'UN General Assembly',
+    scenEUParl: 'EU Parliament',
+    scenArabLeague: 'Arab League summit',
+    scenPress: 'Press conference',
+    scenDiplomatic: 'Diplomatic meeting',
+    scenDebate: 'Political debate',
+    scenInterview: 'Interview',
+    termDensity: 'Terminology density',
+    optTermLow: 'Low — everyday vocabulary',
+    optTermMedium: 'Medium',
+    optTermHigh: 'High — dense specialised terms',
+    longTextAsSource: 'Long text detected — it will be used as the source document and the speech will be grounded in it.',
+    mcqPickAnswer: 'Select your answer, then check it.',
+    mcqCheck: 'Check answer',
+    mcqShowAnswer: 'Show answer',
+    mcqCorrectMsg: '✓ Correct!',
+    mcqWrongMsg: '✗ Not quite. Correct answer:',
+    mcqShowAnswerLabel: 'ℹ️ Correct answer:',
+    mcqYourScore: 'Your score',
+    glossaryEdit: '✏️ Edit glossary',
+    glossaryEditDone: '✓ Done editing',
+    glossaryEditHint: 'Review and correct the equivalents BEFORE recording your interpretation — the evaluation will then check your terminology against this approved glossary.',
+    webPageTab: 'Web page',
+    webPageUrlPlaceholder: 'https://… paste the address of an article or report',
+    webPageFetch: 'Fetch page',
+    webPageFetching: 'Fetching page…',
+    webPageHint: 'The readable text of the page will be extracted and used as the source for the speech.',
+    scrollerTitle: 'Sight translation — scrolling text',
+    scrollerPlay: '▶ Start scrolling',
+    scrollerPause: '⏸ Pause',
+    scrollerReset: '↺ Reset',
+    scrollerSpeed: 'Speed (words/min)',
+    scrollerFontSize: 'Text size',
+    scrollerColumns: 'Columns',
+    scrollerSpacing: 'Line spacing',
+    scrollerHint: 'Translate aloud while the text scrolls at your chosen speed — like a real sight translation exercise.',
+    notesTitle: '📝 Notes (consecutive)',
+    notesTextTab: 'Text notes',
+    notesSketchTab: 'Sketch / mind map',
+    notesClear: 'Clear',
+    notesPlaceholder: 'Take your notes here while listening (symbols, arrows, keywords)…',
+    notesHint: 'Your notes stay on this page only — they are not saved or sent anywhere.',
+    simulTitle: '🎧 Simultaneous mode',
+    simulStart: '▶ Play source + record me',
+    simulStop: '⏹ Stop both',
+    simulHint: 'Wear headphones so the source audio is not captured by your microphone. The source speech plays while your interpretation is recorded — real simultaneous practice.',
+    simulNeedsAudio: 'Generate the source audio in "Audio & materials" first to enable simultaneous mode.',
+    prepTimeLabel: 'preparation time before speaking — not counted against fluency',
+    fluencyExplain: 'This score is measured from your recording: speaking rate, pauses during delivery, and how clearly each word was recognized. Time you take to prepare before speaking is NOT counted. A word recognized with low confidence means it sounded unclear — it is treated as a clarity signal, not automatically as a mistake.',
+    aboutEvalTitle: 'ℹ️ How this evaluation works & where your data goes',
+    aboutEvalCriteria: 'What is analyzed: (1) your recording is transcribed by a speech recognizer (Whisper); (2) measurable events are detected directly from the audio — pauses, repetitions, hesitations, speaking rate; (3) an AI evaluator compares your interpretation to the source speech meaning-by-meaning: accuracy, coverage, terminology, numbers and dates, grammar; (4) scores follow a strict professor rubric (most student performances score 4–7/10).',
+    aboutEvalReliability: 'Reliability: the transcript is an estimate, not ground truth — especially for Arabic. Unclear audio regions are treated as clarity issues, not automatically as translation errors. Use this report as a training aid, not a final grade.',
+    aboutEvalStorage: 'Storage: your audio recording is processed and then deleted from the server — it is not kept. Only the evaluation summary (scores, error counts, recommendations) is saved to your account history to power the Progress page. Generated speeches and transcripts are not stored permanently.',
+    creditsLine: 'ETIB · ESIB · CINIA · USJ Beirut',
+    modeChoose: 'Practice mode',
+    modeSimulDesc: 'The source speech plays while you interpret and record at the same time.',
+    modeConsecDesc: 'Listen to the source and take notes, then record your interpretation.',
+    modeSightDesc: 'Read the scrolling text and translate aloud while recording yourself.',
+    heroTrainIn: 'Train in:',
+    heroTitlePre: 'Master interpretation with ',
+    heroTitleEm: 'AI-generated',
+    heroTitlePost: ' speeches',
+    heroParagraph: 'An adaptive training platform that generates realistic conference speeches, builds multilingual glossaries, and evaluates your interpretation performance across Arabic, French, and English.',
+    guestBtn: 'Continue as Guest',
+    orSep: '— or —',
+    srcPanelTitle: 'Add Source',
+    srcPanelSubtitle: 'Find a UN document, a web page, or upload your own file to ground the speech in real content.',
+    srcTabUN: 'UN Library',
+    srcTabUpload: 'Upload file',
+    srcUNHint: 'Search the UN Digital Library for your topic, download the PDF, then upload it below.',
+    srcUNSearchBtn: 'Search UN Library ↗',
+    srcUNUploadAfter: 'Once you have downloaded the PDF, upload it here:',
+    srcDropPdf: 'Drop the PDF here or',
+    srcDropFile: 'Drop a file here or',
+    srcBrowse: 'browse',
+    srcFileTypes: 'PDF, Word (.docx), or plain text',
+    audioFluencyTitle: 'Audio fluency from the recording',
+    coverageScoreLabel: 'Coverage score',
+    statSpeechRate: 'Speech rate',
+    statLongPauses: 'Long pauses',
+    statSilenceRatio: 'Silence ratio',
+    statWordConfidence: 'Word confidence',
+    verdictGood: 'Good',
+    verdictAcceptable: 'Acceptable',
+    verdictNeedsWork: 'Needs work',
+    nextHintPre: '→ Go to',
+    nextHintPost: 'to listen, review questions, and download the glossary.',
+    transcriptReady: 'Transcript ready',
+    chatGreeting: "Hi! I'm your ETIB assistant. Ask me anything about interpretation techniques, the platform, or terminology.",
+    chatPlaceholder: 'Ask anything…',
+    chatSend: 'Send',
+    chatThinking: 'Thinking…',
+    statAvgPerSession: 'avg / session',
+    statTotal: 'total',
+    statSessions: 'Sessions',
+    outsideRange: '(outside requested range)',
+    progressGuestNote: 'Progress tracking works with an account. Sign in (or create a free account) so your evaluations are saved and analyzed across sessions.',
+    pnTitle: 'Proper nouns (people, organizations, places)',
+    pnCorrect: 'Correct',
+    pnDistorted: 'Distorted — likely mispronounced',
+    pnMissing: 'Omitted',
   },
   ar: {
     uiLanguage: 'لغة الواجهة',
@@ -367,7 +479,7 @@ const UI = {
     structure: 'بنية الخطاب',
     mode: 'نوع الترجمة الفورية',
     numbers: 'كثافة الأرقام',
-    hesitations: 'محاكاة التردد',
+    hesitationsSim: 'محاكاة التردد',
     pressureMode: 'وضع الضغط',
     speedPressure: 'ضغط السرعة',
     topicShifts: 'تحولات الموضوع',
@@ -525,6 +637,117 @@ const UI = {
     diffBeginner: 'مبتدئ',
     diffIntermediate: 'متوسط',
     diffAdvanced: 'متقدم',
+    diffHint: 'مبتدئ: مفردات بسيطة، جمل قصيرة، رقم أو رقمان، إيقاع بطيء. متوسط: مصطلحات معتدلة، عدة إحصاءات، جمل متنوعة. متقدم: مصطلحات كثيفة، أرقام وأسماء متكررة، تراكيب معقدة، إيقاع سريع.',
+    demoKeyBanner: 'تعتمد المنصة على خدمة ذكاء اصطناعي مجانية (Groq) لتوليد الخطابات وتقييمها. أنت تستخدم حالياً المفتاح التجريبي المشترك للمنصة، وهو يعمل لكنه أبطأ وله حدود استخدام مشتركة. إنشاء مفتاحك المجاني الخاص (دقيقتان، دون بطاقة ائتمان) يمنحك استجابات أسرع وحصة خاصة بك.',
+    demoKeyBtn: 'أضف مفتاحي المجاني في الإعدادات',
+    wordRangeShortFull: 'قصير — 120–180 كلمة (≈ 1–1.5 دقيقة بسرعة 120 كلمة/د)',
+    wordRangeMediumFull: 'متوسط — 220–320 كلمة (≈ 2–2.5 دقيقة)',
+    wordRangeLongFull: 'طويل — 400–550 كلمة (≈ 3.5–4.5 دقيقة)',
+    wordRangeExtendedFull: 'ممتد — 650–800 كلمة (≈ 5.5–6.5 دقيقة)',
+    optSemiStructured: 'شبه منظَّم',
+    optDisorganizedFull: 'غير منظَّم عمداً',
+    scenarioLabel: 'أسلوب المتحدث / السياق',
+    scenUNGA: 'الجمعية العامة للأمم المتحدة',
+    scenEUParl: 'البرلمان الأوروبي',
+    scenArabLeague: 'قمة الجامعة العربية',
+    scenPress: 'مؤتمر صحفي',
+    scenDiplomatic: 'اجتماع دبلوماسي',
+    scenDebate: 'مناظرة سياسية',
+    scenInterview: 'مقابلة',
+    termDensity: 'الكثافة المصطلحية',
+    optTermLow: 'منخفضة — مفردات يومية',
+    optTermMedium: 'متوسطة',
+    optTermHigh: 'عالية — مصطلحات متخصصة كثيفة',
+    longTextAsSource: 'تم رصد نص طويل — سيُستخدم كوثيقة مصدر وسيُبنى الخطاب على محتواه.',
+    mcqPickAnswer: 'اختر إجابتك ثم تحقق منها.',
+    mcqCheck: 'تحقق من الإجابة',
+    mcqShowAnswer: 'أظهر الإجابة',
+    mcqCorrectMsg: '✓ صحيح!',
+    mcqWrongMsg: '✗ غير صحيح. الإجابة الصحيحة:',
+    mcqShowAnswerLabel: 'ℹ️ الإجابة الصحيحة:',
+    mcqYourScore: 'نتيجتك',
+    glossaryEdit: '✏️ تعديل المسرد',
+    glossaryEditDone: '✓ إنهاء التعديل',
+    glossaryEditHint: 'راجع المقابلات وصحّحها قبل تسجيل ترجمتك — سيتحقق التقييم من مصطلحاتك وفق هذا المسرد المعتمد.',
+    webPageTab: 'صفحة ويب',
+    webPageUrlPlaceholder: '…https:// الصق رابط مقال أو تقرير',
+    webPageFetch: 'جلب الصفحة',
+    webPageFetching: 'جارٍ جلب الصفحة…',
+    webPageHint: 'سيُستخرج النص المقروء من الصفحة ويُستخدم كمصدر للخطاب.',
+    scrollerTitle: 'الترجمة البصرية — نص متحرك',
+    scrollerPlay: '▶ بدء التمرير',
+    scrollerPause: '⏸ إيقاف مؤقت',
+    scrollerReset: '↺ إعادة',
+    scrollerSpeed: 'السرعة (كلمة/دقيقة)',
+    scrollerFontSize: 'حجم الخط',
+    scrollerColumns: 'الأعمدة',
+    scrollerSpacing: 'تباعد الأسطر',
+    scrollerHint: 'ترجم بصوت عالٍ أثناء تمرير النص بالسرعة التي تختارها — تماماً كتمرين ترجمة بصرية حقيقي.',
+    notesTitle: '📝 الملاحظات (تتابعي)',
+    notesTextTab: 'ملاحظات نصية',
+    notesSketchTab: 'رسم / خريطة ذهنية',
+    notesClear: 'مسح',
+    notesPlaceholder: 'دوّن ملاحظاتك هنا أثناء الاستماع (رموز، أسهم، كلمات مفتاحية)…',
+    notesHint: 'تبقى ملاحظاتك في هذه الصفحة فقط — لا تُحفظ ولا تُرسل إلى أي مكان.',
+    simulTitle: '🎧 الوضع الفوري',
+    simulStart: '▶ تشغيل المصدر + تسجيلي',
+    simulStop: '⏹ إيقاف الاثنين',
+    simulHint: 'استخدم سماعات رأس حتى لا يلتقط الميكروفون صوت المصدر. يُشغَّل الخطاب المصدر بينما تُسجَّل ترجمتك — تدريب فوري حقيقي.',
+    simulNeedsAudio: 'ولّد الصوت المصدر أولاً في «الصوت والمواد» لتفعيل الوضع الفوري.',
+    prepTimeLabel: 'وقت التحضير قبل البدء بالكلام — لا يُحتسب ضد الطلاقة',
+    fluencyExplain: 'تُقاس هذه الدرجة من تسجيلك: سرعة الكلام، التوقفات أثناء الأداء، ووضوح التعرف على كل كلمة. الوقت الذي تستغرقه للتحضير قبل البدء لا يُحتسب. الكلمة المُتعرَّف عليها بثقة منخفضة تعني أنها بدت غير واضحة — وتُعامل كمؤشر وضوح، لا كخطأ تلقائي.',
+    aboutEvalTitle: 'ℹ️ كيف يعمل هذا التقييم وأين تذهب بياناتك',
+    aboutEvalCriteria: 'ما يُحلَّل: (1) يُفرَّغ تسجيلك بواسطة نظام التعرف على الكلام (Whisper)؛ (2) تُرصد الأحداث القابلة للقياس مباشرة من الصوت — التوقفات، التكرارات، التردد، سرعة الكلام؛ (3) يقارن مقيّم ذكاء اصطناعي ترجمتك بالخطاب المصدر معنىً بمعنى: الدقة، التغطية، المصطلحات، الأرقام والتواريخ، القواعد؛ (4) تتبع الدرجات معيار أستاذ صارم (معظم أداءات الطلاب بين 4–7/10).',
+    aboutEvalReliability: 'الموثوقية: النص المفرَّغ تقدير وليس حقيقة مطلقة — خصوصاً للعربية. المقاطع غير الواضحة تُعامل كمشاكل وضوح، لا كأخطاء ترجمة تلقائياً. استخدم هذا التقرير كأداة تدريب، لا كعلامة نهائية.',
+    aboutEvalStorage: 'التخزين: يُعالَج تسجيلك الصوتي ثم يُحذف من الخادم — لا يُحتفظ به. يُحفظ فقط ملخص التقييم (الدرجات، عدد الأخطاء، التوصيات) في سجل حسابك لتغذية صفحة التقدم. لا تُخزَّن الخطابات المولَّدة والنصوص المفرَّغة بشكل دائم.',
+    creditsLine: 'ETIB · ESIB · CINIA · جامعة القديس يوسف بيروت',
+    modeChoose: 'وضع التدريب',
+    modeSimulDesc: 'يُشغَّل الخطاب المصدر بينما تترجم وتسجّل في الوقت نفسه.',
+    modeConsecDesc: 'استمع إلى المصدر ودوّن ملاحظاتك، ثم سجّل ترجمتك.',
+    modeSightDesc: 'اقرأ النص المتحرك وترجم بصوت عالٍ أثناء تسجيل نفسك.',
+    heroTrainIn: 'تدرّب بـ:',
+    heroTitlePre: 'أتقن الترجمة الفورية مع ',
+    heroTitleEm: 'خطابات مولّدة بالذكاء الاصطناعي',
+    heroTitlePost: '',
+    heroParagraph: 'منصة تدريب تكيفية تولّد خطابات مؤتمرات واقعية، وتبني مسارد متعددة اللغات، وتقيّم أداءك في الترجمة الفورية بين العربية والفرنسية والإنجليزية.',
+    guestBtn: 'المتابعة كضيف',
+    orSep: '— أو —',
+    srcPanelTitle: 'إضافة مصدر',
+    srcPanelSubtitle: 'ابحث عن وثيقة أممية أو صفحة ويب أو ارفع ملفك الخاص لتأسيس الخطاب على محتوى حقيقي.',
+    srcTabUN: 'مكتبة الأمم المتحدة',
+    srcTabUpload: 'رفع ملف',
+    srcUNHint: 'ابحث في مكتبة الأمم المتحدة الرقمية عن موضوعك، نزّل ملف PDF، ثم ارفعه أدناه.',
+    srcUNSearchBtn: '↗ البحث في مكتبة الأمم المتحدة',
+    srcUNUploadAfter: 'بعد تنزيل ملف PDF، ارفعه هنا:',
+    srcDropPdf: 'أسقط ملف PDF هنا أو',
+    srcDropFile: 'أسقط ملفاً هنا أو',
+    srcBrowse: 'تصفّح',
+    srcFileTypes: 'PDF أو Word (.docx) أو نص عادي',
+    audioFluencyTitle: 'طلاقة الصوت من التسجيل',
+    coverageScoreLabel: 'درجة التغطية',
+    statSpeechRate: 'سرعة الكلام',
+    statLongPauses: 'توقفات طويلة',
+    statSilenceRatio: 'نسبة الصمت',
+    statWordConfidence: 'وضوح الكلمات',
+    verdictGood: 'جيد',
+    verdictAcceptable: 'مقبول',
+    verdictNeedsWork: 'يحتاج عملاً',
+    nextHintPre: '← انتقل إلى',
+    nextHintPost: 'للاستماع ومراجعة الأسئلة وتنزيل المسرد.',
+    transcriptReady: 'النص المفرَّغ جاهز',
+    chatGreeting: 'مرحباً! أنا مساعد ETIB. اسألني عن تقنيات الترجمة الفورية أو المنصة أو المصطلحات.',
+    chatPlaceholder: 'اسأل أي شيء…',
+    chatSend: 'إرسال',
+    chatThinking: 'أفكر…',
+    statAvgPerSession: 'متوسط / جلسة',
+    statTotal: 'الإجمالي',
+    statSessions: 'الجلسات',
+    outsideRange: '(خارج النطاق المطلوب)',
+    progressGuestNote: 'يعمل تتبع التقدم مع حساب فقط. سجّل الدخول (أو أنشئ حساباً مجانياً) لتُحفظ تقييماتك وتُحلَّل عبر الجلسات.',
+    pnTitle: 'أسماء الأعلام (أشخاص، منظمات، أماكن)',
+    pnCorrect: 'صحيح',
+    pnDistorted: 'محرَّف — نطق خاطئ على الأرجح',
+    pnMissing: 'محذوف',
   },
   fr: {
     uiLanguage: 'Langue de l’interface',
@@ -605,7 +828,27 @@ const UI = {
     ungroundedNote: 'Aucun document de l’ONU correspondant n’a été trouvé — ce discours a été généré sans source.',
     language: 'Langue du discours',
     targetLanguage: 'Langue cible',
+    topic: 'Sujet',
     domain: 'Domaine',
+    speedPressure: 'Pression de vitesse',
+    topicShifts: 'Changements de sujet',
+    pressureMode: 'Mode pression',
+    contextNoise: 'Bruit de contexte',
+    cognitiveLoad: 'Charge cognitive',
+    summary: 'Résumé',
+    mcq: 'QCM',
+    glossary: 'Glossaire',
+    documentGrounding: 'Génération depuis un document',
+    documentFile: 'Document source',
+    sharedSettings: 'Paramètres de génération',
+    sharedSettingsHint: 'Ces paramètres s\'appliquent à la génération par sujet ou par document.',
+    generationMethods: 'Choisir la source de génération',
+    topicOnlyGeneration: 'Génération par sujet',
+    topicOnlyHint: 'Générer à partir du sujet et des paramètres choisis.',
+    documentGenerationHint: 'Déposez un document source pour générer un discours ancré dans son contenu.',
+    generateFromDocument: 'Générer depuis le document',
+    retrieveContext: 'Prévisualiser le contexte extrait',
+    retrievedContext: 'Contexte extrait',
     wordCount: 'Longueur du discours',
     wordRangeShort: 'Court',
     wordRangeMedium: 'Moyen',
@@ -614,12 +857,12 @@ const UI = {
     structure: 'Structure du discours',
     mode: 'Mode d’interprétation',
     numbers: 'Densité des chiffres',
-    hesitations: 'Simuler les hésitations',
+    hesitationsSim: 'Simuler les hésitations',
     submit: 'Générer le discours',
     generating: 'Génération en cours...',
     wordsUnit: 'mots',
     moduleBTitle: 'Audio et supports pédagogiques',
-    moduleBBody: 'Produira : lecture audio, termes clés, glossaire, QCM et flashcards.',
+    moduleBBody: 'Produira : lecture audio, termes clés, glossaire et QCM.',
     moduleCTitle: 'Enregistrer et transcrire',
     moduleCBody: 'Permettra : enregistrement dans le navigateur, transcription ASR, horodatage et lecture.',
     moduleDTitle: 'Évaluation des performances',
@@ -753,15 +996,153 @@ const UI = {
     diffBeginner: 'Débutant',
     diffIntermediate: 'Intermédiaire',
     diffAdvanced: 'Avancé',
+    diffHint: 'Débutant : vocabulaire simple, phrases courtes, 1–2 chiffres, débit lent. Intermédiaire : terminologie modérée, plusieurs statistiques, phrases variées. Avancé : terminologie dense, chiffres et noms fréquents, syntaxe complexe, débit rapide.',
+    demoKeyBanner: 'La plateforme utilise un service d\'IA gratuit (Groq) pour générer et évaluer les discours. Vous utilisez actuellement la clé de démonstration partagée de la plateforme : elle fonctionne, mais elle est plus lente et soumise à des limites d\'usage partagées. Créer votre propre clé gratuite (2 minutes, sans carte bancaire) vous donne des réponses plus rapides et un quota personnel.',
+    demoKeyBtn: 'Ajouter ma clé gratuite dans Paramètres',
+    wordRangeShortFull: 'Court — 120–180 mots (≈ 1–1,5 min à 120 mots/min)',
+    wordRangeMediumFull: 'Moyen — 220–320 mots (≈ 2–2,5 min)',
+    wordRangeLongFull: 'Long — 400–550 mots (≈ 3,5–4,5 min)',
+    wordRangeExtendedFull: 'Étendu — 650–800 mots (≈ 5,5–6,5 min)',
+    optSemiStructured: 'Semi-structuré',
+    optDisorganizedFull: 'Volontairement désorganisé',
+    scenarioLabel: 'Style d\'orateur / contexte',
+    scenUNGA: 'Assemblée générale de l\'ONU',
+    scenEUParl: 'Parlement européen',
+    scenArabLeague: 'Sommet de la Ligue arabe',
+    scenPress: 'Conférence de presse',
+    scenDiplomatic: 'Réunion diplomatique',
+    scenDebate: 'Débat politique',
+    scenInterview: 'Entrevue',
+    termDensity: 'Densité terminologique',
+    optTermLow: 'Faible — vocabulaire courant',
+    optTermMedium: 'Moyenne',
+    optTermHigh: 'Élevée — termes spécialisés denses',
+    longTextAsSource: 'Texte long détecté — il sera utilisé comme document source et le discours s\'appuiera sur son contenu.',
+    mcqPickAnswer: 'Choisissez votre réponse, puis vérifiez-la.',
+    mcqCheck: 'Vérifier la réponse',
+    mcqShowAnswer: 'Afficher la réponse',
+    mcqCorrectMsg: '✓ Correct !',
+    mcqWrongMsg: '✗ Incorrect. Bonne réponse :',
+    mcqShowAnswerLabel: 'ℹ️ Bonne réponse :',
+    mcqYourScore: 'Votre score',
+    glossaryEdit: '✏️ Modifier le glossaire',
+    glossaryEditDone: '✓ Terminer la modification',
+    glossaryEditHint: 'Relisez et corrigez les équivalents AVANT d\'enregistrer votre prestation — l\'évaluation vérifiera ensuite votre terminologie par rapport à ce glossaire validé.',
+    webPageTab: 'Page web',
+    webPageUrlPlaceholder: 'https://… collez l\'adresse d\'un article ou d\'un rapport',
+    webPageFetch: 'Récupérer la page',
+    webPageFetching: 'Récupération…',
+    webPageHint: 'Le texte lisible de la page sera extrait et utilisé comme source du discours.',
+    scrollerTitle: 'Traduction à vue — texte défilant',
+    scrollerPlay: '▶ Lancer le défilement',
+    scrollerPause: '⏸ Pause',
+    scrollerReset: '↺ Réinitialiser',
+    scrollerSpeed: 'Vitesse (mots/min)',
+    scrollerFontSize: 'Taille du texte',
+    scrollerColumns: 'Colonnes',
+    scrollerSpacing: 'Interligne',
+    scrollerHint: 'Traduisez à voix haute pendant que le texte défile à la vitesse choisie — comme un vrai exercice de traduction à vue.',
+    notesTitle: '📝 Prise de notes (consécutive)',
+    notesTextTab: 'Notes texte',
+    notesSketchTab: 'Croquis / carte mentale',
+    notesClear: 'Effacer',
+    notesPlaceholder: 'Prenez vos notes ici pendant l\'écoute (symboles, flèches, mots-clés)…',
+    notesHint: 'Vos notes restent sur cette page uniquement — elles ne sont ni enregistrées ni envoyées.',
+    simulTitle: '🎧 Mode simultané',
+    simulStart: '▶ Lire la source + m\'enregistrer',
+    simulStop: '⏹ Tout arrêter',
+    simulHint: 'Portez un casque pour que l\'audio source ne soit pas capté par votre micro. Le discours source est lu pendant que votre interprétation est enregistrée — un vrai entraînement simultané.',
+    simulNeedsAudio: 'Générez d\'abord l\'audio source dans « Audio et supports » pour activer le mode simultané.',
+    prepTimeLabel: 'temps de préparation avant de parler — non compté dans la fluidité',
+    fluencyExplain: 'Ce score est mesuré à partir de votre enregistrement : débit de parole, pauses pendant la prestation et clarté de reconnaissance de chaque mot. Le temps de préparation avant de commencer n\'est PAS compté. Un mot reconnu avec une faible confiance signifie qu\'il a semblé peu clair — c\'est un indice de clarté, pas automatiquement une erreur.',
+    aboutEvalTitle: 'ℹ️ Comment fonctionne cette évaluation et où vont vos données',
+    aboutEvalCriteria: 'Ce qui est analysé : (1) votre enregistrement est transcrit par une reconnaissance vocale (Whisper) ; (2) les événements mesurables sont détectés directement dans l\'audio — pauses, répétitions, hésitations, débit ; (3) un évaluateur IA compare votre interprétation au discours source sens par sens : exactitude, couverture, terminologie, chiffres et dates, grammaire ; (4) les scores suivent un barème de professeur strict (la plupart des prestations étudiantes obtiennent 4–7/10).',
+    aboutEvalReliability: 'Fiabilité : la transcription est une estimation, pas une vérité absolue — surtout en arabe. Les passages peu clairs sont traités comme des problèmes de clarté, pas automatiquement comme des erreurs de traduction. Utilisez ce rapport comme outil d\'entraînement, pas comme note finale.',
+    aboutEvalStorage: 'Stockage : votre enregistrement audio est traité puis supprimé du serveur — il n\'est pas conservé. Seul le résumé de l\'évaluation (scores, nombre d\'erreurs, recommandations) est enregistré dans l\'historique de votre compte pour alimenter la page Progression. Les discours générés et transcriptions ne sont pas stockés de façon permanente.',
+    creditsLine: 'ETIB · ESIB · CINIA · USJ Beyrouth',
+    modeChoose: 'Mode d\'entraînement',
+    modeSimulDesc: 'Le discours source est lu pendant que vous interprétez et vous enregistrez en même temps.',
+    modeConsecDesc: 'Écoutez la source et prenez des notes, puis enregistrez votre interprétation.',
+    modeSightDesc: 'Lisez le texte défilant et traduisez à voix haute en vous enregistrant.',
+    heroTrainIn: 'Entraînez-vous en :',
+    heroTitlePre: "Maîtrisez l'interprétation avec des ",
+    heroTitleEm: 'discours générés par IA',
+    heroTitlePost: '',
+    heroParagraph: "Une plateforme d'entraînement adaptative qui génère des discours de conférence réalistes, construit des glossaires multilingues et évalue vos performances d'interprétation en arabe, français et anglais.",
+    guestBtn: 'Continuer en invité',
+    orSep: '— ou —',
+    srcPanelTitle: 'Ajouter une source',
+    srcPanelSubtitle: "Trouvez un document de l'ONU, une page web, ou déposez votre propre fichier pour ancrer le discours dans un contenu réel.",
+    srcTabUN: 'Bibliothèque ONU',
+    srcTabUpload: 'Déposer un fichier',
+    srcUNHint: "Cherchez votre sujet dans la Bibliothèque numérique de l'ONU, téléchargez le PDF, puis déposez-le ci-dessous.",
+    srcUNSearchBtn: 'Chercher dans la Bibliothèque ONU ↗',
+    srcUNUploadAfter: 'Une fois le PDF téléchargé, déposez-le ici :',
+    srcDropPdf: 'Déposez le PDF ici ou',
+    srcDropFile: 'Déposez un fichier ici ou',
+    srcBrowse: 'parcourir',
+    srcFileTypes: 'PDF, Word (.docx) ou texte brut',
+    audioFluencyTitle: "Fluidité audio de l'enregistrement",
+    coverageScoreLabel: 'Score de couverture',
+    statSpeechRate: 'Débit de parole',
+    statLongPauses: 'Pauses longues',
+    statSilenceRatio: 'Taux de silence',
+    statWordConfidence: 'Clarté des mots',
+    verdictGood: 'Bien',
+    verdictAcceptable: 'Acceptable',
+    verdictNeedsWork: 'À travailler',
+    nextHintPre: '→ Allez dans',
+    nextHintPost: 'pour écouter, réviser les questions et télécharger le glossaire.',
+    transcriptReady: 'Transcription prête',
+    chatGreeting: "Bonjour ! Je suis votre assistant ETIB. Posez-moi vos questions sur les techniques d'interprétation, la plateforme ou la terminologie.",
+    chatPlaceholder: 'Posez une question…',
+    chatSend: 'Envoyer',
+    chatThinking: 'Réflexion…',
+    statAvgPerSession: 'moy. / session',
+    statTotal: 'total',
+    statSessions: 'Sessions',
+    outsideRange: '(hors de la plage demandée)',
+    progressGuestNote: 'Le suivi de progression fonctionne avec un compte. Connectez-vous (ou créez un compte gratuit) pour que vos évaluations soient enregistrées et analysées.',
+    pnTitle: 'Noms propres (personnes, organisations, lieux)',
+    pnCorrect: 'Correct',
+    pnDistorted: 'Déformé — probablement mal prononcé',
+    pnMissing: 'Omis',
   }
 };
+
+// ── Credits (professor request: ESIB + CINIA logos and developer names) ─────
+const CREDITS = {
+  developers: ['Joe Haddad', 'Kevin Khoury', 'Ali Ali', 'Chris Wehbe', 'Marc Khatar'],
+  logos: [
+    { src: '/usj-etib-logo.png',  alt: 'USJ — ETIB' },
+    { src: '/usj-esib-logo.png',  alt: 'ESIB' },
+    { src: '/usj-cinia-logo.png', alt: 'CINIA' },
+  ],
+};
+
+function AppFooter({ labels }) {
+  return (
+    <footer style={{
+      marginTop: '2.5rem', padding: '1.25rem 1.5rem', borderTop: '1px solid var(--border, #e3ded6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', flexWrap: 'wrap',
+      fontSize: '0.8rem', color: 'var(--warm-gray, #877)',
+    }}>
+      {CREDITS.logos.map(logo => (
+        <img key={logo.src} src={logo.src} alt={logo.alt} style={{ height: 34, objectFit: 'contain' }} />
+      ))}
+      <span>{labels.creditsLine}</span>
+      <span>·</span>
+      <span>{CREDITS.developers.join(' · ')}</span>
+    </footer>
+  );
+}
 
 const NAV_ITEMS = [
   { id: 'module-a', labelKey: 'navA' },
   { id: 'module-b', labelKey: 'navB' },
   { id: 'module-c', labelKey: 'navC' },
   { id: 'module-d', labelKey: 'navD' },
-  // { id: 'module-e', labelKey: 'navE' },
+  { id: 'module-e', labelKey: 'navE' },
 ];
 
 // MARC 041 language codes -> UI language codes / display labels
@@ -922,7 +1303,9 @@ const initialSpeechForm = {
   difficulty: 'intermediate',
   mode: 'consecutive',
   structure: 'well-organized',
+  scenario: 'UN General Assembly',
   number_density: 'low',
+  terminology_density: 'medium',
   include_hesitations: false,
   pressure_enabled: false,
   speed_pressure: 'normal',
@@ -930,6 +1313,10 @@ const initialSpeechForm = {
   context_noise: false,
   cognitive_load: 'medium'
 };
+
+// If the student pastes a full text instead of a short topic, treat the pasted
+// text as the SOURCE DOCUMENT (grounding) rather than as a topic string.
+const TOPIC_AS_SOURCE_THRESHOLD = 300;
 
 // ── Module E — Progress & Adaptive Difficulty ─────────────────────────────────
 function ScoreBadge({ score }) {
@@ -1031,12 +1418,12 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
         <div className="progress-stat-card">
           <div className="progress-stat-label">{labels.progressAvgNumbers}</div>
           <div className="progress-stat-value" style={{ color: avgNumbers <= 1 ? 'var(--sage)' : avgNumbers <= 3 ? 'var(--primary)' : 'var(--sienna)' }}>{avgNumbers ?? '—'}</div>
-          <div className="progress-stat-sub">avg / session</div>
+          <div className="progress-stat-sub">{labels.statAvgPerSession}</div>
         </div>
         <div className="progress-stat-card">
-          <div className="progress-stat-label">Sessions</div>
+          <div className="progress-stat-label">{labels.statSessions}</div>
           <div className="progress-stat-value" style={{ color: 'var(--primary)' }}>{n}</div>
-          <div className="progress-stat-sub">total</div>
+          <div className="progress-stat-sub">{labels.statTotal}</div>
         </div>
       </div>
 
@@ -1138,12 +1525,12 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
               <p style={{ fontSize: '0.85rem', color: 'var(--warm-gray)', marginBottom: '1rem' }}>{labels.progressAdaptiveSubtitle}</p>
               <div className="adaptive-grid">
                 {[
-                  ['Difficulty', adaptive.recommended_params.difficulty],
-                  ['Word count', adaptive.recommended_params.word_count + ' words'],
-                  ['Numbers', adaptive.recommended_params.number_density],
-                  ['Speed', adaptive.recommended_params.speed_pressure],
-                  ['Structure', adaptive.recommended_params.structure],
-                  ['Topic shifts', adaptive.recommended_params.topic_shifts],
+                  [labels.difficulty, adaptive.recommended_params.difficulty],
+                  [labels.wordCount, adaptive.recommended_params.word_count + ' ' + labels.wordsUnit],
+                  [labels.numbers, adaptive.recommended_params.number_density],
+                  [labels.speedPressure, adaptive.recommended_params.speed_pressure],
+                  [labels.structure, adaptive.recommended_params.structure],
+                  [labels.topicShifts, adaptive.recommended_params.topic_shifts],
                 ].map(([k, v]) => (
                   <div key={k} className="adaptive-param">
                     <div className="adaptive-param-label">{k}</div>
@@ -1310,6 +1697,7 @@ export default function App() {
     <div className="shell">
       <Header
         isAuthenticated={isAuthenticated}
+        isGuest={currentUser?.id === 'guest'}
         activePanel={activePanel}
         labels={L}
         onPanelChange={setActivePanel}
@@ -1334,18 +1722,19 @@ export default function App() {
           />
         )}
       </main>
+      <AppFooter labels={L} />
       {showSettings && (
         <SettingsModal labels={L} onClose={() => setShowSettings(false)} />
       )}
-      {isAuthenticated && <ChatWidget />}
+      {isAuthenticated && <ChatWidget labels={L} />}
     </div>
   );
 }
 
-function ChatWidget() {
+function ChatWidget({ labels }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I\'m your ETIB assistant. Ask me anything about interpretation techniques, the platform, or terminology.' }
+    { role: 'assistant', content: labels.chatGreeting }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1413,7 +1802,7 @@ function ChatWidget() {
                 alignSelf: 'flex-start', background: 'var(--surface-raised, #f0f4f8)',
                 padding: '0.55rem 0.85rem', borderRadius: 12, fontSize: '0.875rem',
                 color: 'var(--warm-gray, #888)'
-              }}>Thinking…</div>
+              }}>{labels.chatThinking}</div>
             )}
             <div ref={bottomRef} />
           </div>
@@ -1422,7 +1811,7 @@ function ChatWidget() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-              placeholder="Ask anything…"
+              placeholder={labels.chatPlaceholder}
               style={{
                 flex: 1, padding: '0.5rem 0.75rem', borderRadius: 8,
                 border: '1px solid var(--border, #ddd)', fontSize: '0.875rem',
@@ -1434,7 +1823,7 @@ function ChatWidget() {
               background: 'var(--primary, #1a3a5c)', color: '#fff',
               cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem',
               opacity: loading || !input.trim() ? 0.5 : 1
-            }}>Send</button>
+            }}>{labels.chatSend}</button>
           </div>
         </div>
       )}
@@ -1543,8 +1932,10 @@ function SettingsModal({ labels, onClose }) {
   );
 }
 
-function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, onLanguageChange, onOpenSettings }) {
+function Header({ isAuthenticated, isGuest, activePanel, labels, onPanelChange, uiLang, onLanguageChange, onOpenSettings }) {
   const hasKey = Boolean(getStoredGroqKey());
+  // Progress needs an account — guests have no saved history to show.
+  const navItems = NAV_ITEMS.filter(item => item.id !== 'module-e' || !isGuest);
   return (
     <header className="fade-up">
       <div className="header-logos">
@@ -1556,7 +1947,7 @@ function Header({ isAuthenticated, activePanel, labels, onPanelChange, uiLang, o
       </div>
       {isAuthenticated && (
         <nav aria-label="Training modules">
-          {NAV_ITEMS.map(item => (
+          {navItems.map(item => (
             <button
               key={item.id}
               type="button"
@@ -1617,13 +2008,13 @@ function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
       {/* Left: marketing copy */}
       <div className="hero-text">
         <div className="lang-tabs">
-          <span className="lang-tabs-label">Train in:</span>
+          <span className="lang-tabs-label">{labels.heroTrainIn}</span>
           <span className="lang-tab lang-tab-ar">عربي</span>
           <span className="lang-tab lang-tab-fr">Français</span>
           <span className="lang-tab lang-tab-en">English</span>
         </div>
-        <h1>Master interpretation with <em>AI-generated</em> speeches</h1>
-        <p>An adaptive training platform that generates realistic conference speeches, builds multilingual glossaries, and evaluates your interpretation performance across Arabic, French, and English.</p>
+        <h1>{labels.heroTitlePre}<em>{labels.heroTitleEm}</em>{labels.heroTitlePost}</h1>
+        <p>{labels.heroParagraph}</p>
       </div>
 
       {/* Right: auth form */}
@@ -1668,7 +2059,7 @@ function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
             </button>
           </div>
           <div style={{ textAlign: 'center', margin: '0.75rem 0 0' }}>
-            <span style={{ color: '#aaa', fontSize: '0.8rem' }}>— or —</span>
+            <span style={{ color: '#aaa', fontSize: '0.8rem' }}>{labels.orSep}</span>
           </div>
           <button
             type="button"
@@ -1680,7 +2071,7 @@ function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
               color: '#555', fontWeight: 500,
             }}
           >
-            Continue as Guest
+            {labels.guestBtn}
           </button>
         </form>
       </div>
@@ -1693,6 +2084,7 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
   const [lastTranscript, setLastTranscript] = useState(null);
   const [lastRecordingBlob, setLastRecordingBlob] = useState(null);
   const [progressRefresh, setProgressRefresh] = useState(0);
+  const [adaptiveParams, setAdaptiveParams] = useState(null);
   const hasKey = Boolean(getStoredGroqKey());
 
   return (
@@ -1711,7 +2103,7 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
           display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap'
         }}>
           <span style={{ flex: 1, fontSize: '0.92rem' }}>
-            ℹ️ You're using the platform's shared demo key. <strong>Add your own free Groq key</strong> in Settings for faster responses and higher usage limits.
+            ℹ️ {labels.demoKeyBanner}
           </span>
           <button
             onClick={() => { onOpenSettings(); }}
@@ -1720,22 +2112,23 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
               padding: '0.45rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem', whiteSpace: 'nowrap'
             }}
           >
-            ⚙ Add API key in Settings
+            ⚙ {labels.demoKeyBtn}
           </button>
         </div>
       )}
 
       {/* Keep all panels mounted — state persists when switching tabs */}
       <div style={{ display: activePanel === 'module-a' ? 'block' : 'none' }}>
-        <ModuleA labels={labels} onGenerated={onGenerated} isRtl={isRtl} />
+        <ModuleA labels={labels} onGenerated={onGenerated} isRtl={isRtl} adaptiveParams={adaptiveParams} />
       </div>
       <div style={{ display: activePanel === 'module-b' ? 'block' : 'none' }}>
         <ModuleB labels={labels} lastGeneratedScript={lastGeneratedScript}
-          onAudioGenerated={setSharedAudioUrl} isRtl={isRtl} />
+          onAudioGenerated={setSharedAudioUrl} onScriptUpdate={onGenerated} isRtl={isRtl} />
       </div>
       <div style={{ display: activePanel === 'module-c' ? 'block' : 'none' }}>
         <ModuleC labels={labels} referenceAudioUrl={sharedAudioUrl}
           sourceScript={lastGeneratedScript?.script || ''}
+          targetLanguage={lastGeneratedScript?.target_language || ''}
           onTranscriptComplete={setLastTranscript}
           onRecordingComplete={setLastRecordingBlob} />
       </div>
@@ -1746,8 +2139,20 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
           onEvaluationSaved={() => setProgressRefresh(n => n + 1)} />
       </div>
       <div style={{ display: activePanel === 'module-e' ? 'block' : 'none' }}>
+        {currentUser?.id === 'guest' ? (
+          <div className="card coming-soon">
+            <p className="eyebrow">{labels.navE}</p>
+            <p>{labels.progressGuestNote}</p>
+          </div>
+        ) : (
         <ModuleProgress labels={labels} refresh={progressRefresh}
-          onApplyParams={(params) => { onGenerated && onGenerated(null); onPanelChange('module-a'); }} />
+          onApplyParams={(params) => {
+            // Adaptive difficulty (cahier D12): apply the recommended
+            // parameters to the generation form, then jump to Module A.
+            setAdaptiveParams({ ...params, _appliedAt: Date.now() });
+            onPanelChange('module-a');
+          }} />
+        )}
       </div>
 
     </section>
@@ -1756,14 +2161,30 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
 
 // ── Sources Panel ─────────────────────────────────────────────────────────────
 
-function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelectFile, onClose }) {
-  const [tab, setTab]   = useState('library');  // 'library' | 'upload'
+function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary, onSelectFile, onClose }) {
+  const [tab, setTab]   = useState('library');  // 'library' | 'upload' | 'webpage'
   const [query, setQuery] = useState(initialQuery || '');
+  const [pageUrl, setPageUrl] = useState('');
+  const [urlStatus, setUrlStatus] = useState('idle');
+  const [urlError, setUrlError] = useState('');
 
   function handleFileChosen(file) {
     if (!file) return;
     onSelectFile(file);
     onClose();
+  }
+
+  async function handleFetchUrl() {
+    if (!pageUrl.trim()) return;
+    setUrlStatus('loading'); setUrlError('');
+    try {
+      const data = await fetchWebPage(pageUrl.trim());
+      onSelectLibrary({ text: data.text, title: data.title || pageUrl, un_id: '', web_url: data.url });
+      onClose();
+    } catch (err) {
+      setUrlError(err.message);
+      setUrlStatus('error');
+    }
   }
 
   const unSearchUrl = `https://digitallibrary.un.org/search?p=${encodeURIComponent(query || 'United Nations')}&ln=en&sf=date&so=d&of=hb&fct__1=Documents+and+Publications`;
@@ -1772,20 +2193,50 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
     <div className="library-overlay">
       <div className="library-panel">
         <div className="library-header">
-          <h2 className="library-title">Add Source</h2>
+          <h2 className="library-title">{labels?.srcPanelTitle || 'Add Source'}</h2>
           <button className="library-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <p className="library-subtitle">Find a UN document or upload your own file to ground the speech in real content.</p>
+        <p className="library-subtitle">{labels?.srcPanelSubtitle}</p>
 
         <div className="library-tabs">
-          <button className={`lib-tab ${tab === 'library' ? 'lib-tab-active' : ''}`} onClick={() => setTab('library')}>UN Library</button>
-          <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>Upload file</button>
+          <button className={`lib-tab ${tab === 'library' ? 'lib-tab-active' : ''}`} onClick={() => setTab('library')}>{labels?.srcTabUN || 'UN Library'}</button>
+          <button className={`lib-tab ${tab === 'webpage' ? 'lib-tab-active' : ''}`} onClick={() => setTab('webpage')}>🔗 {labels?.webPageTab || 'Web page'}</button>
+          <button className={`lib-tab ${tab === 'upload' ? 'lib-tab-active' : ''}`} onClick={() => setTab('upload')}>{labels?.srcTabUpload || 'Upload file'}</button>
         </div>
+
+        {tab === 'webpage' && (
+          <div style={{ padding: '1.2rem 0' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--warm-gray)', marginBottom: '1rem', lineHeight: 1.6 }}>
+              {labels?.webPageHint || 'The readable text of the page will be extracted and used as the source for the speech.'}
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                className="library-search-input"
+                type="url"
+                value={pageUrl}
+                onChange={e => { setPageUrl(e.target.value); setUrlError(''); setUrlStatus('idle'); }}
+                placeholder={labels?.webPageUrlPlaceholder || 'https://…'}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleFetchUrl(); } }}
+                disabled={urlStatus === 'loading'}
+              />
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ whiteSpace: 'nowrap' }}
+                onClick={handleFetchUrl}
+                disabled={urlStatus === 'loading' || !pageUrl.trim()}
+              >
+                {urlStatus === 'loading' ? (labels?.webPageFetching || 'Fetching…') : (labels?.webPageFetch || 'Fetch page')}
+              </button>
+            </div>
+            {urlError && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{urlError}</div>}
+          </div>
+        )}
 
         {tab === 'library' && (
           <div style={{ padding: '1.2rem 0' }}>
             <p style={{ fontSize: '0.875rem', color: 'var(--warm-gray)', marginBottom: '1rem', lineHeight: 1.6 }}>
-              Search the UN Digital Library for your topic, download the PDF, then upload it below.
+              {labels?.srcUNHint}
             </p>
 
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.2rem' }}>
@@ -1803,13 +2254,13 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
                 className="btn-primary"
                 style={{ whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
               >
-                Search UN Library ↗
+                {labels?.srcUNSearchBtn || 'Search UN Library ↗'}
               </a>
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.1rem' }}>
               <p style={{ fontSize: '0.82rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>
-                Once you have downloaded the PDF, upload it here:
+                {labels?.srcUNUploadAfter}
               </p>
               <label className="upload-zone">
                 <input
@@ -1821,8 +2272,8 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
                 <svg className="upload-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <div className="upload-zone-label">Drop the PDF here or <span className="upload-zone-browse">browse</span></div>
-                <div className="upload-zone-hint">PDF, Word (.docx), or plain text</div>
+                <div className="upload-zone-label">{labels?.srcDropPdf} <span className="upload-zone-browse">{labels?.srcBrowse}</span></div>
+                <div className="upload-zone-hint">{labels?.srcFileTypes}</div>
               </label>
             </div>
           </div>
@@ -1840,8 +2291,8 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
               <svg className="upload-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
-              <div className="upload-zone-label">Drop a file here or <span className="upload-zone-browse">browse</span></div>
-              <div className="upload-zone-hint">PDF, Word (.docx), or plain text</div>
+              <div className="upload-zone-label">{labels?.srcDropFile} <span className="upload-zone-browse">{labels?.srcBrowse}</span></div>
+              <div className="upload-zone-hint">{labels?.srcFileTypes}</div>
             </label>
           </div>
         )}
@@ -1850,8 +2301,26 @@ function SourcesPanel({ language, domain, initialQuery, onSelectLibrary, onSelec
   );
 }
 
-function ModuleA({ labels, onGenerated, isRtl }) {
+function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
   const [form, setForm] = useState(initialSpeechForm);
+
+  // Adaptive difficulty (cahier D12): merge the recommended parameters from
+  // the Progress page into the generation form whenever the student clicks
+  // "Apply these settings".
+  useEffect(() => {
+    if (!adaptiveParams) return;
+    const wc = Number(adaptiveParams.word_count || 0);
+    const word_count_range = wc <= 180 ? 'short' : wc <= 320 ? 'medium' : wc <= 550 ? 'long' : 'extended';
+    setForm(current => ({
+      ...current,
+      difficulty: adaptiveParams.difficulty || current.difficulty,
+      word_count_range: wc ? word_count_range : current.word_count_range,
+      number_density: adaptiveParams.number_density || current.number_density,
+      speed_pressure: adaptiveParams.speed_pressure || current.speed_pressure,
+      structure: adaptiveParams.structure || current.structure,
+      topic_shifts: adaptiveParams.topic_shifts || current.topic_shifts,
+    }));
+  }, [adaptiveParams]);
   const [documentFile, setDocumentFile] = useState(null);
   const [retrievalResult, setRetrievalResult] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(true);
@@ -1873,11 +2342,25 @@ function ModuleA({ labels, onGenerated, isRtl }) {
     setForm(current => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
   }
 
+  const topicIsLongText = form.topic.trim().length > TOPIC_AS_SOURCE_THRESHOLD;
+
   async function handleSubmit(event) {
     event.preventDefault();
     setStatus('loading'); setError(''); setResult(null);
     try {
-      const data = await generateSpeech(form);
+      let params = form;
+      if (topicIsLongText) {
+        // Pasted full text → use it as the grounding source document and
+        // derive a short topic from its first words.
+        const pasted = form.topic.trim();
+        params = {
+          ...form,
+          topic: pasted.split(/\s+/).slice(0, 12).join(' '),
+          source_text: pasted,
+          source_title: 'Pasted text',
+        };
+      }
+      const data = await generateSpeech(params);
       setResult(data); onGenerated(data); setStatus('success');
     } catch (err) { setError(err.message); setStatus('error'); }
   }
@@ -1925,21 +2408,25 @@ function ModuleA({ labels, onGenerated, isRtl }) {
     <div className="card module-a-card">
       <form onSubmit={handleSubmit}>
 
-        {/* ── Main topic bar ── */}
+        {/* ── Main topic bar — textarea so full texts can be pasted ── */}
         <div className="topic-bar">
-          <input
+          <textarea
             className="topic-input"
             name="topic"
-            type="text"
             value={form.topic}
             minLength="3"
-            maxLength="180"
+            maxLength="12000"
             required
+            rows={topicIsLongText ? 6 : 1}
             placeholder={labels.topicPlaceholder || 'Enter a topic or paste text to generate a speech…'}
             onChange={updateField}
             disabled={isLoading}
+            style={{ resize: 'vertical', overflow: 'auto', minHeight: '2.6rem' }}
           />
         </div>
+        {topicIsLongText && (
+          <div className="info-tip" style={{ marginTop: '0.4rem' }}>📄 {labels.longTextAsSource}</div>
+        )}
 
         {/* ── Attached file chip ── */}
         {documentFile && (
@@ -1993,18 +2480,48 @@ function ModuleA({ labels, onGenerated, isRtl }) {
           <div className="advanced-panel">
             <div className="form-grid">
               <SelectField label={labels.wordCount} id="f-words" name="word_count_range" value={form.word_count_range} onChange={updateField}>
-                <option value="short">{labels.wordRangeShort || 'Short'}</option>
-                <option value="medium">{labels.wordRangeMedium || 'Medium'}</option>
-                <option value="long">{labels.wordRangeLong || 'Long'}</option>
+                <option value="short">{labels.wordRangeShortFull || 'Short — 120–180 words (≈1–1.5 min)'}</option>
+                <option value="medium">{labels.wordRangeMediumFull || 'Medium — 220–320 words (≈2–2.5 min)'}</option>
+                <option value="long">{labels.wordRangeLongFull || 'Long — 400–550 words (≈3.5–4.5 min)'}</option>
+                <option value="extended">{labels.wordRangeExtendedFull || 'Extended — 650–800 words (≈5.5–6.5 min)'}</option>
               </SelectField>
-              <SelectField label={labels.mode} id="f-mode" name="mode" value={form.mode} onChange={updateField}>
-                <option value="consecutive">{labels.optConsecutive || 'Consecutive'}</option>
-                <option value="simultaneous">{labels.optSimultaneous || 'Simultaneous'}</option>
-                <option value="sight_translation">{labels.optSight || 'Sight translation'}</option>
+              <SelectField label={labels.domain} id="f-domain" name="domain" value={form.domain} onChange={updateField}>
+                <option value="politics">{labels.domPolitics || 'Politics'}</option>
+                <option value="diplomacy">{labels.domDiplomacy || 'Diplomacy'}</option>
+                <option value="economics">{labels.domEconomics || 'Economics'}</option>
+                <option value="climate">{labels.domClimate || 'Climate & Environment'}</option>
+                <option value="health">{labels.domHealth || 'Health'}</option>
+                <option value="human rights">{labels.domHumanRights || 'Human Rights'}</option>
+                <option value="education">{labels.domEducation || 'Education'}</option>
+                <option value="technology">{labels.domTechnology || 'Technology & AI'}</option>
+                <option value="migration">{labels.domMigration || 'Migration & Refugees'}</option>
+                <option value="disarmament">{labels.domDisarmament || 'Disarmament'}</option>
+                <option value="women">{labels.domWomen || 'Women & Gender'}</option>
+                <option value="food">{labels.domFood || 'Food & Hunger'}</option>
+              </SelectField>
+              <SelectField label={labels.scenarioLabel || 'Speaker style / setting'} id="f-scenario" name="scenario" value={form.scenario} onChange={updateField}>
+                <option value="UN General Assembly">{labels.scenUNGA || 'UN General Assembly'}</option>
+                <option value="EU Parliament">{labels.scenEUParl || 'EU Parliament'}</option>
+                <option value="Arab League summit">{labels.scenArabLeague || 'Arab League summit'}</option>
+                <option value="press conference">{labels.scenPress || 'Press conference'}</option>
+                <option value="diplomatic meeting">{labels.scenDiplomatic || 'Diplomatic meeting'}</option>
+                <option value="political debate">{labels.scenDebate || 'Political debate'}</option>
+                <option value="interview">{labels.scenInterview || 'Interview'}</option>
+              </SelectField>
+              <SelectField label={labels.structure} id="f-structure" name="structure" value={form.structure} onChange={updateField}>
+                <option value="well-organized">{labels.optWellOrganized || 'Well organized'}</option>
+                <option value="semi-structured">{labels.optSemiStructured || 'Semi-structured'}</option>
+                <option value="deliberately disorganized">{labels.optDisorganizedFull || 'Deliberately disorganized'}</option>
               </SelectField>
               <SelectField label={labels.numbers} id="f-numbers" name="number_density" value={form.number_density} onChange={updateField}>
                 <option value="low">{labels.optLowNumbers || 'Low numbers'}</option>
+                <option value="medium">{labels.optTermMedium || 'Medium'}</option>
                 <option value="high">{labels.optHighNumbers || 'High numbers'}</option>
+              </SelectField>
+              <SelectField label={labels.termDensity || 'Terminology density'} id="f-term" name="terminology_density" value={form.terminology_density} onChange={updateField}>
+                <option value="low">{labels.optTermLow || 'Low — everyday vocabulary'}</option>
+                <option value="medium">{labels.optTermMedium || 'Medium'}</option>
+                <option value="high">{labels.optTermHigh || 'High — dense specialised terms'}</option>
               </SelectField>
               <SelectField label={labels.speedPressure || 'Speed pressure'} id="f-speed" name="speed_pressure" value={form.speed_pressure} onChange={updateField}>
                 <option value="normal">{labels.optNormalSpeed || 'Normal speed'}</option>
@@ -2015,7 +2532,21 @@ function ModuleA({ labels, onGenerated, isRtl }) {
                 <option value="none">{labels.optNoShifts || 'No topic shifts'}</option>
                 <option value="mild">{labels.optShifts || 'Topic shifts'}</option>
               </SelectField>
+              <div className="field" style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 500 }}>
+                  <input
+                    type="checkbox"
+                    name="include_hesitations"
+                    checked={form.include_hesitations}
+                    onChange={updateField}
+                  />
+                  {labels.hesitationsSim || 'Simulate hesitations'}
+                </label>
+              </div>
             </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginTop: '0.75rem', lineHeight: 1.5 }}>
+              💡 {labels.diffHint}
+            </p>
           </div>
         )}
 
@@ -2058,6 +2589,7 @@ function ModuleA({ labels, onGenerated, isRtl }) {
 
       {showLibrary && (
         <SourcesPanel
+          labels={labels}
           language={form.language}
           domain={form.domain}
           initialQuery={form.topic}
@@ -2158,7 +2690,7 @@ function SpeechResult({ data, labels }) {
         <span>
           {data.word_count} {labels.wordsUnit}
           {requestedRange ? ` / ${requestedRange}` : ''}
-          {rangeMissed ? ' (outside requested range)' : ''}
+          {rangeMissed ? ` ${labels.outsideRange}` : ''}
         </span>
         {duration && <span>~{duration}</span>}
         {data.topic && <span>{data.topic}</span>}
@@ -2182,14 +2714,287 @@ function SpeechResult({ data, labels }) {
       <div className={`speech-text ${isArabic ? 'arabic' : ''}`}>
         {data.script}
       </div>
-      <p className="speech-next-hint">→ Go to <strong>Audio &amp; materials</strong> to listen, review questions, and download the glossary.</p>
+      <p className="speech-next-hint">{labels.nextHintPre} <strong>{labels.navB}</strong> {labels.nextHintPost}</p>
+    </div>
+  );
+}
+
+// ── Interactive MCQ quiz — answers hidden until the student answers ─────────
+
+function McqQuiz({ mcqs, labels, isArabic }) {
+  const [answers, setAnswers] = useState({});
+
+  function getCorrectText(item) {
+    if (item.answer_text) return item.answer_text;
+    if (Number.isInteger(item.answer_index) && Array.isArray(item.options))
+      return item.options[item.answer_index] || '';
+    const letter = String(item.answer || '').trim().toUpperCase();
+    const idx = { A: 0, B: 1, C: 2, D: 3 }[letter];
+    if (idx !== undefined && Array.isArray(item.options)) return item.options[idx] || '';
+    return item.answer || '';
+  }
+
+  function isCorrectOption(item, option) {
+    if (Number.isInteger(item.answer_index) && Array.isArray(item.options))
+      return item.options[item.answer_index] === option;
+    return option === getCorrectText(item);
+  }
+
+  function select(qi, option) {
+    setAnswers(prev => (prev[qi]?.revealed ? prev : { ...prev, [qi]: { selected: option, revealed: false } }));
+  }
+
+  function check(qi) {
+    setAnswers(prev => ({ ...prev, [qi]: { ...(prev[qi] || {}), revealed: true } }));
+  }
+
+  const revealedCount = mcqs.filter((_, qi) => answers[qi]?.revealed).length;
+  const correctCount = mcqs.filter((item, qi) =>
+    answers[qi]?.revealed && answers[qi]?.selected && isCorrectOption(item, answers[qi].selected)
+  ).length;
+
+  return (
+    <div>
+      <p style={{ fontSize: '0.83rem', color: 'var(--warm-gray)', marginBottom: '0.9rem' }}>
+        {labels.mcqPickAnswer}
+        {revealedCount > 0 && (
+          <strong style={{ marginInlineStart: '0.75rem' }}>
+            {labels.mcqYourScore}: {correctCount}/{revealedCount}
+          </strong>
+        )}
+      </p>
+      {mcqs.map((item, qi) => {
+        const state = answers[qi] || {};
+        const revealed = Boolean(state.revealed);
+        const selectedIsCorrect = state.selected ? isCorrectOption(item, state.selected) : false;
+        const correctText = getCorrectText(item);
+        return (
+          <div key={qi} className="eval-item" style={{ marginBottom: '1.1rem', paddingBottom: '0.9rem', borderBottom: '1px solid var(--border, #eee)' }}>
+            <div className={`mcq-q ${isArabic ? 'arabic' : ''}`} style={{ fontWeight: 600, marginBottom: '0.55rem' }}>
+              {qi + 1}. {item.question}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {(item.options || []).map((opt, oi) => {
+                const letter = 'ABCD'[oi] || String(oi + 1);
+                const isSelected = state.selected === opt;
+                const optionCorrect = isCorrectOption(item, opt);
+                let border = '1.5px solid var(--border, #ddd)';
+                let background = 'transparent';
+                if (revealed && optionCorrect) { border = '1.5px solid #2D5A4E'; background = '#2d5a4e14'; }
+                else if (revealed && isSelected && !optionCorrect) { border = '1.5px solid #8B3A2A'; background = '#8b3a2a14'; }
+                else if (isSelected) { border = '1.5px solid var(--primary, #1a3a5c)'; background = '#1a3a5c0d'; }
+                return (
+                  <button
+                    key={oi}
+                    type="button"
+                    onClick={() => select(qi, opt)}
+                    className={isArabic ? 'arabic' : ''}
+                    style={{
+                      textAlign: 'start', padding: '0.5rem 0.75rem', borderRadius: 8,
+                      border, background, cursor: revealed ? 'default' : 'pointer',
+                      fontSize: '0.86rem', lineHeight: 1.45,
+                      display: 'flex', gap: '0.55rem', alignItems: 'flex-start',
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, minWidth: '1.1rem', color: 'var(--warm-gray)' }}>{letter}.</span>
+                    <span style={{ flex: 1 }}>{opt}{revealed && optionCorrect && ' ✓'}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {!revealed ? (
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.55rem' }}>
+                <button type="button" className="btn-secondary btn-sm" onClick={() => check(qi)} disabled={!state.selected}>
+                  {labels.mcqCheck}
+                </button>
+                <button type="button" className="btn-secondary btn-sm" style={{ opacity: 0.7 }} onClick={() => check(qi)}>
+                  {labels.mcqShowAnswer}
+                </button>
+              </div>
+            ) : (
+              <p style={{ marginTop: '0.55rem', fontSize: '0.84rem', fontWeight: 600,
+                color: state.selected ? (selectedIsCorrect ? '#2D5A4E' : '#8B3A2A') : 'var(--warm-gray)' }}>
+                {state.selected
+                  ? (selectedIsCorrect
+                    ? labels.mcqCorrectMsg
+                    : <>{labels.mcqWrongMsg} <strong>{correctText}</strong></>)
+                  : <>{labels.mcqShowAnswerLabel} <strong>{correctText}</strong></>}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Sight translation scroller (professor request, cf. scroller.dipintra.it) ─
+// Continuous vertical scroll at a words/min pace with a live dashboard
+// (elapsed / remaining), like the University of Bologna Scroller tool.
+
+function SightScroller({ script, isArabic, labels }) {
+  const [playing, setPlaying] = useState(false);
+  const [wpm, setWpm] = useState(120);
+  const [fontSize, setFontSize] = useState(1.15);   // rem
+  const [columns, setColumns] = useState(1);
+  const [spacing, setSpacing] = useState(1.9);      // line-height
+  const [progress, setProgress] = useState(0);      // 0..1 of the exercise
+  const wrapRef = useRef(null);
+  const rafRef = useRef(null);
+  const lastTsRef = useRef(null);
+  const lastUiUpdateRef = useRef(0);
+  // Time-driven engine (like scroller.dipintra.it): progress is a fraction of
+  // elapsed exercise TIME, and the scroll position is derived from it each
+  // frame. Timer and scroll can never disagree, and the float accumulator
+  // avoids the whole-pixel scrollTop rounding that froze slow speeds.
+  const progressRef = useRef(0);
+
+  const wordCount = useMemo(() => String(script || '').split(/\s+/).filter(Boolean).length, [script]);
+  const totalSeconds = (wordCount / Math.max(40, wpm)) * 60;
+
+  useEffect(() => {
+    if (!playing) {
+      cancelAnimationFrame(rafRef.current);
+      lastTsRef.current = null;
+      return;
+    }
+    // Re-sync with the scrollbar (the user may have dragged it while paused).
+    const wrapAtStart = wrapRef.current;
+    if (wrapAtStart) {
+      const scrollable = wrapAtStart.scrollHeight - wrapAtStart.clientHeight;
+      if (scrollable > 0 && wrapAtStart.scrollTop > 0) {
+        progressRef.current = wrapAtStart.scrollTop / scrollable;
+      }
+    }
+    function step(ts) {
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      if (lastTsRef.current != null && totalSeconds > 0) {
+        const dt = (ts - lastTsRef.current) / 1000;
+        progressRef.current = Math.min(1, progressRef.current + dt / totalSeconds);
+        const scrollable = wrap.scrollHeight - wrap.clientHeight;
+        if (scrollable > 0) {
+          wrap.scrollTop = progressRef.current * scrollable;
+        }
+        if (ts - lastUiUpdateRef.current > 200) {
+          lastUiUpdateRef.current = ts;
+          setProgress(progressRef.current);
+        }
+        if (progressRef.current >= 1) {
+          setProgress(1);
+          setPlaying(false);
+        }
+      }
+      lastTsRef.current = ts;
+      rafRef.current = requestAnimationFrame(step);
+    }
+    rafRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [playing, totalSeconds]);
+
+  function reset() {
+    setPlaying(false);
+    setProgress(0);
+    progressRef.current = 0;
+    if (wrapRef.current) wrapRef.current.scrollTop = 0;
+  }
+
+  function fmtTime(seconds) {
+    const s = Math.max(0, Math.round(seconds));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  const elapsed = progress * totalSeconds;
+  const wordsRead = Math.round(progress * wordCount);
+
+  return (
+    <div>
+      <p style={{ fontSize: '0.83rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>{labels.scrollerHint}</p>
+
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '0.9rem' }}>
+        <div className="field" style={{ minWidth: 160 }}>
+          <label>{labels.scrollerSpeed}: <strong>{wpm}</strong></label>
+          <input type="range" min="80" max="240" step="10" value={wpm}
+            onChange={e => setWpm(Number(e.target.value))} className="rate-slider" />
+        </div>
+        <div className="field" style={{ minWidth: 100 }}>
+          <label>{labels.scrollerFontSize}</label>
+          <select value={fontSize} onChange={e => setFontSize(Number(e.target.value))}>
+            <option value={0.95}>A</option>
+            <option value={1.15}>A+</option>
+            <option value={1.45}>A++</option>
+            <option value={1.8}>A+++</option>
+          </select>
+        </div>
+        <div className="field" style={{ minWidth: 90 }}>
+          <label>{labels.scrollerColumns}</label>
+          <select value={columns} onChange={e => setColumns(Number(e.target.value))}>
+            <option value={1}>1</option>
+            <option value={2}>2</option>
+          </select>
+        </div>
+        <div className="field" style={{ minWidth: 100 }}>
+          <label>{labels.scrollerSpacing}</label>
+          <select value={spacing} onChange={e => setSpacing(Number(e.target.value))}>
+            <option value={1.55}>1</option>
+            <option value={1.9}>1.5</option>
+            <option value={2.4}>2</option>
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button type="button" className="btn-primary" onClick={() => setPlaying(p => !p)}>
+            {playing ? labels.scrollerPause : labels.scrollerPlay}
+          </button>
+          <button type="button" className="btn-secondary" onClick={reset}>{labels.scrollerReset}</button>
+        </div>
+      </div>
+
+      {/* Live dashboard — elapsed / remaining / words, like the Bologna tool */}
+      <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginBottom: '0.6rem',
+        fontSize: '0.8rem', color: 'var(--warm-gray)', fontVariantNumeric: 'tabular-nums' }}>
+        <span>⏱ {fmtTime(elapsed)} / {fmtTime(totalSeconds)}</span>
+        <span>⏳ −{fmtTime(totalSeconds - elapsed)}</span>
+        <span>📖 {wordsRead} / {wordCount} {labels.wordsUnit}</span>
+        <span style={{ flex: 1, alignSelf: 'center', height: 4, background: 'rgba(27,58,107,0.12)', borderRadius: 2, minWidth: 120 }}>
+          <span style={{ display: 'block', height: '100%', width: `${Math.round(progress * 100)}%`,
+            background: 'var(--primary, #1a3a5c)', borderRadius: 2, transition: 'width 0.25s linear' }} />
+        </span>
+      </div>
+
+      {/* Outer wrapper owns the fixed height + vertical scrollbar; the inner
+          block owns the column layout with natural height — putting both on
+          one element makes CSS columns overflow horizontally (no scrolling).
+          Spacer divs make the text enter from the bottom and exit through the
+          top, teleprompter-style, like the Bologna Scroller tool. */}
+      <div
+        ref={wrapRef}
+        style={{
+          height: 340, overflowY: 'auto', overflowX: 'hidden',
+          border: '1px solid var(--border, #ddd)', borderRadius: 10,
+          background: 'var(--surface, #fff)',
+        }}
+      >
+        <div aria-hidden="true" style={{ height: 300 }} />
+        <div
+          className={isArabic ? 'arabic' : ''}
+          dir={isArabic ? 'rtl' : 'ltr'}
+          style={{
+            padding: '0 1.5rem',
+            fontSize: `${fontSize}rem`, lineHeight: spacing,
+            columnCount: columns, columnGap: '2.5rem', whiteSpace: 'pre-wrap',
+          }}
+        >
+          {script}
+        </div>
+        <div aria-hidden="true" style={{ height: 280 }} />
+      </div>
     </div>
   );
 }
 
 // ── Module B — TTS + Pedagogical Materials ──────────────────────────────────
 
-function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, isRtl }) {
+function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate, isRtl }) {
   const language = lastGeneratedScript?.language || 'ar';
   const isArabic = language === 'ar';
   const voiceOptions = VOICE_OPTIONS[language] || VOICE_OPTIONS.en;
@@ -2200,6 +3005,15 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, isRtl }) {
   const [audioUrl, setAudioUrl] = useState(null);
   const [audioStatus, setAudioStatus] = useState('idle');
   const [audioError, setAudioError] = useState('');
+  const [editingGlossary, setEditingGlossary] = useState(false);
+
+  function updateGlossaryCell(index, key, value) {
+    const current = lastGeneratedScript?.glossary || [];
+    const updated = current.map((row, i) => (i === index ? { ...row, [key]: value } : row));
+    // Propagate upward so Module D evaluates terminology against the
+    // student-corrected glossary (cahier des charges request).
+    onScriptUpdate?.({ ...lastGeneratedScript, glossary: updated });
+  }
 
   useEffect(() => {
     const opts = VOICE_OPTIONS[language] || VOICE_OPTIONS.en;
@@ -2280,51 +3094,31 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, isRtl }) {
         </div>
       )}
 
-      {/* ── MCQ ── */}
+      {/* ── MCQ — interactive: the answer stays hidden until the student answers ── */}
       {mcqs.length > 0 && (
         <div className="card">
           <h2 className="b-section-title">❓ {labels.mcqTitle}</h2>
-          <div className="table-responsive">
-            <table className="mcq-table">
-              <thead>
-                <tr>
-                  <th style={{width:'2.5rem'}}>#</th>
-                  <th>{labels.mcqQuestionHeader || 'Question'}</th>
-                  <th>{labels.mcqOptionsHeader || 'Options'}</th>
-                  <th style={{width:'5rem'}}>{labels.mcqAnswerHeader || 'Answer'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mcqs.map((item, i) => (
-                  <tr key={i}>
-                    <td className="mcq-num">{i + 1}</td>
-                    <td className={`mcq-q ${isArabic ? 'arabic' : ''}`}>{item.question}</td>
-                    <td>
-                      <ul className="mcq-opts-inline">
-                        {(item.options || []).map((opt, oi) => (
-                          <li key={oi} className={
-                            item.answer && (opt === item.answer || opt.startsWith(item.answer + '.') || opt.startsWith(item.answer + ' '))
-                              ? 'mcq-correct-opt' : ''
-                          }>{opt}</li>
-                        ))}
-                      </ul>
-                    </td>
-                    <td className="mcq-ans">{item.answer}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* key = speech fingerprint: a new speech mounts a fresh quiz,
+              otherwise answers from the previous text stay selected */}
+          <McqQuiz key={speechId} mcqs={mcqs} labels={labels} isArabic={isArabic} />
         </div>
       )}
 
-      {/* ── Glossary ── */}
+      {/* ── Glossary — editable BEFORE recording; evaluation checks against it ── */}
       {glossary.length > 0 && (
         <div className="card">
           <div className="b-section-header">
             <h2 className="b-section-title">📖 {labels.glossaryTitle}</h2>
-            <button className="btn-secondary btn-sm" onClick={handleDownloadGlossary}>{labels.downloadGlossary}</button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="btn-secondary btn-sm" onClick={() => setEditingGlossary(v => !v)}>
+                {editingGlossary ? labels.glossaryEditDone : labels.glossaryEdit}
+              </button>
+              <button className="btn-secondary btn-sm" onClick={handleDownloadGlossary}>{labels.downloadGlossary}</button>
+            </div>
           </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>
+            💡 {labels.glossaryEditHint}
+          </p>
           <div className="table-responsive">
             <table className="glossary-table">
               <thead>
@@ -2339,11 +3133,23 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, isRtl }) {
               <tbody>
                 {glossary.map((item, i) => (
                   <tr key={i}>
-                    <td><strong>{item.term}</strong></td>
-                    <td className="arabic" dir="rtl">{glossaryArabicValue(item)}</td>
-                    <td>{glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])}</td>
-                    <td>{glossaryValue(item, ['english', 'English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])}</td>
-                    <td className="gloss-def">{item.definition || ''}</td>
+                    {editingGlossary ? (
+                      <>
+                        <td><input className="glossary-edit-input" value={item.term || ''} onChange={e => updateGlossaryCell(i, 'term', e.target.value)} /></td>
+                        <td><input className="glossary-edit-input arabic" dir="rtl" value={glossaryArabicValue(item)} onChange={e => updateGlossaryCell(i, 'arabic', e.target.value)} /></td>
+                        <td><input className="glossary-edit-input" value={glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])} onChange={e => updateGlossaryCell(i, 'french', e.target.value)} /></td>
+                        <td><input className="glossary-edit-input" value={glossaryValue(item, ['english', 'English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])} onChange={e => updateGlossaryCell(i, 'english', e.target.value)} /></td>
+                        <td><input className="glossary-edit-input" value={item.definition || ''} onChange={e => updateGlossaryCell(i, 'definition', e.target.value)} /></td>
+                      </>
+                    ) : (
+                      <>
+                        <td><strong>{item.term}</strong></td>
+                        <td className="arabic" dir="rtl">{glossaryArabicValue(item)}</td>
+                        <td>{glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])}</td>
+                        <td>{glossaryValue(item, ['english', 'English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])}</td>
+                        <td className="gloss-def">{item.definition || ''}</td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -2356,10 +3162,116 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, isRtl }) {
   );
 }
 
+// ── Note-taking space for consecutive interpretation (text + sketch) ─────────
+
+function NotesPad({ labels }) {
+  const [tab, setTab] = useState('text');   // 'text' | 'sketch'
+  const [notes, setNotes] = useState('');
+  const canvasRef = useRef(null);
+  const drawingRef = useRef(false);
+  const lastPointRef = useRef(null);
+
+  function canvasPos(e) {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const source = e.touches ? e.touches[0] : e;
+    return {
+      x: (source.clientX - rect.left) * (canvas.width / rect.width),
+      y: (source.clientY - rect.top) * (canvas.height / rect.height),
+    };
+  }
+
+  function startDraw(e) {
+    drawingRef.current = true;
+    lastPointRef.current = canvasPos(e);
+  }
+
+  function draw(e) {
+    if (!drawingRef.current) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const point = canvasPos(e);
+    ctx.strokeStyle = '#1a3a5c';
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+    lastPointRef.current = point;
+  }
+
+  function endDraw() {
+    drawingRef.current = false;
+  }
+
+  function clearAll() {
+    if (tab === 'text') {
+      setNotes('');
+    } else {
+      const canvas = canvasRef.current;
+      canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  return (
+    <div className="record-section" style={{ marginTop: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+        <p className="record-section-label" style={{ margin: 0 }}>{labels.notesTitle}</p>
+        <div style={{ display: 'flex', gap: '0.35rem' }}>
+          <button type="button" className={`lib-tab ${tab === 'text' ? 'lib-tab-active' : ''}`} onClick={() => setTab('text')}>
+            {labels.notesTextTab}
+          </button>
+          <button type="button" className={`lib-tab ${tab === 'sketch' ? 'lib-tab-active' : ''}`} onClick={() => setTab('sketch')}>
+            {labels.notesSketchTab}
+          </button>
+        </div>
+        <button type="button" className="btn-secondary btn-sm" onClick={clearAll}>{labels.notesClear}</button>
+      </div>
+
+      {tab === 'text' ? (
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder={labels.notesPlaceholder}
+          style={{
+            width: '100%', minHeight: 160, padding: '0.75rem 1rem',
+            border: '1px solid var(--border, #ddd)', borderRadius: 10,
+            fontSize: '0.92rem', lineHeight: 1.6, resize: 'vertical',
+            fontFamily: 'inherit', background: 'var(--surface, #fff)',
+          }}
+        />
+      ) : (
+        <canvas
+          ref={canvasRef}
+          width={900}
+          height={360}
+          style={{
+            width: '100%', height: 240, border: '1px solid var(--border, #ddd)',
+            borderRadius: 10, background: 'var(--surface, #fff)', touchAction: 'none', cursor: 'crosshair',
+          }}
+          onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
+          onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
+        />
+      )}
+      <p style={{ fontSize: '0.75rem', color: 'var(--warm-gray)', marginTop: '0.4rem' }}>{labels.notesHint}</p>
+    </div>
+  );
+}
+
 // ── Module C — ASR Transcription + Browser Recording ────────────────────────
 
-function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete, onRecordingComplete }) {
+function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTranscriptComplete, onRecordingComplete }) {
   const [language, setLanguage] = useState('ar');
+
+  // The student interprets INTO the target language chosen in Module A —
+  // preselect it so the recognizer transcribes in the right language.
+  useEffect(() => {
+    if (targetLanguage && ['ar', 'fr', 'en'].includes(targetLanguage)) {
+      setLanguage(targetLanguage);
+    }
+  }, [targetLanguage]);
   const [status, setStatus] = useState('idle');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -2375,6 +3287,11 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const referenceAudioRef = useRef(null);
+  const [simultaneousActive, setSimultaneousActive] = useState(false);
+  // 3 practice modes (professor request): simultaneous | consecutive | sight
+  const [interpMode, setInterpMode] = useState('consecutive');
+  const sourceIsArabic = /[؀-ۿ]/.test(sourceScript || '');
 
   const lowConfWords = useMemo(() =>
     (result?.segments || []).flatMap(seg =>
@@ -2403,9 +3320,38 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
     }
   }
 
-  async function startRecording() {
+  // Simultaneous interpretation: the source speech plays WHILE the student
+  // records — echo cancellation reduces source bleed; headphones recommended.
+  async function startSimultaneous() {
+    const player = referenceAudioRef.current;
+    if (!player) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      player.currentTime = 0;
+      setSimultaneousActive(true);
+      const started = await startRecording({ echoCancellation: true, noiseSuppression: true });
+      if (!started) { setSimultaneousActive(false); return; }
+      await player.play();
+      player.onended = () => stopSimultaneous();
+    } catch (err) {
+      setSimultaneousActive(false);
+      setError('Could not start simultaneous mode — check microphone permission.');
+    }
+  }
+
+  function stopSimultaneous() {
+    const player = referenceAudioRef.current;
+    if (player) { player.pause(); player.onended = null; }
+    setSimultaneousActive(false);
+    stopRecording();
+  }
+
+  async function startRecording(audioConstraints) {
+    try {
+      // Guard: when used as onClick handler the first arg is the click event.
+      const isConstraintObject = audioConstraints && typeof audioConstraints === 'object'
+        && !('target' in audioConstraints);
+      const constraints = { audio: isConstraintObject ? audioConstraints : true };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus' : 'audio/webm';
       const mr = new MediaRecorder(stream, { mimeType });
@@ -2430,8 +3376,10 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
       mr.start(250);
       setIsRecording(true);
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+      return true;
     } catch (err) {
       setError('Microphone access denied — please allow microphone permission and try again.');
+      return false;
     }
   }
 
@@ -2477,11 +3425,74 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
           </SelectField>
         </div>
 
-        {/* Reference audio from Module B */}
-        {referenceAudioUrl && (
+        {/* ── Practice mode selector: simultaneous | consecutive | sight ── */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <p className="record-section-label" style={{ marginBottom: '0.5rem' }}>{labels.modeChoose}</p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {[
+              { id: 'simultaneous', name: labels.optSimultaneous, icon: '🎧' },
+              { id: 'consecutive',  name: labels.optConsecutive,  icon: '📝' },
+              { id: 'sight',        name: labels.optSight,        icon: '📜' },
+            ].map(m => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setInterpMode(m.id)}
+                style={{
+                  flex: '1 1 140px', padding: '0.65rem 0.9rem', borderRadius: 10, cursor: 'pointer',
+                  border: interpMode === m.id ? '2px solid var(--primary, #1a3a5c)' : '1.5px solid var(--border, #ddd)',
+                  background: interpMode === m.id ? 'rgba(27,58,107,0.07)' : 'transparent',
+                  fontWeight: interpMode === m.id ? 700 : 500, fontSize: '0.9rem',
+                }}
+              >
+                {m.icon} {m.name}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginTop: '0.5rem' }}>
+            {interpMode === 'simultaneous' && labels.modeSimulDesc}
+            {interpMode === 'consecutive' && labels.modeConsecDesc}
+            {interpMode === 'sight' && labels.modeSightDesc}
+          </p>
+        </div>
+
+        {/* Reference audio from Module B — for simultaneous & consecutive */}
+        {interpMode !== 'sight' && referenceAudioUrl && (
           <div className="reference-audio-box">
             <p className="ref-audio-label">🔊 {labels.sourceAudio}</p>
-            <audio controls src={referenceAudioUrl} style={{ width: '100%' }} />
+            <audio ref={referenceAudioRef} controls src={referenceAudioUrl} style={{ width: '100%' }} />
+          </div>
+        )}
+
+        {/* Simultaneous — source plays while the student records */}
+        {interpMode === 'simultaneous' && (
+          <div className="record-section" style={{ borderLeft: '3px solid var(--primary, #1a3a5c)', paddingLeft: '0.9rem', marginBottom: '1rem' }}>
+            <p className="record-section-label">{labels.simulTitle}</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', margin: '0.3rem 0 0.6rem' }}>
+              {referenceAudioUrl ? labels.simulHint : labels.simulNeedsAudio}
+            </p>
+            {referenceAudioUrl && (
+              !simultaneousActive ? (
+                <button className="btn-primary" onClick={startSimultaneous} disabled={isRecording}>
+                  {labels.simulStart}
+                </button>
+              ) : (
+                <button className="btn-record recording-active" onClick={stopSimultaneous}>
+                  <span className="rec-dot" /> {labels.simulStop} — {formatTime(recordingTime)}
+                </button>
+              )
+            )}
+          </div>
+        )}
+
+        {/* Sight translation — scrolling source text, record while translating */}
+        {interpMode === 'sight' && (
+          <div className="record-section" style={{ marginBottom: '1rem' }}>
+            {sourceScript ? (
+              <SightScroller key={sourceScript.slice(0, 50)} script={sourceScript} isArabic={sourceIsArabic} labels={labels} />
+            ) : (
+              <div className="info-tip">ℹ️ {labels.needsSource}</div>
+            )}
           </div>
         )}
 
@@ -2491,13 +3502,17 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
 
           <div className="record-controls">
             {!isRecording ? (
-              <button className="btn-record" onClick={startRecording}>
+              <button className="btn-record" onClick={startRecording} disabled={simultaneousActive}>
                 {labels.recordBtn}
               </button>
-            ) : (
+            ) : !simultaneousActive ? (
               <button className="btn-record recording-active" onClick={stopRecording}>
                 <span className="rec-dot" /> {labels.stopBtn} — {formatTime(recordingTime)}
               </button>
+            ) : (
+              <span style={{ fontSize: '0.85rem', color: 'var(--warm-gray)' }}>
+                {labels.recordingLive}… ({labels.simulTitle})
+              </span>
             )}
 
             <label className="auto-transcribe-toggle">
@@ -2535,6 +3550,9 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
             </div>
           )}
         </div>
+
+        {/* Note-taking space — consecutive mode only */}
+        {interpMode === 'consecutive' && <NotesPad labels={labels} />}
 
         {/* Upload fallback */}
         <details className="upload-fallback">
@@ -2600,7 +3618,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, onTranscriptComplete
 
 // ── Module D — Full Evaluation Report ────────────────────────────────────────
 
-function ScoreBar({ score }) {
+function ScoreBar({ score, labels }) {
   const pct = Math.round((score / 10) * 100);
   const color = score >= 7 ? '#2D5A4E' : score >= 5 ? '#1B3A6B' : '#8B3A2A';
   const circumference = 188.5;
@@ -2613,7 +3631,7 @@ function ScoreBar({ score }) {
       </div>
       <div>
         <div className="score-bar-wrap"><div className="score-bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
-        <div style={{ fontSize: '0.74rem', color: 'var(--warm-gray)', marginTop: '0.3rem' }}>{pct}% — {score >= 7 ? 'Good' : score >= 5 ? 'Acceptable' : 'Needs work'}</div>
+        <div style={{ fontSize: '0.74rem', color: 'var(--warm-gray)', marginTop: '0.3rem' }}>{pct}% — {score >= 7 ? (labels?.verdictGood || 'Good') : score >= 5 ? (labels?.verdictAcceptable || 'Acceptable') : (labels?.verdictNeedsWork || 'Needs work')}</div>
       </div>
     </div>
   );
@@ -2693,7 +3711,7 @@ function PronunciationPanel({ labels, lastTranscript, lastGeneratedScript }) {
           {/* Scores */}
           <div style={{ display: 'flex', gap: '2rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             <div>
-              <p className="report-label">Coverage score</p>
+              <p className="report-label">{labels.coverageScoreLabel}</p>
               <div className="score-number" style={{ color: coverageColor }}>
                 {result.coverage_score?.toFixed(1)}<span>/10</span>
               </div>
@@ -2814,7 +3832,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           lastGeneratedScript?.script || '',
           language,
           lastGeneratedScript?.language || language,
-          lastGeneratedScript?.domain || ''
+          lastGeneratedScript?.domain || '',
+          lastGeneratedScript?.glossary || []   // student-reviewed glossary → terminology check
         );
       } else {
         // Fallback: use stored Groq transcript (less accurate for hesitations)
@@ -2822,7 +3841,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           source_script:   lastGeneratedScript?.script || '',
           transcript_text: lastTranscript.full_text,
           transcript:      lastTranscript,
-          language
+          language,
+          glossary:        lastGeneratedScript?.glossary || []
         });
       }
       // Attach pronunciation report for the pronunciation panel
@@ -2868,8 +3888,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
       <div className="card">
         <h2>{labels.moduleDTitle}</h2>
         <div className="info-tip" style={{ marginBottom: '1rem' }}>
-          📄 Transcript ready ({lastTranscript.duration_seconds}s · {(lastTranscript.language_detected || '').toUpperCase()})
-          {lastGeneratedScript && <> · Source: {lastGeneratedScript.domain}</>}
+          📄 {labels.transcriptReady} ({lastTranscript.duration_seconds}s · {(lastTranscript.language_detected || '').toUpperCase()})
+          {lastGeneratedScript && <> · {labels.source}: {lastGeneratedScript.domain}</>}
         </div>
         <button className="btn-primary" onClick={handleEvaluate} disabled={status === 'loading'}>
           {status === 'loading' ? labels.runningEvaluation : labels.runEvaluation}
@@ -2890,12 +3910,12 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="report-score-row">
               <div>
                 <p className="report-label">{labels.overallScore}</p>
-                <ScoreBar score={report.overall_score || 0} />
+                <ScoreBar score={report.overall_score || 0} labels={labels} />
               </div>
               {report.fluency_score !== undefined && (
                 <div>
                   <p className="report-label">{labels.fluencyScore}</p>
-                  <ScoreBar score={report.fluency_score || 0} />
+                  <ScoreBar score={report.fluency_score || 0} labels={labels} />
                 </div>
               )}
               {(report.strengths || []).length > 0 && (
@@ -2934,12 +3954,19 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             {(algo.long_silences || []).length > 0 && (
               <div className="algo-detail-block">
                 <p className="algo-detail-title">🔇 {labels.longSilences}</p>
-                {algo.long_silences.map((s, i) => (
-                  <div key={i} className="algo-detail-row">
-                    <span className="algo-detail-badge algo-badge-warn">{s.duration_seconds}s</span>
-                    <span className="algo-detail-text">at {s.at_seconds}s{s.after_text ? ` after: "${s.after_text}"` : ''}</span>
-                  </div>
-                ))}
+                {algo.long_silences.map((s, i) => {
+                  const isPrep = String(s.type || '').includes('leading') || Number(s.at_seconds) === 0;
+                  return (
+                    <div key={i} className="algo-detail-row">
+                      <span className={`algo-detail-badge ${isPrep ? 'algo-badge-gold' : 'algo-badge-warn'}`}>{s.duration_seconds}s</span>
+                      <span className="algo-detail-text">
+                        {isPrep
+                          ? <>⏱ {labels.prepTimeLabel}</>
+                          : <>at {s.at_seconds}s{s.after_text ? ` after: "${s.after_text}"` : ''}</>}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
             {(algo.repetitions || []).length > 0 && (
@@ -2950,8 +3977,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                     <span className="algo-detail-badge algo-badge-gold">"{r.word}"</span>
                     <span className="algo-detail-text">
                       {r.at_seconds !== undefined
-                        ? `at ${r.at_seconds}s · repeated at ${r.second_occurrence}s`
-                        : `repeated near word ${r.position ?? i}`}
+                        ? `at ${r.at_seconds}s${r.second_occurrence !== undefined ? ` · again at ${r.second_occurrence}s` : ''}`
+                        : `near word ${r.position ?? i}`}
                     </span>
                   </div>
                 ))}
@@ -3057,25 +4084,30 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           {/* Audio-based fluency */}
           {fluency && (
             <div className="card">
-              <h3 className="report-section-title">Audio fluency from recording</h3>
+              <h3 className="report-section-title">{labels.audioFluencyTitle}</h3>
               <div className="report-score-row">
                 <div>
-                  <p className="report-label">Fluency score</p>
-                  <ScoreBar score={fluency.fluency_score || 0} />
+                  <p className="report-label">{labels.fluencyScore}</p>
+                  <ScoreBar score={fluency.fluency_score || 0} labels={labels} />
                 </div>
                 <div className="report-summary">
                   <p>{fluency.summary}</p>
                   <p style={{ fontSize: '0.82rem', color: 'var(--warm-gray)', marginTop: '0.45rem' }}>
-                    Uses local audio timing and Whisper confidence. Low-confidence transcript regions are treated as clarity evidence, not automatic translation mistakes.
+                    {labels.fluencyExplain}
                   </p>
+                  {fluency.preparation_seconds > 0 && (
+                    <p style={{ fontSize: '0.82rem', color: 'var(--sage)', marginTop: '0.35rem' }}>
+                      ⏱ {fluency.preparation_seconds}s {labels.prepTimeLabel}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="algo-grid" style={{ marginTop: '1rem' }}>
                 {[
-                  { label: 'Speech rate', value: `${fluency.speech_rate_wpm || 0} wpm` },
-                  { label: 'Long pauses', value: fluency.long_pause_count || 0 },
-                  { label: 'Silence ratio', value: `${Math.round((fluency.silence_ratio || 0) * 100)}%` },
-                  { label: 'Word confidence', value: `${Math.round((fluency.average_word_confidence || 0) * 100)}%` },
+                  { label: labels.statSpeechRate, value: `${fluency.speech_rate_wpm || 0} wpm` },
+                  { label: labels.statLongPauses, value: fluency.long_pause_count || 0 },
+                  { label: labels.statSilenceRatio, value: `${Math.round((fluency.silence_ratio || 0) * 100)}%` },
+                  { label: labels.statWordConfidence, value: `${Math.round((fluency.average_word_confidence || 0) * 100)}%` },
                 ].map(({ label, value }) => (
                   <div key={label} className="algo-card">
                     <span className="algo-count">{value}</span>
@@ -3090,7 +4122,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           {report.coverage_score !== undefined && (
             <div className="card">
               <h3 className="report-section-title">📊 {labels.coverageTitle}</h3>
-              <ScoreBar score={report.coverage_score} />
+              <ScoreBar score={report.coverage_score} labels={labels} />
               <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--warm-gray)' }}>
                 {labels.coverageHint}
               </p>
@@ -3113,6 +4145,35 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
+          {/* Proper nouns — names of people, organizations, places */}
+          {(report.proper_nouns || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">🏛️ {labels.pnTitle}</h3>
+              {report.proper_nouns.map((pn, i) => {
+                const status = String(pn.status || '').toLowerCase();
+                const color = status === 'correct' ? 'var(--sage)' : status === 'missing' ? 'var(--warm-gray)' : 'var(--sienna)';
+                const statusLabel = status === 'correct' ? labels.pnCorrect : status === 'missing' ? labels.pnMissing : labels.pnDistorted;
+                return (
+                  <div key={i} className="eval-item" style={{ borderLeft: `3px solid ${color}`, paddingLeft: '0.75rem', marginBottom: '0.6rem' }}>
+                    <div style={{ fontSize: '0.84rem' }}>
+                      <strong>{pn.source_name}</strong>
+                      {pn.student_said && status !== 'missing' && (
+                        <>
+                          <span style={{ color: 'var(--warm-gray)' }}> · {labels.studentSaidShort}: </span>
+                          <strong style={{ color }} className={isAr ? 'arabic' : ''}>{pn.student_said}</strong>
+                        </>
+                      )}
+                      <span className={`importance-badge importance-${status === 'correct' ? 'low' : 'high'}`} style={{ marginLeft: '0.5rem' }}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                    {pn.note && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{pn.note}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Missing content */}
           {(report.missing_content || []).length > 0 && (
             <div className="card">
@@ -3126,7 +4187,56 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
+          {/* Language errors (grammar / syntax) */}
+          {(report.language_errors || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">⚠️ {labels.languageErrors}</h3>
+              {report.language_errors.map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.6rem' }}>
+                  <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
+                  {item.explanation && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{item.explanation}</div>}
+                  {item.correction && <div className="eval-correction">✓ {labels.correction}: <strong className={isAr ? 'arabic' : ''}>{item.correction}</strong></div>}
+                </div>
+              ))}
+            </div>
+          )}
 
+          {/* Auto-corrections (self-corrections the student made mid-speech) */}
+          {(report.auto_corrections || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">✏️ {labels.autoCorrections}</h3>
+              {report.auto_corrections.map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sage)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                  <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* False starts (incomplete phrases abandoned mid-sentence) */}
+          {(report.false_starts || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">↩️ {labels.falseStarts}</h3>
+              {report.false_starts.map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                  <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Lapsus linguae (slips of the tongue) */}
+          {(report.lapsus_linguae || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">👅 {labels.lapsusLinguae}</h3>
+              {report.lapsus_linguae.map((item, i) => (
+                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                  <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
+                  {item.likely_intended && <div className="eval-correction">→ {labels.correction}: <strong className={isAr ? 'arabic' : ''}>{item.likely_intended}</strong></div>}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Recommendations */}
           {(report.recommendations || []).length > 0 && (
@@ -3137,6 +4247,20 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               </ul>
             </div>
           )}
+
+          {/* Transparency: evaluation criteria, reliability, data storage */}
+          <div className="card">
+            <details>
+              <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: '0.92rem' }}>
+                {labels.aboutEvalTitle}
+              </summary>
+              <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', lineHeight: 1.65, color: 'var(--ink, #333)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <p>{labels.aboutEvalCriteria}</p>
+                <p>{labels.aboutEvalReliability}</p>
+                <p>{labels.aboutEvalStorage}</p>
+              </div>
+            </details>
+          </div>
         </div>
       )}
 

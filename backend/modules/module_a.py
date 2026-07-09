@@ -6,6 +6,7 @@ grounding/retrieval from TXT, DOCX, and PDF uploads.
 """
 import ast
 import json
+import random
 import re
 
 from flask import Blueprint, current_app, jsonify, request
@@ -98,6 +99,7 @@ def build_structured_material_prompt(params: dict, topic: str, excerpts: list[st
     structure       = params.get('structure', 'well-organized')
     scenario        = params.get('scenario', 'UN General Assembly')
     number_density  = params.get('number_density', 'low')
+    terminology_density = params.get('terminology_density', 'medium')
     hesitations     = bool(params.get('include_hesitations', False))
     mode            = params.get('mode', 'consecutive')
     pressure_enabled = bool(params.get('pressure_enabled', False))
@@ -136,6 +138,18 @@ def build_structured_material_prompt(params: dict, topic: str, excerpts: list[st
         'high': 'Include at least 8–10 statistics, percentages, dates, and large numbers spread throughout the speech.',
     }.get(number_density, 'Include 4–6 statistics or figures.')
 
+    # ── Lexical complexity / terminological density ──────────────────────────
+    terminology_instruction = {
+        'low': (
+            'Use everyday vocabulary. Only 1–2 specialised terms in the whole speech, '
+            'each introduced with a brief natural explanation.'
+        ),
+        'high': (
+            'Dense specialised terminology: at least 10–12 domain-specific technical terms, '
+            'institutional jargon, and formal register throughout. Do not simplify.'
+        ),
+    }.get(terminology_density, 'Moderate terminology: 5–7 domain-specific terms woven naturally into the speech.')
+
     # ── Pressure block ───────────────────────────────────────────────────────
     pressure_block = ''
     if pressure_enabled:
@@ -172,6 +186,44 @@ FACTUAL ACCURACY RULES (no source document available):
 - When in doubt, use ranges rather than precise invented numbers.
 """
 
+    # ── Scenario / speaker-style profile ─────────────────────────────────────
+    # Each setting has a distinct register and format; without this the model
+    # writes the same UN-podium speech for every scenario (professor feedback).
+    scenario_styles = {
+        'UN General Assembly': (
+            'Formal multilateral address by a state representative at the UN podium: measured diplomatic '
+            'register, references to resolutions and member states, collective appeals to "the international community".'
+        ),
+        'EU Parliament': (
+            'Parliamentary address to fellow Members of the European Parliament: European institutional '
+            'vocabulary (the Commission, the Council, directives), civic-democratic appeals, direct address to colleagues.'
+        ),
+        'Arab League summit': (
+            'Pan-Arab summit address: solemn elevated register, appeals to Arab solidarity and joint action, '
+            'references to member states and Arab institutions.'
+        ),
+        'press conference': (
+            'Opening statement to journalists at a press conference: direct, short, quotable sentences; concrete '
+            'announcements and decisions stated up front; anticipates journalists\' concerns; closes by signalling '
+            'readiness to take questions. NOT a podium speech.'
+        ),
+        'diplomatic meeting': (
+            'Remarks in a closed bilateral working meeting, addressed directly to counterparts: pragmatic and '
+            'courteous, focused on shared interests, points of negotiation, and concrete next steps. No podium rhetoric.'
+        ),
+        'political debate': (
+            'Debate intervention: combative first-person argumentation, rebuts opposing positions explicitly, '
+            'rhetorical questions, sharp contrasts, direct appeals to the audience and the moderator.'
+        ),
+        'interview': (
+            'Extended spoken answers in a broadcast interview: first person singular, conversational yet '
+            'professional register, engages the interviewer\'s implicit questions ("You ask me whether..."), '
+            'personal framing of facts and experiences. ABSOLUTELY NOT a structured podium speech — it must '
+            'sound like someone talking to a journalist across a table.'
+        ),
+    }
+    scenario_style = scenario_styles.get(scenario, f'Style and register appropriate to: {scenario}.')
+
     # ── Mode instruction ─────────────────────────────────────────────────────
     mode_note = MODE_INSTRUCTIONS.get(mode, '')
 
@@ -205,29 +257,40 @@ Speech language:     {lang_name}
 Interpretation into: {target_name}
 Domain:              {domain}
 Scenario:            {scenario}
+Scenario style:      {scenario_style}
+                     The register and FORMAT must audibly match this scenario — an interview answer,
+                     a press statement, and a UN podium address must sound clearly different from
+                     each other even when built on the same facts.
 Difficulty:          {difficulty.upper()} — {diff_profile}
 Required length:     between {word_count_min} and {word_count_max} words in the "script" field (target about {word_count} words)
 Interpretation mode: {mode} — {mode_note}
 Numbers/statistics:  {number_instruction}
+Terminology density: {terminology_density.upper()} — {terminology_instruction}
 Hesitations:         {'Yes — ' + hesitation_note if hesitations else 'No'}
 {pressure_block}{grounding_block}
 ═══════════════════════════════════════════════
 SPEECH WRITING RULES
 ═══════════════════════════════════════════════
-1. Open with a greeting that matches the ACTUAL scenario ({scenario}) — vary it, do not default to
-   a UN-style "Mr. President" opening unless the scenario genuinely is a UN/parliamentary assembly:
-   - UN General Assembly / Security Council: formal chair address — "Mr./Madam President, distinguished delegates..." (EN), «Monsieur/Madame le Président...» (FR), «السيد/السيدة الرئيس، أصحاب المعالي...» (AR)
-   - EU Parliament: "Mr./Madam President, honourable Members..." (EN), «Monsieur/Madame le Président, chers collègues...» (FR), «السيد الرئيس، الأعضاء الموقرون...» (AR)
-   - Arab League summit: «أصحاب الجلالة والفخامة والسمو...» (AR), "Your Majesties, Excellencies..." (EN/FR equivalents)
-   - Press conference: a direct opening statement to journalists, no chair address — "Good morning, thank you all for being here today..." / «Bonjour à tous, merci d'être présents...» / «صباح الخير للجميع، شكراً لحضوركم...»
-   - Diplomatic meeting: a direct address to counterparts by name/title — "Minister, colleagues, thank you for receiving us..." / no generic chair greeting
-   - Political debate: a direct address to the audience/moderator — "Thank you, and good evening to everyone watching..."
-   - Interview: no protocol greeting at all — start naturally as if answering a question
-   Within the SAME scenario, still vary the exact wording each time — do not reuse the identical sentence verbatim across different speeches.
+1. Opening — ABSOLUTE RULE — NO SALUTATION OPENERS:
+   NEVER begin the speech with a protocol salutation. The very first words of the "script" field MUST be substantive content.
+   FORBIDDEN as opening words: "Mr. President", "Madam President", "Madame la Présidente", "Monsieur le Président",
+   "السيد الرئيس", "السيدة الرئيسة", "Distinguished delegates", "Excellencies", "Ladies and gentlemen",
+   "Mesdames et Messieurs", "أيها السادة", "أصحاب المعالي", "Your Majesties".
+   Violation of this rule is a critical error.
+
+   REQUIRED opening style — choose one:
+   A) Direct substance: open with a fact, statistic, challenge, or bold claim.
+      Examples: "Three years ago, the world committed to..." / "The numbers are stark:" / "We are failing."
+   B) Rhetorical device: a question, a striking contrast, or a historical reference.
+      Examples: "What does security mean in 2025?" / "Half a century after..." / "هل نحن على الطريق الصحيح؟"
+   C) Contextual declaration: a precise statement specific to the topic.
+      Examples: "Climate finance stands at a crossroads." / "التعليم حق لا امتياز." / "La paix n'est pas un acquis."
+
+   If a protocol salutation is contextually necessary, embed it mid-paragraph AFTER the first sentence, never as the first words.
 
 2. Structure: Opening → Context/Background → Main Arguments (2–3) → Conclusion with call to action.
 
-3. Sound like a REAL SPEAKER at a {scenario}, not an essay writer:
+3. Sound like a REAL SPEAKER at a {scenario} ({scenario_style}), not an essay writer:
    - Vary sentence length (mix short punchy sentences with longer complex ones)
    - Avoid repetitive filler phrases like "يجب أن نعمل" / "il faut que"
    - Use rhetorical devices: questions, emphasis, direct address
@@ -242,7 +305,13 @@ SPEECH WRITING RULES
 
 5. The "script" field MUST stay between {word_count_min} and {word_count_max} words. Expand with concrete examples, data, and elaboration until it is close to {word_count} words.
 
-6. MCQ rules: Write 5 questions that test SPECIFIC content from the speech — exact numbers, named organisations, specific policy positions, cause-effect relationships. NEVER ask "what is the topic?" or "who gave this speech?".
+6. MCQ rules: Write 5 questions that test SPECIFIC content from the speech.
+   - Mix the question types: AT LEAST 2 questions about ideas, arguments, positions, or cause-effect
+     relationships from the speech, and AT MOST 2 questions about numbers/statistics.
+   - Every question MUST be answerable from the speech text alone. NEVER ask about a fact that is
+     not explicitly stated in the speech — that is a critical error.
+   - The 3 wrong options must be plausible but clearly contradicted by the speech.
+   - NEVER ask "what is the topic?" or "who gave this speech?".
 
 7. Glossary: 8–12 key terms, each with Arabic, French, English, and a brief definition.
 
@@ -350,6 +419,62 @@ def _clean_arabic_script(text: str) -> str:
     return _to_arabic_indic(cleaned)
 
 
+_MCQ_PREFIX_RE = re.compile(r'^\s*[A-Da-dأ-د]\s*[.)\-:،]\s*')
+_ARABIC_ANSWER_LETTERS = {'أ': 0, 'ا': 0, 'ب': 1, 'ج': 2, 'د': 3}
+
+
+def normalize_mcqs(mcqs: list) -> list:
+    """
+    Make MCQs unambiguous and fair:
+    - strip "A." / "ب)" prefixes from options,
+    - resolve the correct answer to an INDEX (letter- or text-based), dropping
+      questions whose answer cannot be resolved,
+    - shuffle the options so the correct answer is not always the same letter.
+    The frontend matches on answer_index — no more letter/text guessing.
+    """
+    normalized = []
+    for item in mcqs or []:
+        if not isinstance(item, dict):
+            continue
+        question = str(item.get('question', '')).strip()
+        raw_options = [str(opt).strip() for opt in (item.get('options') or []) if str(opt).strip()]
+        if not question or len(raw_options) < 2:
+            continue
+
+        options = [_MCQ_PREFIX_RE.sub('', opt).strip() or opt for opt in raw_options]
+        answer_raw = str(item.get('answer', '')).strip()
+
+        index = None
+        if re.fullmatch(r'[A-Da-d]', answer_raw):
+            index = 'ABCD'.index(answer_raw.upper())
+        elif answer_raw in _ARABIC_ANSWER_LETTERS:
+            index = _ARABIC_ANSWER_LETTERS[answer_raw]
+        if index is not None and index >= len(options):
+            index = None
+        if index is None:
+            answer_text = _MCQ_PREFIX_RE.sub('', answer_raw).strip()
+            for i, opt in enumerate(options):
+                if opt == answer_text:
+                    index = i
+                    break
+        if index is None:
+            continue  # unresolvable answer → drop rather than mislead the student
+
+        order = list(range(len(options)))
+        random.shuffle(order)
+        shuffled = [options[i] for i in order]
+        new_index = order.index(index)
+
+        normalized.append({
+            'question': question,
+            'options': shuffled,
+            'answer_index': new_index,
+            'answer': 'ABCD'[new_index] if new_index < 4 else str(new_index + 1),
+            'answer_text': shuffled[new_index],
+        })
+    return normalized
+
+
 def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
     """Parse model JSON and fall back to treating the output as script text."""
     text = clean_model_json_text(raw_output)
@@ -361,6 +486,13 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
     def clean(s: str) -> str:
         return _clean_arabic_script(str(s).strip()) if language == 'ar' else str(s).strip()
 
+    def clean_mcq_option(s: str) -> str:
+        # MCQ options may contain mixed Arabic+Latin (e.g. "GDP نمو 5%").
+        # Only strip extra whitespace and convert digits; never strip Latin chars.
+        import re as _re
+        cleaned = _re.sub(r'\s{2,}', ' ', str(s).strip())
+        return _to_arabic_indic(cleaned) if language == 'ar' else cleaned
+
     script = clean(data.get('script', ''))
 
     # Clean MCQ text to remove stray foreign characters
@@ -371,7 +503,7 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
             continue
         mcqs.append({
             'question': clean(item.get('question', '')),
-            'options':  [clean(opt) for opt in (item.get('options') or [])],
+            'options':  [clean_mcq_option(opt) for opt in (item.get('options') or [])],
             # Answer is a short option label/letter (e.g. "A" or "32") — never
             # run it through the Arabic-only filter, which would strip Latin
             # letters used as MCQ choice labels.
@@ -385,7 +517,7 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
     return {
         'script':   script,
         'summary':  summary,
-        'mcqs':     mcqs,
+        'mcqs':     normalize_mcqs(mcqs),
         'glossary': normalize_glossary(data.get('glossary')),
         'metadata': data.get('metadata') if isinstance(data.get('metadata'), dict) else {},
     }
@@ -751,6 +883,7 @@ def parse_document_generation_params(form) -> dict:
         'mode',
         'structure',
         'number_density',
+        'terminology_density',
         'include_hesitations',
         'wpm',
         'scenario',
@@ -1034,10 +1167,13 @@ def find_un_grounding_source(params: dict) -> dict | None:
                 log.debug('[Grounding] UN search error (%s, %s): %s', query, un_lang, exc)
                 results = []
 
-            for result in results[:5]:
+            # Shuffle the candidates so the same topic + settings does not
+            # always ground in the exact same document (professor feedback:
+            # repeated generations should bring fresh material).
+            candidates = [r for r in results if r.get('pdf_url')]
+            random.shuffle(candidates)
+            for result in candidates[:5]:
                 pdf_url = result.get('pdf_url')
-                if not pdf_url:
-                    continue
                 try:
                     # Short timeout so one slow PDF doesn't block generation
                     text = _clean_extracted_text(_download_and_extract(pdf_url, timeout=20))
@@ -1101,7 +1237,8 @@ def find_wikipedia_grounding_source(params: dict) -> dict | None:
             if not hits:
                 continue
 
-            title = hits[0]['title']
+            # Random pick among the top hits so repeated generations vary
+            title = random.choice(hits[:3])['title']
             extract_resp = requests.get(
                 f'https://{wiki_lang}.wikipedia.org/w/api.php',
                 params={'action': 'query', 'prop': 'extracts', 'explaintext': 1,
@@ -1153,14 +1290,47 @@ def generate_speech():
         return jsonify(validation_error), status
 
     try:
-        # Always attempt UN Library grounding to ensure factual accuracy.
-        # If no matching document is found, fall back to a real Wikipedia
-        # search on the topic so the speech is still grounded in actual
-        # searched data rather than relying only on the LLM's own knowledge.
-        source = find_un_grounding_source(params)
-        if not source:
-            source = find_wikipedia_grounding_source(params)
+        source = None
         excerpts = None
+
+        # If the user selected a specific source document in the Sources panel,
+        # use it for RAG instead of auto-searching.
+        source_text = str(params.get('source_text', '')).strip()
+        source_pdf_url = str(params.get('source_pdf_url', '')).strip()
+
+        if source_text:
+            source = {
+                'text':         source_text,
+                'title':        str(params.get('source_title', 'Selected UN Document')).strip(),
+                'un_id':        str(params.get('source_un_id', '')).strip(),
+                'web_url':      str(params.get('source_web_url', '')).strip(),
+                'pdf_url':      source_pdf_url,
+                'date':         str(params.get('source_date', '')).strip(),
+                'source_label': 'UN Digital Library',
+            }
+        elif source_pdf_url:
+            try:
+                raw = _clean_extracted_text(_download_and_extract(source_pdf_url, timeout=30))
+                if len(raw.split()) >= 40:
+                    source = {
+                        'text':         raw,
+                        'title':        str(params.get('source_title', 'Selected UN Document')).strip(),
+                        'un_id':        str(params.get('source_un_id', '')).strip(),
+                        'web_url':      str(params.get('source_web_url', '')).strip(),
+                        'pdf_url':      source_pdf_url,
+                        'date':         str(params.get('source_date', '')).strip(),
+                        'source_label': 'UN Digital Library',
+                    }
+                else:
+                    current_app.logger.warning('[Generate] Source PDF too short after extraction: %s', source_pdf_url)
+            except Exception as exc:
+                current_app.logger.warning('[Generate] Failed to fetch source PDF (%s): %s', source_pdf_url, exc)
+        else:
+            # No explicit source — auto-search UN library, then Wikipedia fallback.
+            source = find_un_grounding_source(params)
+            if not source:
+                source = find_wikipedia_grounding_source(params)
+
         if source:
             normalized_text = normalize_text(source['text'])
             chunks = chunk_text(normalized_text)
@@ -1384,3 +1554,151 @@ def generate_from_document():
         return jsonify({'error': str(exc)}), 400
     except Exception as exc:
         return jsonify({'error': str(exc)}), 500
+
+
+# ── Web page as grounding source ─────────────────────────────────────────────
+# Professor feedback (7 June 2026): "Add source: est-il possible d'ajouter
+# l'hyperlien d'une page web ?" — fetch any public web page, extract its
+# readable text, and return it so the frontend can attach it as a source.
+
+class _WebPageTextExtractor:
+    """Minimal readable-text extractor using only the standard library."""
+
+    SKIP_TAGS = {'script', 'style', 'noscript', 'header', 'footer', 'nav', 'aside', 'form', 'svg', 'button'}
+
+    def __init__(self):
+        from html.parser import HTMLParser
+
+        extractor = self
+
+        class _Parser(HTMLParser):
+            def __init__(self):
+                super().__init__(convert_charrefs=True)
+                self.skip_depth = 0
+                self.title_parts = []
+                self.in_title = False
+                self.text_parts = []
+
+            def handle_starttag(self, tag, attrs):
+                if tag in _WebPageTextExtractor.SKIP_TAGS:
+                    self.skip_depth += 1
+                if tag == 'title':
+                    self.in_title = True
+
+            def handle_endtag(self, tag):
+                if tag in _WebPageTextExtractor.SKIP_TAGS and self.skip_depth > 0:
+                    self.skip_depth -= 1
+                if tag == 'title':
+                    self.in_title = False
+                if tag in {'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'br', 'tr'}:
+                    self.text_parts.append('\n')
+
+            def handle_data(self, data):
+                if self.in_title:
+                    self.title_parts.append(data)
+                elif self.skip_depth == 0 and data.strip():
+                    self.text_parts.append(data)
+
+        self._parser = _Parser()
+
+    def extract(self, html: str) -> tuple[str, str]:
+        self._parser.feed(html)
+        title = ' '.join(''.join(self._parser.title_parts).split())
+        raw = ''.join(self._parser.text_parts)
+        lines = [' '.join(line.split()) for line in raw.split('\n')]
+        text = '\n'.join(line for line in lines if line)
+        return text, title
+
+
+def _is_public_http_url(url: str) -> bool:
+    """
+    SSRF guard: only allow http(s) URLs that resolve to PUBLIC IP addresses.
+    Blocks localhost, private ranges (10/8, 172.16/12, 192.168/16), link-local
+    (169.254/16 — cloud metadata), and other non-global destinations.
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https') or not parsed.hostname:
+            return False
+        if parsed.port not in (None, 80, 443, 8080):
+            return False
+        infos = socket.getaddrinfo(parsed.hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)
+        for info in infos:
+            ip = ipaddress.ip_address(info[4][0])
+            if not ip.is_global or ip.is_multicast:
+                return False
+        return bool(infos)
+    except (ValueError, OSError):
+        return False
+
+
+@module_a_bp.route('/fetch-url', methods=['POST'])
+def fetch_web_page():
+    """
+    Download a public web page and return its readable text for grounding.
+
+    Request body (JSON):
+      url   str   http(s) URL of the page
+
+    Response (JSON):
+      text, title, url, word_count
+    """
+    payload = request.get_json(silent=True) or {}
+    url = str(payload.get('url', '')).strip()
+
+    if not url.lower().startswith(('http://', 'https://')):
+        return jsonify({'error': 'Please provide a valid web page URL starting with http:// or https://'}), 400
+
+    if not _is_public_http_url(url):
+        return jsonify({'error': 'This URL cannot be fetched. Only public web pages are allowed.'}), 400
+
+    try:
+        import requests as _requests
+        # Follow redirects manually so every hop is re-validated against the
+        # SSRF guard (a public URL may redirect to an internal address).
+        headers = {'User-Agent': 'Mozilla/5.0 (compatible; ETIB-Interpreter-Trainer/1.0; academic use)'}
+        current_url = url
+        resp = None
+        for _hop in range(4):
+            resp = _requests.get(current_url, timeout=20, headers=headers, allow_redirects=False)
+            if resp.status_code in (301, 302, 303, 307, 308):
+                next_url = resp.headers.get('Location', '')
+                if next_url.startswith('/'):
+                    from urllib.parse import urljoin
+                    next_url = urljoin(current_url, next_url)
+                if not _is_public_http_url(next_url):
+                    return jsonify({'error': 'This URL cannot be fetched. Only public web pages are allowed.'}), 400
+                current_url = next_url
+                continue
+            break
+        resp.raise_for_status()
+        url = current_url
+
+        content_type = resp.headers.get('Content-Type', '')
+        if 'pdf' in content_type.lower() or url.lower().endswith('.pdf'):
+            # PDF link — reuse the existing PDF extraction pipeline
+            text = _clean_extracted_text(_download_and_extract(url, timeout=30))
+            title = url.rsplit('/', 1)[-1]
+        else:
+            resp.encoding = resp.apparent_encoding or resp.encoding
+            text, title = _WebPageTextExtractor().extract(resp.text)
+
+        text = text.strip()
+        word_count = len(text.split())
+        if word_count < 50:
+            return jsonify({'error': 'Could not extract enough readable text from this page. '
+                                     'Try another URL or copy/paste the text directly.'}), 422
+
+        return jsonify({
+            'text': text[:20000],
+            'title': title or url,
+            'url': url,
+            'word_count': word_count,
+        })
+
+    except Exception as exc:
+        return jsonify({'error': f'Could not fetch this page: {str(exc)[:200]}'}), 502

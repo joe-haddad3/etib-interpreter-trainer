@@ -16,7 +16,9 @@ load_dotenv(override=True)
 from config import LLM_PROVIDER, LOCAL_MODEL_ID, REMOTE_AYA_URL
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-change-in-prod')
+# Random fallback instead of a fixed public string — sessions are not used
+# (token-in-body auth), but a predictable secret key is never acceptable.
+app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.urandom(32)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB — audio files can be large
 
 _ALLOWED_ORIGINS = {
@@ -46,6 +48,15 @@ def add_cors(response):
 @app.route('/<path:path>', methods=['OPTIONS'])
 def options_handler(path):
     return add_cors(app.make_response(''))
+
+@app.route('/')
+def index():
+    """Root route — HF Spaces and browsers probe GET / (avoids 405/500 noise)."""
+    return jsonify({
+        'service': 'ETIB Interpreter Trainer API',
+        'status': 'ok',
+        'docs': 'Backend for https://etib-interpreter-trainer.vercel.app — see /health and /api/config',
+    })
 
 # Ensure output directories exist at startup
 os.makedirs(os.getenv('UPLOAD_FOLDER', './uploads'), exist_ok=True)
@@ -97,9 +108,11 @@ def get_config():
         'languages': ['ar', 'fr', 'en'],
         'target_languages': ['ar', 'fr', 'en'],
         'domains': [
-            'politics', 'economics',
-            'climate', 'health', 'human rights', 'education'
+            'politics', 'diplomacy', 'economics', 'climate', 'health',
+            'human rights', 'education', 'technology', 'migration',
+            'disarmament', 'women', 'food'
         ],
+        'terminology_densities': ['low', 'medium', 'high'],
         'difficulties': ['beginner', 'intermediate', 'advanced'],
         'structures': ['well-organized', 'semi-structured', 'deliberately disorganized'],
         'scenarios': [

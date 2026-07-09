@@ -1,5 +1,12 @@
 /* ============================================================
    RTL overrides — applied to <body class="rtl"> when UI is Arabic
+   ------------------------------------------------------------
+   NOTE: App.jsx also sets <html dir="rtl">, which already mirrors
+   all flex/grid layouts natively. Do NOT add flex-direction:
+   row-reverse on top of dir=rtl — the double reversal cancels out
+   and the task sequence appears left-to-right again (professor
+   feedback, 7 June 2026). Only text alignment, fonts, and
+   asymmetric paddings need explicit overrides here.
    ============================================================ */
 
 body.rtl {
@@ -8,17 +15,8 @@ body.rtl {
   font-family: 'Noto Naskh Arabic', 'Segoe UI', sans-serif;
 }
 
-body.rtl .header-inner { flex-direction: row-reverse; }
-body.rtl nav { flex-direction: row-reverse; }
-body.rtl .language-picker {
-  margin-left: 0;
-  margin-right: 0.5rem;
-  flex-direction: row-reverse;
-}
 body.rtl .form-grid { direction: rtl; }
-body.rtl .field { align-items: flex-end; }
-body.rtl .checkbox-field label { flex-direction: row-reverse; }
-body.rtl select, body.rtl input { text-align: right; direction: rtl; }
+body.rtl select, body.rtl input, body.rtl textarea { text-align: right; direction: rtl; }
 body.rtl .password-control input {
   padding-right: 0.75rem;
   padding-left: 4.75rem;
@@ -27,12 +25,17 @@ body.rtl .password-toggle {
   right: auto;
   left: 0.35rem;
 }
-body.rtl .result-meta { flex-direction: row-reverse; }
-body.rtl .btn-primary { align-self: flex-end; }
 body.rtl .coming-soon { direction: rtl; }
 body.rtl .login-layout { direction: rtl; }
-body.rtl .workspace-heading { flex-direction: row-reverse; }
 body.rtl .secondary-action { direction: rtl; }
+
+/* Latin-script content (URLs, API keys, emails) stays LTR even in RTL UI */
+body.rtl .settings-key-input,
+body.rtl input[type="url"],
+body.rtl input[type="email"] {
+  direction: ltr;
+  text-align: left;
+}
 
 @media (max-width: 780px) {
   body.rtl .workspace-heading {

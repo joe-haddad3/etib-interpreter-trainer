@@ -19,7 +19,14 @@ from werkzeug.security import check_password_hash, generate_password_hash
 auth_bp = Blueprint('auth', __name__)
 
 # ── Token store ───────────────────────────────────────────────────────────────
-_tokens: dict = {}  # in-memory fallback: token_hex → email
+# Tokens are stored HASHED (sha256): a database leak must not hand out live
+# session tokens. The raw token exists only in the client's browser.
+import hashlib
+
+_tokens: dict = {}  # in-memory fallback: token_hash → email
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(str(token or '').encode('utf-8')).hexdigest()
 
 def _get_tokens_col():
     if _try_mongo():
@@ -28,40 +35,46 @@ def _get_tokens_col():
 
 def create_token(user: dict) -> str:
     token = secrets.token_hex(32)
+    token_hash = _hash_token(token)
     col = _get_tokens_col()
     if col is not None:
-        col.update_one({'token': token}, {'$set': {'token': token, 'email': user['email']}}, upsert=True)
+        col.update_one({'token': token_hash}, {'$set': {'token': token_hash, 'email': user['email']}}, upsert=True)
     else:
-        _tokens[token] = user['email']
+        _tokens[token_hash] = user['email']
     return token
 
 def revoke_token(token: str) -> None:
+    token_hash = _hash_token(token)
     col = _get_tokens_col()
     if col is not None:
-        col.delete_one({'token': token})
+        col.delete_one({'token': token_hash})
     else:
-        _tokens.pop(token, None)
+        _tokens.pop(token_hash, None)
 
 def get_user_from_token(token: str):
     if not token:
         return None
+    token_hash = _hash_token(token)
     col = _get_tokens_col()
     if col is not None:
-        doc = col.find_one({'token': token})
+        doc = col.find_one({'token': token_hash})
         email = doc['email'] if doc else None
     else:
-        email = _tokens.get(token)
+        email = _tokens.get(token_hash)
     return find_user_by_email(email) if email else None
 
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017')
 MONGODB_DB = os.getenv('MONGODB_DB', 'etib_interpreter_trainer')
 VALID_ROLES = {'student', 'coordinator'}
 
+# Demo accounts with publicly-known passwords are a security hole in
+# production — anyone reading the repo can log into them. Only seeded when
+# SEED_DEMO_USERS=true is set explicitly (local development).
+_SEED_ENABLED = os.getenv('SEED_DEMO_USERS', '').strip().lower() in {'1', 'true', 'yes'}
 SEED_USERS = [
     ('Demo Student', 'student@etib.edu', 'student', 'student123'),
-    ('Demo Instructor', 'instructor@etib.edu', 'instructor', 'instructor123'),
     ('Demo Coordinator', 'coordinator@etib.edu', 'coordinator', 'coordinator123'),
-]
+] if _SEED_ENABLED else []
 
 # ── Storage backend (MongoDB or in-memory fallback) ──────────────────────────
 

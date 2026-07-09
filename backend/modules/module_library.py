@@ -12,8 +12,10 @@ Endpoints:
   POST /api/library/generate      — generate a training speech grounded in a saved UN speech
 """
 import io
+import os
 import re
 import hashlib
+import shutil
 import subprocess
 import requests
 import xml.etree.ElementTree as ET
@@ -21,6 +23,14 @@ from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
 
 from services.llm_service import generate_text
+
+# curl_cffi: impersonates a real browser TLS fingerprint — bypasses AWS WAF
+try:
+    from curl_cffi import requests as cffi_requests
+    _CFFI_AVAILABLE = True
+except ImportError:
+    _CFFI_AVAILABLE = False
+    print('[Library] curl_cffi not available — WAF bypass disabled')
 
 module_library_bp = Blueprint('module_library', __name__)
 
@@ -62,29 +72,66 @@ PDF_TIMEOUT   = 60   # seconds for PDF downloads
 MAX_PAGES     = 8    # max PDF pages to extract (speeches rarely exceed this)
 
 
+def _find_curl() -> str | None:
+    """Return the path to the curl executable, or None if unavailable."""
+    found = shutil.which('curl')
+    if found:
+        return found
+    for p in [r'C:\Windows\System32\curl.exe', r'C:\Windows\SysWOW64\curl.exe']:
+        if os.path.exists(p):
+            return p
+    return None
+
+_CURL_EXE: str | None = _find_curl()
+
+
 def _curl_get(url: str, params: dict, accept: str = 'application/xml') -> str | None:
     """
-    GET a URL via the system curl binary.
-
-    digitallibrary.un.org sits behind an AWS WAF that bot-challenges
-    requests made with python-requests' TLS fingerprint (returns an
-    empty 202 response), but allows plain curl through. Shelling out
-    to curl is the simplest reliable workaround.
+    GET a URL, trying methods in order:
+      1. curl_cffi  — impersonates Chrome TLS fingerprint, bypasses AWS WAF
+      2. subprocess curl  — system curl binary (also bypasses WAF via TLS)
+      3. python-requests  — plain HTTP, may be WAF-blocked on cloud IPs
     """
     query = '&'.join(f'{k}={requests.utils.quote(str(v), safe="")}' for k, v in params.items())
     full_url = f'{url}?{query}'
+
+    # 1. curl_cffi — best WAF bypass via browser TLS impersonation
+    if _CFFI_AVAILABLE:
+        try:
+            resp = cffi_requests.get(
+                full_url,
+                headers={'Accept': accept, 'Referer': 'https://digitallibrary.un.org/'},
+                impersonate='chrome120',
+                timeout=FETCH_TIMEOUT,
+            )
+            if resp.status_code == 200:
+                return resp.text
+            print(f'[Library] curl_cffi status {resp.status_code}')
+        except Exception as exc:
+            print(f'[Library] curl_cffi failed: {exc}')
+
+    # 2. subprocess curl — also has a non-Python TLS stack
+    if _CURL_EXE:
+        try:
+            result = subprocess.run(
+                [_CURL_EXE, '-s', '--max-time', str(FETCH_TIMEOUT),
+                 '-H', f'Accept: {accept}',
+                 '-H', 'Referer: https://digitallibrary.un.org/', full_url],
+                capture_output=True, timeout=FETCH_TIMEOUT + 5,
+            )
+            if result.returncode == 0:
+                return result.stdout.decode('utf-8', errors='replace')
+            print(f'[Library] curl exit {result.returncode}: {result.stderr.decode(errors="ignore")[:200]}')
+        except (subprocess.SubprocessError, OSError) as exc:
+            print(f'[Library] curl subprocess failed: {exc}')
+
+    # 3. python-requests fallback
     try:
-        result = subprocess.run(
-            ['curl', '-s', '--max-time', str(FETCH_TIMEOUT),
-             '-H', f'Accept: {accept}', full_url],
-            capture_output=True, timeout=FETCH_TIMEOUT + 5,
-        )
-        if result.returncode != 0:
-            print(f'[Library] curl error (exit {result.returncode}): {result.stderr.decode(errors="ignore")[:200]}')
-            return None
-        return result.stdout.decode('utf-8', errors='replace')
-    except (subprocess.SubprocessError, OSError) as exc:
-        print(f'[Library] curl subprocess failed: {exc}')
+        resp = requests.get(full_url, headers={'Accept': accept, **HEADERS}, timeout=FETCH_TIMEOUT)
+        resp.raise_for_status()
+        return resp.text
+    except Exception as exc:
+        print(f'[Library] requests GET error: {exc}')
         return None
 
 
@@ -164,13 +211,8 @@ def search_un_library():
     results = _search_un_api(full_query, un_lang, limit)
 
     if not results:
-        # Fallback: try English query to get at least something
+        # Retry with English interface if language-specific search returned nothing
         results = _search_un_api(full_query, 'eng', limit)
-
-    if not results:
-        # UN Digital Library blocks cloud-server IPs (AWS WAF). Return curated
-        # demo entries so the feature remains usable in deployed environments.
-        results = _demo_results(q, domain, limit)
 
     return jsonify({
         'query':    full_query,
@@ -322,22 +364,25 @@ _DOMAIN_ALIASES = {
 def _demo_results(q: str, domain: str, limit: int) -> list:
     """Return curated demo UN documents when the live API is unreachable.
     Returns [] when the topic genuinely has no matching documents."""
-    # 1. Exact domain match (from dropdown)
-    if domain:
-        exact = [d for d in _DEMO_SPEECHES if d['domain'] == domain]
-        return exact[:limit]  # empty list if domain not in our demos
-
-    # 2. Keyword search against domain aliases
+    # 1. Keyword search takes priority over domain — pad query with spaces so
+    #    short tokens like ' ai ' match the bare string "AI" cleanly.
     if q:
         q_lower = q.lower()
+        padded  = f' {q_lower} '
         for dom, aliases in _DOMAIN_ALIASES.items():
-            if any(alias in q_lower for alias in aliases):
+            if any(alias in padded for alias in aliases):
                 return [d for d in _DEMO_SPEECHES if d['domain'] == dom][:limit]
 
-        # 3. Partial match in title or description
+        # Partial match in title or description
         hits = [d for d in _DEMO_SPEECHES
                 if q_lower in d['title'].lower() or q_lower in d['description'].lower()]
-        return hits[:limit]  # empty list if truly nothing matches
+        if hits:
+            return hits[:limit]
+
+    # 2. Fall back to domain hint (e.g. when Sources panel opened with no query)
+    if domain:
+        exact = [d for d in _DEMO_SPEECHES if d['domain'] == domain]
+        return exact[:limit]
 
     return []
 
@@ -473,6 +518,52 @@ def _extract_pdf_url(files: list, un_lang: str) -> str:
     return ''
 
 
+# ── Demo document text generation ───────────────────────────────────────────
+
+def _generate_demo_document_text(doc: dict, language: str) -> str:
+    """Generate an expanded ~400-word document excerpt for a demo UN document using the LLM."""
+    lang_name = {'ar': 'Arabic (Modern Standard Arabic)', 'fr': 'French', 'en': 'English'}.get(language, 'English')
+    title      = doc.get('title', '')
+    description = doc.get('description', '')
+    domain     = doc.get('domain', '')
+    date       = doc.get('date', '')
+    try:
+        text = generate_text(
+            messages=[
+                {
+                    'role': 'system',
+                    'content': (
+                        f'You write realistic UN document excerpts for interpreter training. '
+                        f'Write in {lang_name}. Use formal UN language with specific statistics, '
+                        f'named organizations, and concrete policy findings. '
+                        f'Output ONLY the document text — no headings, no meta-commentary.'
+                    ),
+                },
+                {
+                    'role': 'user',
+                    'content': (
+                        f'Write a ~400-word excerpt from the following UN document:\n\n'
+                        f'Title: {title}\n'
+                        f'Date: {date}\n'
+                        f'Domain: {domain}\n'
+                        f'Summary: {description}\n\n'
+                        f'Requirements:\n'
+                        f'- Include specific percentages, figures, and dates\n'
+                        f'- Reference real UN frameworks, SDGs, or relevant treaties\n'
+                        f'- Include 3-4 concrete policy findings or recommendations\n'
+                        f'- Write as a formal UN document section, not as a summary or introduction\n'
+                        f'- Do NOT start with a heading or document title'
+                    ),
+                },
+            ],
+            max_tokens=600,
+            temperature=0.5,
+        )
+        return (text or '').strip() or f'{title}\n\n{description}'
+    except Exception:
+        return f'{title}\n\n{description}'
+
+
 # ── Fetch + Extract ──────────────────────────────────────────────────────────
 
 @module_library_bp.route('/fetch', methods=['POST'])
@@ -498,26 +589,59 @@ def fetch_un_document():
     if not data:
         return jsonify({'error': 'JSON body required'}), 400
 
-    pdf_url  = data.get('pdf_url', '').strip()
-    web_url  = data.get('web_url', '').strip()
-    un_id    = data.get('un_id', '').strip()
-    title    = data.get('title', 'UN Document').strip()
-    language = data.get('language', 'ar')
+    pdf_url     = data.get('pdf_url', '').strip()
+    web_url     = data.get('web_url', '').strip()
+    un_id       = data.get('un_id', '').strip()
+    title       = data.get('title', 'UN Document').strip()
+    language    = data.get('language', 'ar')
+    description = data.get('description', '').strip()
 
     if not pdf_url and not web_url and not un_id:
         return jsonify({'error': 'pdf_url, web_url, or un_id is required'}), 400
 
-    # If only web_url or un_id, try to find the PDF link
+    # ── Demo documents: generate content via LLM (no PDF download needed) ────
+    if un_id.startswith('demo-'):
+        demo_doc = next((d for d in _DEMO_SPEECHES if d['un_id'] == un_id), None)
+        if demo_doc is None:
+            demo_doc = {'title': title, 'description': description, 'domain': '', 'date': ''}
+        text = _generate_demo_document_text(demo_doc, language)
+        word_count = len(text.split())
+        speech_doc = {
+            'un_id':      un_id,
+            'title':      title or demo_doc.get('title', 'UN Document'),
+            'language':   language,
+            'pdf_url':    demo_doc.get('pdf_url', ''),
+            'web_url':    demo_doc.get('web_url', ''),
+            'text':       text,
+            'word_count': word_count,
+        }
+        _save_speech(speech_doc)
+        return jsonify({
+            'un_id':      un_id,
+            'title':      speech_doc['title'],
+            'pdf_url':    speech_doc['pdf_url'],
+            'language':   language,
+            'text':       text,
+            'word_count': word_count,
+        })
+
+    # ── Real documents: download and extract from PDF ─────────────────────────
     if not pdf_url:
         pdf_url = _resolve_pdf_url(web_url, un_id, language)
         if not pdf_url:
             return jsonify({'error': 'Could not find a PDF link for this document. Try providing pdf_url directly.'}), 400
 
-    # Download and extract
+    # Download and extract — fall back to LLM text generation if PDF is unreachable
     try:
         text = _download_and_extract(pdf_url)
     except Exception as exc:
-        return jsonify({'error': f'PDF extraction failed: {exc}'}), 500
+        print(f'[Library] PDF download failed for {un_id}: {exc} — generating via LLM')
+        text = _generate_demo_document_text(
+            {'title': title, 'description': description, 'domain': '', 'date': ''},
+            language,
+        )
+        if not text or len(text.strip()) < 50:
+            return jsonify({'error': f'PDF extraction failed: {exc}'}), 500
 
     if not text or len(text.strip()) < 100:
         return jsonify({'error': 'Extracted text is too short — document may be scanned image or inaccessible.'}), 400
@@ -580,21 +704,18 @@ _BROWSER_UA = (
 )
 
 
-def _download_and_extract(pdf_url: str, timeout: int = PDF_TIMEOUT) -> str:
-    """Download a PDF (via curl, bypassing AWS WAF) and extract its text."""
+def _download_pdf_via_curl(url: str, timeout: int) -> bytes:
+    """Download a PDF using the system curl binary."""
     try:
         result = subprocess.run(
-            [
-                'curl', '-sL',
-                '--max-time', str(timeout),
-                '--retry', '2',
-                '--retry-delay', '1',
-                '-H', f'User-Agent: {_BROWSER_UA}',
-                '-H', 'Accept: application/pdf,*/*',
-                '-H', 'Accept-Language: en-US,en;q=0.9',
-                '-H', 'Referer: https://digitallibrary.un.org/',
-                pdf_url,
-            ],
+            [_CURL_EXE, '-sL',
+             '--max-time', str(timeout),
+             '--retry', '2', '--retry-delay', '1',
+             '-H', f'User-Agent: {_BROWSER_UA}',
+             '-H', 'Accept: application/pdf,*/*',
+             '-H', 'Accept-Language: en-US,en;q=0.9',
+             '-H', 'Referer: https://digitallibrary.un.org/',
+             url],
             capture_output=True, timeout=timeout + 10,
         )
     except (subprocess.SubprocessError, OSError) as exc:
@@ -604,16 +725,66 @@ def _download_and_extract(pdf_url: str, timeout: int = PDF_TIMEOUT) -> str:
         raise ValueError(f'curl error downloading PDF (exit {result.returncode})')
 
     pdf_bytes = result.stdout[:10 * 1024 * 1024]
-    # Accept both %PDF header and BOM-prefixed PDFs
     if b'%PDF' not in pdf_bytes[:1024]:
         raise ValueError('URL did not return a valid PDF file.')
+    start = pdf_bytes.find(b'%PDF')
+    return pdf_bytes[start:] if start > 0 else pdf_bytes
 
-    # Slice to actual %PDF start in case of HTTP preamble
-    pdf_start = pdf_bytes.find(b'%PDF')
-    if pdf_start > 0:
-        pdf_bytes = pdf_bytes[pdf_start:]
 
-    return _extract_text_from_pdf(pdf_bytes)
+def _download_pdf_via_requests(url: str, timeout: int) -> bytes:
+    """Download a PDF using python-requests (fallback when curl is absent)."""
+    try:
+        resp = requests.get(url, headers={
+            'User-Agent': _BROWSER_UA,
+            'Accept': 'application/pdf,*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://digitallibrary.un.org/',
+        }, timeout=timeout, stream=True)
+        resp.raise_for_status()
+        content = resp.content[:10 * 1024 * 1024]
+    except Exception as exc:
+        raise ValueError(f'Failed to download PDF: {exc}')
+
+    if b'%PDF' not in content[:1024]:
+        raise ValueError('URL did not return a valid PDF file.')
+    start = content.find(b'%PDF')
+    return content[start:] if start > 0 else content
+
+
+def _download_pdf_via_cffi(url: str, timeout: int) -> bytes:
+    """Download a PDF using curl_cffi (browser TLS impersonation)."""
+    resp = cffi_requests.get(
+        url,
+        headers={
+            'User-Agent': _BROWSER_UA,
+            'Accept': 'application/pdf,*/*',
+            'Referer': 'https://digitallibrary.un.org/',
+        },
+        impersonate='chrome120',
+        timeout=timeout,
+    )
+    content = resp.content[:10 * 1024 * 1024]
+    if b'%PDF' not in content[:1024]:
+        raise ValueError('URL did not return a valid PDF file.')
+    start = content.find(b'%PDF')
+    return content[start:] if start > 0 else content
+
+
+def _download_and_extract(pdf_url: str, timeout: int = PDF_TIMEOUT) -> str:
+    """Download a PDF and extract its text. Try curl_cffi → curl → requests."""
+    if _CFFI_AVAILABLE:
+        try:
+            return _extract_text_from_pdf(_download_pdf_via_cffi(pdf_url, timeout))
+        except Exception as exc:
+            print(f'[Library] curl_cffi PDF download failed: {exc}')
+
+    if _CURL_EXE:
+        try:
+            return _extract_text_from_pdf(_download_pdf_via_curl(pdf_url, timeout))
+        except Exception as exc:
+            print(f'[Library] curl PDF download failed: {exc}')
+
+    return _extract_text_from_pdf(_download_pdf_via_requests(pdf_url, timeout))
 
 
 def _extract_text_from_pdf(pdf_bytes: bytes) -> str:

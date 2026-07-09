@@ -17,6 +17,15 @@ from config import (GROQ_API_KEY, WHISPER_MODEL_SIZE, WHISPER_DEVICE,
 
 module_c_bp = Blueprint('module_c', __name__)
 
+_ALLOWED_AUDIO_EXTS = {'.mp3', '.wav', '.m4a', '.ogg', '.webm', '.flac', '.mp4', '.mpeg', '.mpga', '.opus'}
+
+def _safe_audio_ext(filename: str) -> str:
+    """Return a whitelisted audio extension from an untrusted filename."""
+    import os as _os
+    ext = _os.path.splitext(_os.path.basename(str(filename or '')))[1].lower()
+    return ext if ext in _ALLOWED_AUDIO_EXTS else '.webm'
+
+
 _whisper_model = None
 
 # Priming prompts containing disfluencies — Whisper imitates the style of the
@@ -215,7 +224,7 @@ def transcribe():
     language    = request.form.get('language', 'ar')
     source_text = request.form.get('source_text', '')  # optional — source speech for error comparison
 
-    ext = os.path.splitext(audio_file.filename)[1] or '.webm'
+    ext = _safe_audio_ext(audio_file.filename)
     temp_path = os.path.join(UPLOAD_FOLDER, f'upload_{uuid.uuid4().hex[:8]}{ext}')
     audio_file.save(temp_path)
 
@@ -276,7 +285,7 @@ def align_pronunciation():
     except Exception:
         segments = []
 
-    ext       = os.path.splitext(audio_file.filename)[1] or '.webm'
+    ext       = _safe_audio_ext(audio_file.filename)
     temp_path = os.path.join(UPLOAD_FOLDER, f'align_{uuid.uuid4().hex[:8]}{ext}')
     audio_file.save(temp_path)
 
