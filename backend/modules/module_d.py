@@ -1489,41 +1489,52 @@ def detect_repetitions(segments: list, language: str = 'ar') -> list:
 
 
 def merge_repetition_reports(*reports: list) -> list:
-    """Merge word-timestamp and transcript-text repetitions without hiding either source."""
+    """Merge timing-window, word-level, and text-level repetition reports.
+
+    Strategy:
+    - Deduplicate word-level (timestamped) items by (word, time) within 0.8s.
+    - Text-level items that have timestamps use the same proximity check.
+    - Text-only items (no at_seconds) are treated as fallback: skip if the
+      same word already appears in merged results (timing/word found it).
+    """
     word_level = list(reports[0] or []) if reports else []
     text_level = []
     for report in reports[1:]:
         text_level.extend(report or [])
 
     merged = []
-    seen = set()
-    word_counts = {}
 
     for item in word_level:
-        word = str(item.get('word', '')).strip().lower()
+        word = normalize_repetition_word(str(item.get('word', '')))
         if not word:
             continue
-        position_key = round(float(item.get('at_seconds', -1) or -1), 1)
-        key = (word, position_key, item.get('gap_words'))
-        if key in seen:
+        at_s = round(float(item.get('at_seconds') or 0), 1)
+        if any(normalize_repetition_word(str(ex.get('word', ''))) == word
+               and abs(float(ex.get('at_seconds') or 0) - at_s) < 0.8
+               for ex in merged):
             continue
-        seen.add(key)
-        word_counts[word] = word_counts.get(word, 0) + 1
         merged.append(item)
 
-    skipped_text_counts = {}
+    words_in_merged = {normalize_repetition_word(str(ex.get('word', ''))) for ex in merged}
+
     for item in text_level:
-        word = str(item.get('word', '')).strip().lower()
+        word = normalize_repetition_word(str(item.get('word', '')))
         if not word:
             continue
-        if skipped_text_counts.get(word, 0) < word_counts.get(word, 0):
-            skipped_text_counts[word] = skipped_text_counts.get(word, 0) + 1
-            continue
-        key = (word, item.get('position'), item.get('gap_words'))
-        if key in seen:
-            continue
-        seen.add(key)
+        has_time = item.get('at_seconds') is not None
+        if has_time:
+            at_s = round(float(item['at_seconds']), 1)
+            if any(normalize_repetition_word(str(ex.get('word', ''))) == word
+                   and abs(float(ex.get('at_seconds') or 0) - at_s) < 0.8
+                   for ex in merged):
+                continue
+        else:
+            # Text-only fallback: skip entirely if timing/word detection already found this word
+            if word in words_in_merged:
+                continue
         merged.append(item)
+        words_in_merged.add(word)
+
     return merged
 
 
@@ -2283,8 +2294,11 @@ def detect_repetitions_timing_window(segments: list, language: str = 'ar',
     words = get_word_timing_sequence(segments)
     repetitions = []
     seen_keys = set()
+    consumed_as_second = set()  # indices already matched as second occurrence
 
     for i, w in enumerate(words):
+        if i in consumed_as_second:
+            continue
         word = normalize_repetition_word(w['word'])
         if len(word) < 2:
             continue
@@ -2298,6 +2312,7 @@ def detect_repetitions_timing_window(segments: list, language: str = 'ar',
                 key = (word, round(w['start'], 1))
                 if key not in seen_keys:
                     seen_keys.add(key)
+                    consumed_as_second.add(j)
                     repetitions.append({
                         'word': w['word'],
                         'at_seconds': round(w['start'], 1),
