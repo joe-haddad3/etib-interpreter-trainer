@@ -21,10 +21,11 @@ module_c_bp = Blueprint('module_c', __name__)
 _ALLOWED_AUDIO_EXTS = {'.mp3', '.wav', '.m4a', '.ogg', '.webm', '.flac', '.mp4', '.mpeg', '.mpga', '.opus'}
 
 def _clean_asr_text(text: str) -> str:
-    """Strip ASR artifacts: trailing ellipsis that Groq/Whisper adds on trailing-off audio."""
+    """Strip ASR artifacts: ellipsis tokens Groq/Whisper inserts for silent or unclear audio."""
     cleaned = str(text or '').strip()
-    cleaned = re.sub(r'\s*\.{2,}\s*$', '', cleaned)   # trailing ... or ....
-    cleaned = re.sub(r'\s*…\s*$', '', cleaned)          # trailing unicode ellipsis
+    cleaned = re.sub(r'\.{2,}', '', cleaned)   # remove all ... regardless of position
+    cleaned = re.sub(r'…', '', cleaned)          # remove unicode ellipsis
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned)   # collapse extra spaces left behind
     return cleaned.strip()
 
 
@@ -67,17 +68,23 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
     raw_segs = getattr(result, 'segments', None) or []
     for seg in raw_segs:
         if isinstance(seg, dict):
+            seg_text = _clean_asr_text(seg.get('text', ''))
+            if not seg_text:
+                continue
             segments.append({
                 'start': round(seg.get('start', 0), 2),
                 'end':   round(seg.get('end', 0), 2),
-                'text':  seg.get('text', '').strip(),
+                'text':  seg_text,
                 'words': []
             })
         else:
+            seg_text = _clean_asr_text(getattr(seg, 'text', ''))
+            if not seg_text:
+                continue
             segments.append({
                 'start': round(getattr(seg, 'start', 0), 2),
                 'end':   round(getattr(seg, 'end', 0), 2),
-                'text':  getattr(seg, 'text', '').strip(),
+                'text':  seg_text,
                 'words': []
             })
 

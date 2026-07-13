@@ -312,9 +312,16 @@ def _extract_json(text: str) -> dict:
 _ELONGATED_RUN_RE = re.compile(r'(.)\1{4,}', flags=re.UNICODE)
 
 
+_PURE_PUNCT_RE = re.compile(r'^[.…,;:!?\-–—]+$')
+
 def is_asr_garbage_token(token: str) -> bool:
     """True if a token is an ASR hallucination artifact, not real speech."""
     t = str(token or '').strip()
+    if not t:
+        return False
+    # Pure punctuation tokens like "..." that Groq inserts for silent audio
+    if _PURE_PUNCT_RE.match(t):
+        return True
     if len(t) < 6:
         return False
     if not _ELONGATED_RUN_RE.search(t):
@@ -2693,9 +2700,10 @@ def full_evaluation():
         # Strip ASR hallucination artifacts (e.g. one character stretched dozens
         # of times over unclear audio) so they are never treated as student speech.
         full_text, asr_artifacts = remove_asr_artifacts(full_text)
-        # Strip trailing ellipsis Groq/Whisper adds when audio trails off.
-        full_text = re.sub(r'\s*\.{2,}\s*$', '', full_text).strip()
-        full_text = re.sub(r'\s*…\s*$', '', full_text).strip()
+        # Strip all ellipsis Groq/Whisper inserts for silent/unclear audio.
+        full_text = re.sub(r'\.{2,}', '', full_text).strip()
+        full_text = re.sub(r'…', '', full_text).strip()
+        full_text = re.sub(r'\s{2,}', ' ', full_text).strip()
         transcript = {
             'full_text':           full_text,
             'segment_text':        segment_text,
