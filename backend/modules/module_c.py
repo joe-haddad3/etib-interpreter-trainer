@@ -50,53 +50,89 @@ DISFLUENCY_PROMPTS = {
 
 # ── Groq hosted Whisper (fast) ───────────────────────────────────────────────
 
+_VERBATIM_EXAMPLES = {
+    'fr': "Transcription verbatim. Garder les mots répétés: 'climat climat action' → 'climat climat action'.",
+    'ar': "نسخ حرفي. الإبقاء على الكلمات المكررة كما هي.",
+    'en': "Transcribe verbatim. Keep repeated words: 'climate climate action' → 'climate climate action'.",
+}
+
 def _transcribe_groq(audio_path: str, language: str) -> dict:
-    """Transcribe via Groq's hosted whisper-large-v3. Returns in seconds."""
-    from utils.groq_client import get_groq_client
-    client = get_groq_client()
+    """Transcribe via Groq REST API with word-level timestamps to preserve repetitions."""
+    import requests as _requests
+    from utils.groq_client import get_groq_key
+    key = get_groq_key()
+    if not key:
+        raise RuntimeError('No Groq API key')
 
-    with open(audio_path, 'rb') as f:
-        result = client.audio.transcriptions.create(
-            file=(os.path.basename(audio_path), f),
-            model='whisper-large-v3',
-            language=language,
-            response_format='verbose_json',
-            prompt=DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en'])
+    # Combine disfluency prompt + verbatim instruction so repeated words survive
+    disfluency = DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en'])
+    verbatim   = _VERBATIM_EXAMPLES.get(language, _VERBATIM_EXAMPLES['en'])
+    prompt     = f"{disfluency} {verbatim}"
+
+    with open(audio_path, 'rb') as fh:
+        resp = _requests.post(
+            'https://api.groq.com/openai/v1/audio/transcriptions',
+            headers={'Authorization': f'Bearer {key}'},
+            files={'file': (os.path.basename(audio_path), fh)},
+            data=[
+                ('model',                      'whisper-large-v3'),
+                ('language',                   language),
+                ('response_format',            'verbose_json'),
+                ('timestamp_granularities[]',  'word'),
+                ('timestamp_granularities[]',  'segment'),
+                ('prompt',                     prompt[:400]),
+            ],
+            timeout=120,
         )
+    if not resp.ok:
+        raise RuntimeError(f'Groq transcription failed: {resp.status_code} {resp.text[:120]}')
 
+    data       = resp.json()
+    raw_segs   = data.get('segments') or []
+    raw_words  = data.get('words') or []
+
+    # Build segments from segment-level data (used for silence/timing analysis)
     segments = []
-    raw_segs = getattr(result, 'segments', None) or []
     for seg in raw_segs:
-        if isinstance(seg, dict):
-            seg_text = _clean_asr_text(seg.get('text', ''))
-            if not seg_text:
-                continue
-            segments.append({
-                'start': round(seg.get('start', 0), 2),
-                'end':   round(seg.get('end', 0), 2),
-                'text':  seg_text,
-                'words': []
-            })
-        else:
-            seg_text = _clean_asr_text(getattr(seg, 'text', ''))
-            if not seg_text:
-                continue
-            segments.append({
-                'start': round(getattr(seg, 'start', 0), 2),
-                'end':   round(getattr(seg, 'end', 0), 2),
-                'text':  seg_text,
-                'words': []
-            })
+        seg_text = _clean_asr_text(str(seg.get('text', '')).strip())
+        if not seg_text:
+            continue
+        segments.append({
+            'start': round(float(seg.get('start', 0) or 0), 2),
+            'end':   round(float(seg.get('end', 0) or 0), 2),
+            'text':  seg_text,
+            'words': [],
+        })
 
-    clean_text = _clean_asr_text(result.text)
+    # Attach word-level timestamps so repetition detection has per-word timing
+    for w in raw_words:
+        token = _clean_asr_text(str(w.get('word', '')).strip())
+        if not token:
+            continue
+        start = round(float(w.get('start', 0) or 0), 2)
+        end   = round(float(w.get('end', 0) or 0), 2)
+        entry = {'word': token, 'start': start, 'end': end, 'probability': 1.0}
+        for seg in segments:
+            if seg['start'] - 0.05 <= start < seg['end'] + 0.05:
+                seg['words'].append(entry)
+                break
+        else:
+            if segments:
+                segments[-1]['words'].append(entry)
+
+    # Build full_text from word timestamps — preserves repetitions Groq keeps
+    word_tokens = [w.get('word', '') for seg in segments for w in seg.get('words', [])]
+    clean_text  = re.sub(r'\s{2,}', ' ', ' '.join(word_tokens)).strip() if word_tokens \
+                  else _clean_asr_text(str(data.get('text', '')))
+
     return {
-        'full_text':            clean_text,
-        'no_speech_detected':   not bool(clean_text),
-        'language_detected':    language,
-        'language_confidence':  1.0,
-        'duration_seconds':     round(getattr(result, 'duration', 0) or 0, 1),
-        'segments':             segments,
-        'method':               'groq'
+        'full_text':           clean_text,
+        'no_speech_detected':  not bool(clean_text),
+        'language_detected':   str(data.get('language', language) or language),
+        'language_confidence': 1.0,
+        'duration_seconds':    round(float(data.get('duration', 0) or 0), 1),
+        'segments':            segments,
+        'method':              'groq'
     }
 
 

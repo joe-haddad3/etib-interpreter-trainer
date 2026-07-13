@@ -558,11 +558,22 @@ If the student said nothing for a source segment → put it under missing_conten
 TASK 2 — CONTENT COVERAGE:
 List every important idea, fact, number, name, or argument from the source speech.
 For each one, state whether it was COVERED, PARTIALLY COVERED, or MISSING in the student's interpretation.
-Give a coverage_score from 0 to 10 based ONLY on content, NOT on length.
-Important: interpretation is always shorter than the source — a good interpreter conveys the same meaning in fewer words.
-Do NOT penalise the student for using fewer words. Only penalise for missing ideas, facts, or arguments.
-If the student covered all important content, coverage_score must be 8-10 even if their interpretation is shorter.
-Only add items to missing_content if a clearly important idea or fact is genuinely absent from the interpretation.
+
+CRITICAL RULES for coverage assessment:
+- An idea is COVERED if the student expressed the same meaning in the target language, even with different words, structure, or phrasing. Paraphrase = covered.
+- An idea is MISSING only if it is completely absent — not mentioned, not implied, not reformulated.
+- Do NOT mark an idea as missing just because the student used fewer words than the source.
+- Interpretation is always shorter than the source — a skilled interpreter conveys the same content in fewer, more direct words.
+- The source and target languages are different — do not expect word-for-word translation.
+
+coverage_score rubric (0–10, base this ONLY on content, not length or style):
+- 9–10: All important ideas, facts, names, and numbers present
+- 7–8: Almost all content covered; only minor or peripheral details missing
+- 5–6: Main ideas present but several supporting facts or arguments missing
+- 3–4: Some main ideas missing; significant information loss
+- 0–2: Most content absent; interpretation is fragmentary
+
+Only add an item to missing_content if an important idea or fact is genuinely and completely absent.
 
 TASK 3 — PRONUNCIATION FLAGS:
 The uncertain words listed above are words Whisper was not confident about.
