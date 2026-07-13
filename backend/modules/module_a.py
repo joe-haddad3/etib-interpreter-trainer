@@ -1469,14 +1469,9 @@ def retrieve_document_context():
 
 @module_a_bp.route('/from-document', methods=['POST'])
 def generate_from_document():
-    uploaded_file = request.files.get('document')
-    if not uploaded_file or not uploaded_file.filename:
-        return jsonify({'error': 'Missing required file field: document'}), 400
-
-    if not is_supported_document(uploaded_file.filename):
-        return jsonify({
-            'error': 'Unsupported document type. Please upload a .txt, .docx, or .pdf file.'
-        }), 400
+    uploaded_files = uploaded_document_files(request.files)
+    if not uploaded_files:
+        return jsonify({'error': 'Missing required file field: documents or document'}), 400
 
     try:
         params = parse_document_generation_params(request.form)
@@ -1488,20 +1483,38 @@ def generate_from_document():
         return jsonify(validation_error), status
 
     try:
-        safe_source_filename = secure_filename(uploaded_file.filename)
-        source_type = get_source_type(uploaded_file.filename)
-        extracted_text = extract_document_text(uploaded_file, source_type)
-        normalized_text = normalize_text(extracted_text)
-        validate_extracted_text(normalized_text)
+        all_chunk_records = []
+        source_names = []
+        total_chars = 0
 
-        chunks = chunk_text(normalized_text)
-        chunk_records = build_chunk_records(
-            chunks,
-            source_filename=safe_source_filename,
-            source_type=source_type,
-        )
+        for source_order, uploaded_file in enumerate(uploaded_files):
+            safe_name = secure_filename(uploaded_file.filename) or 'uploaded_document'
+            if not is_supported_document(safe_name):
+                continue
+            source_type = get_source_type(safe_name)
+            try:
+                extracted_text = extract_document_text(uploaded_file, source_type)
+                normalized_text = normalize_text(extracted_text)
+                validate_extracted_text(normalized_text)
+                file_chunks = chunk_text(normalized_text)
+                all_chunk_records.extend(build_chunk_records(
+                    file_chunks,
+                    source_filename=safe_name,
+                    source_type=source_type,
+                    source_order=source_order,
+                ))
+                source_names.append(safe_name)
+                total_chars += len(normalized_text)
+            except DocumentGroundingError:
+                raise
+            except Exception:
+                pass
+
+        if not all_chunk_records:
+            return jsonify({'error': 'No valid documents could be processed.'}), 400
+
         selected_chunk_records = select_production_relevant_chunks(
-            chunk_records,
+            all_chunk_records,
             params,
             max_excerpts=DEFAULT_MAX_EXCERPTS,
             max_total_characters=DEFAULT_MAX_EXCERPT_CHARACTERS,
@@ -1509,7 +1522,9 @@ def generate_from_document():
         )
         selected_chunks = selected_chunk_texts(selected_chunk_records)
         fallback_used = dense_fallback_used(selected_chunk_records)
-        topic = params.get('topic') or f'Document-grounded speech from {safe_source_filename}'
+
+        source_label = source_names[0] if len(source_names) == 1 else f'{len(source_names)} documents'
+        topic = params.get('topic') or f'Document-grounded speech from {source_label}'
         params['topic'] = topic
         prompt = build_structured_material_prompt(params, topic=topic, excerpts=selected_chunks)
 
@@ -1535,9 +1550,10 @@ def generate_from_document():
         generated = parse_generation_output(raw_output, language=params.get('language', 'ar'))
         generated = enforce_generation_word_range(generated, params)
         extra = {
-            'source_filename': safe_source_filename,
-            'source_type': source_type.lstrip('.'),
-            'extracted_characters': len(normalized_text),
+            'source_filename': source_label,
+            'source_type': 'multi' if len(source_names) > 1 else (source_names[0].rsplit('.', 1)[-1] if source_names else ''),
+            'source_count': len(source_names),
+            'extracted_characters': total_chars,
             'selected_excerpt_count': len(selected_chunks),
         }
         if fallback_used:

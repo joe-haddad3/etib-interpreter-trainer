@@ -2334,23 +2334,25 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
       topic_shifts: adaptiveParams.topic_shifts || current.topic_shifts,
     }));
   }, [adaptiveParams]);
-  const [documentFile, setDocumentFile] = useState(null);
+  const [documentFiles, setDocumentFiles] = useState([]);   // File[]
+  const [librarySources, setLibrarySources] = useState([]); // {text, title, un_id}[]
   const [retrievalResult, setRetrievalResult] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(true);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [showLibrary, setShowLibrary] = useState(false);
-  const [librarySource, setLibrarySource] = useState(null); // {text, title, un_id}
   const isLoading = status === 'loading';
 
   function updateField(event) {
     const { name, value, type, checked } = event.target;
-    // Changing topic or domain after attaching a library document means the
-    // student changed their mind — detach it so generation isn't silently
-    // grounded in the old (now-irrelevant) document text.
-    if ((name === 'topic' || name === 'domain') && librarySource) {
-      setLibrarySource(null);
+    // Changing topic or domain after attaching sources means the student
+    // changed their mind — clear sources so generation isn't grounded in
+    // now-irrelevant documents.
+    if ((name === 'topic' || name === 'domain') && (documentFiles.length > 0 || librarySources.length > 0)) {
+      setDocumentFiles([]);
+      setLibrarySources([]);
+      setRetrievalResult(null);
     }
     setForm(current => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
   }
@@ -2378,26 +2380,23 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
     } catch (err) { setError(err.message); setStatus('error'); }
   }
 
+  function buildAllSourceFiles() {
+    const libFiles = librarySources.map(src => {
+      const blob = new Blob([src.text], { type: 'text/plain' });
+      return new File([blob], `${src.un_id || 'source'}.txt`, { type: 'text/plain' });
+    });
+    return [...documentFiles, ...libFiles];
+  }
+
+  const hasSources = documentFiles.length > 0 || librarySources.length > 0;
+
   async function handleDocumentGenerate() {
     setStatus('loading'); setError(''); setResult(null); setRetrievalResult(null);
     try {
-      if (!documentFile) throw new Error('Choose a TXT, DOCX, or PDF document first.');
-      const data = await generateSpeechFromDocument(documentFile, form);
-      setResult(data); onGenerated(data); setStatus('success');
-    } catch (err) { setError(err.message); setStatus('error'); }
-  }
-
-  async function handleLibraryGenerate() {
-    if (!librarySource?.text) return;
-    setStatus('loading'); setError(''); setResult(null);
-    try {
-      // Convert the extracted UN speech text into a Blob/File and use from-document endpoint
-      const blob = new Blob([librarySource.text], { type: 'text/plain' });
-      const file = new File([blob], `${librarySource.un_id || 'un-speech'}.txt`, { type: 'text/plain' });
-      const data = await generateSpeechFromDocument(file, {
-        ...form,
-        topic: form.topic || librarySource.title,
-      });
+      const allFiles = buildAllSourceFiles();
+      if (!allFiles.length) throw new Error('Add at least one source document first.');
+      const topicFallback = form.topic || librarySources[0]?.title || '';
+      const data = await generateSpeechFromDocument(allFiles, { ...form, topic: topicFallback });
       setResult(data); onGenerated(data); setStatus('success');
     } catch (err) { setError(err.message); setStatus('error'); }
   }
@@ -2405,8 +2404,9 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
   async function handleRetrieveContext() {
     setStatus('loading'); setError(''); setRetrievalResult(null);
     try {
-      if (!documentFile) throw new Error('Choose a TXT, DOCX, or PDF document first.');
-      const data = await retrieveDocumentContext(documentFile, {
+      const allFiles = buildAllSourceFiles();
+      if (!allFiles.length) throw new Error('Add at least one source document first.');
+      const data = await retrieveDocumentContext(allFiles, {
         query: form.topic, language: form.language, domain: form.domain,
         scenario: 'UN General Assembly', difficulty: form.difficulty,
         mode: form.mode, number_density: form.number_density, max_chunks: 4
@@ -2441,21 +2441,25 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
           <div className="info-tip" style={{ marginTop: '0.4rem' }}>📄 {labels.longTextAsSource}</div>
         )}
 
-        {/* ── Attached file chip ── */}
-        {documentFile && (
-          <div className="file-chip">
-            <span>📄 {documentFile.name}</span>
-            <button type="button" className="file-chip-remove" onClick={() => { setDocumentFile(null); setRetrievalResult(null); setResult(null); setError(''); }}>×</button>
+        {/* ── Attached source chips ── */}
+        {documentFiles.map((f, i) => (
+          <div key={i} className="file-chip">
+            <span>📄 {f.name}</span>
+            <button type="button" className="file-chip-remove" onClick={() => {
+              setDocumentFiles(prev => prev.filter((_, idx) => idx !== i));
+              setRetrievalResult(null); setResult(null); setError('');
+            }}>×</button>
           </div>
-        )}
-
-        {/* ── Document Library source chip ── */}
-        {librarySource && (
-          <div className="file-chip file-chip-un">
-            <span>📚 {librarySource.title.slice(0, 60)}{librarySource.title.length > 60 ? '…' : ''}</span>
-            <button type="button" className="file-chip-remove" onClick={() => { setLibrarySource(null); setResult(null); setError(''); }} title="Remove attached document">×</button>
+        ))}
+        {librarySources.map((src, i) => (
+          <div key={i} className="file-chip file-chip-un">
+            <span>📚 {src.title.slice(0, 60)}{src.title.length > 60 ? '…' : ''}</span>
+            <button type="button" className="file-chip-remove" onClick={() => {
+              setLibrarySources(prev => prev.filter((_, idx) => idx !== i));
+              setResult(null); setError('');
+            }} title="Remove source">×</button>
           </div>
-        )}
+        ))}
 
         {/* ── Language + quick settings row ── */}
         <div className="quick-settings-row">
@@ -2568,11 +2572,7 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
           <button type="button" className="btn-un-library" onClick={() => setShowLibrary(true)} disabled={isLoading}>
             📚 Add source
           </button>
-          {librarySource ? (
-            <button type="button" className="btn-primary" onClick={handleLibraryGenerate} disabled={isLoading}>
-              {isLoading ? labels.generating : '▷ Generate from selected document'}
-            </button>
-          ) : documentFile ? (
+          {hasSources ? (
             <>
               <button type="button" className="btn-secondary" onClick={handleRetrieveContext} disabled={isLoading}>
                 Preview context
@@ -2606,8 +2606,8 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
           language={form.language}
           domain={form.domain}
           initialQuery={form.topic}
-          onSelectLibrary={src => { setLibrarySource(src); setDocumentFile(null); setRetrievalResult(null); setResult(null); setError(''); }}
-          onSelectFile={file => { setDocumentFile(file); setLibrarySource(null); setRetrievalResult(null); setResult(null); setError(''); }}
+          onSelectLibrary={src => { setLibrarySources(prev => [...prev, src]); setRetrievalResult(null); setResult(null); setError(''); }}
+          onSelectFile={file => { setDocumentFiles(prev => [...prev, file]); setRetrievalResult(null); setResult(null); setError(''); }}
           onClose={() => setShowLibrary(false)}
         />
       )}

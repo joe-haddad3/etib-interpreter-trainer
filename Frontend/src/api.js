@@ -105,9 +105,10 @@ export async function generateSpeech(params) {
   return parseJsonResponse(res);
 }
 
-export async function generateSpeechFromDocument(file, params) {
+export async function generateSpeechFromDocument(files, params) {
   const form = new FormData();
-  form.append('document', file);
+  const fileList = Array.isArray(files) ? files : [files];
+  fileList.forEach(f => form.append('documents', f));
   form.append('auth_token', getAuthToken());
   form.append('groq_api_key', getStoredGroqKey());
   Object.entries(params).forEach(([key, value]) => form.append(key, String(value)));
@@ -115,9 +116,10 @@ export async function generateSpeechFromDocument(file, params) {
   return parseJsonResponse(res);
 }
 
-export async function retrieveDocumentContext(file, params) {
+export async function retrieveDocumentContext(files, params) {
   const form = new FormData();
-  form.append('document', file);
+  const fileList = Array.isArray(files) ? files : [files];
+  fileList.forEach(f => form.append('documents', f));
   form.append('auth_token', getAuthToken());
   form.append('groq_api_key', getStoredGroqKey());
   Object.entries(params).forEach(([key, value]) => form.append(key, String(value)));
