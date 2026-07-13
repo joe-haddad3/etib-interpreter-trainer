@@ -4,7 +4,6 @@ import {
   generateSpeechFromDocument,
   loginUser,
   logoutUser,
-  retrieveDocumentContext,
   signupUser,
   textToSpeech,
   downloadGlossary,
@@ -2336,8 +2335,7 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
   }, [adaptiveParams]);
   const [documentFiles, setDocumentFiles] = useState([]);   // File[]
   const [librarySources, setLibrarySources] = useState([]); // {text, title, un_id}[]
-  const [retrievalResult, setRetrievalResult] = useState(null);
-  const [showAdvanced, setShowAdvanced] = useState(true);
+const [showAdvanced, setShowAdvanced] = useState(true);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -2352,7 +2350,6 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
     if ((name === 'topic' || name === 'domain') && (documentFiles.length > 0 || librarySources.length > 0)) {
       setDocumentFiles([]);
       setLibrarySources([]);
-      setRetrievalResult(null);
     }
     setForm(current => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
   }
@@ -2391,27 +2388,13 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
   const hasSources = documentFiles.length > 0 || librarySources.length > 0;
 
   async function handleDocumentGenerate() {
-    setStatus('loading'); setError(''); setResult(null); setRetrievalResult(null);
+    setStatus('loading'); setError(''); setResult(null);
     try {
       const allFiles = buildAllSourceFiles();
       if (!allFiles.length) throw new Error('Add at least one source document first.');
       const topicFallback = form.topic || librarySources[0]?.title || '';
       const data = await generateSpeechFromDocument(allFiles, { ...form, topic: topicFallback });
       setResult(data); onGenerated(data); setStatus('success');
-    } catch (err) { setError(err.message); setStatus('error'); }
-  }
-
-  async function handleRetrieveContext() {
-    setStatus('loading'); setError(''); setRetrievalResult(null);
-    try {
-      const allFiles = buildAllSourceFiles();
-      if (!allFiles.length) throw new Error('Add at least one source document first.');
-      const data = await retrieveDocumentContext(allFiles, {
-        query: form.topic, language: form.language, domain: form.domain,
-        scenario: 'UN General Assembly', difficulty: form.difficulty,
-        mode: form.mode, number_density: form.number_density, max_chunks: 4
-      });
-      setRetrievalResult(data); setStatus('success');
     } catch (err) { setError(err.message); setStatus('error'); }
   }
 
@@ -2447,7 +2430,7 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
             <span>📄 {f.name}</span>
             <button type="button" className="file-chip-remove" onClick={() => {
               setDocumentFiles(prev => prev.filter((_, idx) => idx !== i));
-              setRetrievalResult(null); setResult(null); setError('');
+              setResult(null); setError('');
             }}>×</button>
           </div>
         ))}
@@ -2574,15 +2557,6 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
           </button>
           {hasSources ? (
             <>
-              {retrievalResult ? (
-                <button type="button" className="btn-secondary" onClick={() => setRetrievalResult(null)} disabled={isLoading}>
-                  × Clear context
-                </button>
-              ) : (
-                <button type="button" className="btn-secondary" onClick={handleRetrieveContext} disabled={isLoading}>
-                  Preview context
-                </button>
-              )}
               <button type="button" className="btn-primary" onClick={handleDocumentGenerate} disabled={isLoading}>
                 {isLoading ? labels.generating : `▷ ${labels.generateFromDocument || 'Generate from document'}`}
               </button>
@@ -2603,7 +2577,6 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
           <p style={{ marginTop: '1rem', color: 'var(--warm-gray)' }}>{labels.generating}</p>
         </div>
       )}
-      {retrievalResult && <RetrievalResult data={retrievalResult} labels={labels} onDismiss={() => setRetrievalResult(null)} />}
       {result && <SpeechResult data={result} labels={labels} />}
 
       {showLibrary && (
@@ -2612,8 +2585,8 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
           language={form.language}
           domain={form.domain}
           initialQuery={form.topic}
-          onSelectLibrary={src => { setLibrarySources(prev => [...prev, src]); setRetrievalResult(null); setResult(null); setError(''); }}
-          onSelectFile={file => { setDocumentFiles(prev => [...prev, file]); setRetrievalResult(null); setResult(null); setError(''); }}
+          onSelectLibrary={src => { setLibrarySources(prev => [...prev, src]); setResult(null); setError(''); }}
+          onSelectFile={file => { setDocumentFiles(prev => [...prev, file]); setResult(null); setError(''); }}
           onClose={() => setShowLibrary(false)}
         />
       )}
@@ -2651,40 +2624,6 @@ function SummaryBlock({ text, isArabic }) {
         return <div key={i} className="summary-line">{trimmed}</div>;
       })}
     </div>
-  );
-}
-
-function RetrievalResult({ data, labels, onDismiss }) {
-  return (
-    <section className="retrieval-result">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-        <h3 style={{ margin: 0 }}>{labels.retrievedContext || 'Retrieved context'}</h3>
-        {onDismiss && <button type="button" className="file-chip-remove" onClick={onDismiss} title="Clear context" style={{ fontSize: '1.1rem', padding: '0.1rem 0.4rem' }}>×</button>}
-      </div>
-      <div className="result-meta">
-        <span>{data.selected_chunk_count || 0} chunks</span>
-        {(data.documents_processed || []).map((doc, index) => (
-          <span key={`${doc.filename}-${index}`}>{doc.filename}</span>
-        ))}
-      </div>
-      <div className="chunk-list">
-        {(data.selected_chunks || []).map((chunk, index) => (
-          <article className="chunk-item" key={`${chunk.source_filename}-${chunk.chunk_index}-${index}`}>
-            <p className="chunk-source">
-              {chunk.source_filename} · chunk {Number(chunk.chunk_index || 0) + 1}
-            </p>
-            <p>{chunk.text}</p>
-          </article>
-        ))}
-      </div>
-      {Array.isArray(data.document_errors) && data.document_errors.length > 0 && (
-        <div className="error-msg">
-          {data.document_errors.map((item, index) => (
-            <p key={`${item.filename}-${index}`}>{item.filename}: {item.error}</p>
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
