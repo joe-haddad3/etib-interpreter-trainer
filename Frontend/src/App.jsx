@@ -2574,9 +2574,15 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
           </button>
           {hasSources ? (
             <>
-              <button type="button" className="btn-secondary" onClick={handleRetrieveContext} disabled={isLoading}>
-                Preview context
-              </button>
+              {retrievalResult ? (
+                <button type="button" className="btn-secondary" onClick={() => setRetrievalResult(null)} disabled={isLoading}>
+                  × Clear context
+                </button>
+              ) : (
+                <button type="button" className="btn-secondary" onClick={handleRetrieveContext} disabled={isLoading}>
+                  Preview context
+                </button>
+              )}
               <button type="button" className="btn-primary" onClick={handleDocumentGenerate} disabled={isLoading}>
                 {isLoading ? labels.generating : `▷ ${labels.generateFromDocument || 'Generate from document'}`}
               </button>
