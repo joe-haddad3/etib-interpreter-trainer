@@ -558,9 +558,11 @@ If the student said nothing for a source segment → put it under missing_conten
 TASK 2 — CONTENT COVERAGE:
 List every important idea, fact, number, name, or argument from the source speech.
 For each one, state whether it was COVERED, PARTIALLY COVERED, or MISSING in the student's interpretation.
-Give a coverage_score from 0 to 10.
-Important: if the student interpretation is much shorter than the source, coverage_score must be low.
-Do not give 7/10 coverage for only a few lines of a much longer source speech.
+Give a coverage_score from 0 to 10 based ONLY on content, NOT on length.
+Important: interpretation is always shorter than the source — a good interpreter conveys the same meaning in fewer words.
+Do NOT penalise the student for using fewer words. Only penalise for missing ideas, facts, or arguments.
+If the student covered all important content, coverage_score must be 8-10 even if their interpretation is shorter.
+Only add items to missing_content if a clearly important idea or fact is genuinely absent from the interpretation.
 
 TASK 3 — PRONUNCIATION FLAGS:
 The uncertain words listed above are words Whisper was not confident about.
@@ -1751,18 +1753,16 @@ def estimate_length_coverage(source_script: str, transcript_text: str) -> dict:
 
     ratio = min(1.0, transcript_count / source_count)
 
-    if ratio < 0.15:
+    # Interpretation is always shorter than the source — same ideas, fewer words.
+    # Only cap for extremely short transcripts that cannot possibly cover the content.
+    if ratio < 0.10:
         cap = 2.0
-    elif ratio < 0.30:
+    elif ratio < 0.20:
         cap = 3.5
-    elif ratio < 0.45:
-        cap = 5.0
-    elif ratio < 0.60:
-        cap = 6.5
-    elif ratio < 0.75:
-        cap = 7.5
+    elif ratio < 0.30:
+        cap = 5.5
     else:
-        cap = 10.0
+        cap = 10.0  # no cap — trust the LLM's content-based assessment
 
     return {
         'source_word_count': source_count,
@@ -1785,15 +1785,6 @@ def apply_coverage_guardrail(result: dict, source_script: str, transcript_text: 
 
     if current_score is not None and current_score > coverage['score_cap']:
         result['coverage_score'] = coverage['score_cap']
-        missing = result.setdefault('missing_content', [])
-        if isinstance(missing, list):
-            missing.append({
-                'content': (
-                    f"Only about {int(coverage['length_ratio'] * 100)}% of the source length "
-                    f"was present in the student's interpretation."
-                ),
-                'importance': 'high',
-            })
 
     result['coverage_diagnostics'] = coverage
     return result
