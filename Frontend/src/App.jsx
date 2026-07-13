@@ -3847,10 +3847,14 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
   const isAr = (lastTranscript.language || lastTranscript.language_detected) === 'ar';
   const llmNumberErrors = (report?.number_accuracy || [])
     .filter(item => item && item.correct === false)
-    .map(item => ({
-      ...item,
-      message: `${item.source_value || ''} was rendered as ${item.student_said || 'missing'}`.trim(),
-    }));
+    .map(item => {
+      const src = item.source_value || '';
+      const said = item.student_said;
+      const msg = said && String(said).trim() && String(said).trim().toLowerCase() !== 'missing'
+        ? `${src} was said as ${said}`
+        : `${src} was not mentioned`;
+      return { ...item, message: msg.trim() };
+    });
   const displayNumberErrors = llmNumberErrors.length > 0 ? llmNumberErrors : (algo.number_errors || []);
 
   return (

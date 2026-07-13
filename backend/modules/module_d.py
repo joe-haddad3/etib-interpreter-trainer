@@ -509,7 +509,7 @@ STUDENT INTERPRETATION TRANSCRIPT (in {target_language}, raw ASR output):
 {transcript}
 {glossary_block}
 AUTOMATICALLY DETECTED ISSUES (algorithmic):
-- Long silences (> 1.0s gaps): {silence_count} detected → details: {silence_examples}
+- Long silences (> 2.0s gaps): {silence_count} detected → details: {silence_examples}
 - Word repetitions: {repetition_count} detected → examples: {repetition_examples}
 - Hesitation markers: {hesitation_count} detected → examples: {hesitation_examples}
 - Number reproduction errors: {number_errors} detected
@@ -606,7 +606,7 @@ TASK 7 — TERMINOLOGY:
 Key domain-specific terms from the source — were they rendered with the correct equivalent in the target language?
 
 TASK 8 — PAUSES & FLOW:
-{silence_count} pause(s) longer than 1 second were detected: {silence_examples}
+{silence_count} pause(s) longer than 2 seconds were detected: {silence_examples}
 For each pause, judge whether it disrupted the flow of the interpretation (lost the thread, made the listener wait)
 or was a natural processing pause for a consecutive/simultaneous interpreter.
 For disruptive pauses, note what information was likely delayed or lost because of it.
@@ -623,6 +623,13 @@ For each one, find what the student actually said in {target_language} (numbers 
 or spelled out words — both count). Mark each as correct or incorrect.
 A wrong number, date, or statistic is a SERIOUS interpretation error — it can mislead an entire
 negotiation — so flag it clearly even if the rest of the sentence was fine.
+
+CRITICAL — fill student_said correctly:
+- If the student said a DIFFERENT number in place of the correct one (e.g., said 100 instead of 98),
+  set student_said to what they actually said ("100") — do NOT leave student_said empty in this case.
+- Only set student_said to "" or null if the number was completely omitted with no replacement.
+- This distinction is essential: "said 100 instead of 98" is a substitution error, not a missing number.
+
 CRITICAL — do NOT flag format-only differences as errors:
 - Date word order differs between languages: "29 June 2026", "June 29, 2026" and "٢٩ يونيو ٢٠٢٦"
   are the SAME date → correct.
@@ -1102,7 +1109,7 @@ def detect_repetitions_from_text(full_text: str, language: str = 'ar') -> list:
     return repetitions
 
 
-def detect_long_silences(segments: list, threshold_seconds: float = 1.0) -> list:
+def detect_long_silences(segments: list, threshold_seconds: float = 2.0) -> list:
     """
     Detect gaps longer than threshold — both between segments AND between
     consecutive words within the same segment.
@@ -1214,7 +1221,7 @@ def audio_dbfs(samples) -> float:
     return 20.0 * float(np.log10(rms))
 
 
-def detect_audio_silences(audio_path: str, threshold_ms: int = 1200) -> list:
+def detect_audio_silences(audio_path: str, threshold_ms: int = 2000) -> list:
     """Detect quiet gaps directly from decoded audio energy."""
     try:
         import numpy as np
