@@ -1050,10 +1050,11 @@ def words_are_repetition_equivalent(first: str, second: str, language: str = 'ar
 
 def detect_repetitions_from_text(full_text: str, language: str = 'ar') -> list:
     """Detect immediate repeated words or repeated adjacent short phrases."""
+    skip_words = _SHORT_PARTICLES.get(language, set())
     words = []
     for match in re.finditer(r'\w+', full_text or '', flags=re.UNICODE):
         word = normalize_repetition_word(match.group(0))
-        if word:
+        if word and word not in skip_words:
             words.append({
                 'word': word,
                 'key': repetition_compare_key(word, language),
@@ -1447,11 +1448,12 @@ def detect_repetitions(segments: list, language: str = 'ar') -> list:
     """
     Detect immediate repeated words and adjacent repeated short phrases.
     """
+    skip_words = _SHORT_PARTICLES.get(language, set())
     all_words = []
     for seg in segments:
         for w in seg.get('words', []):
             clean = normalize_repetition_word(w.get('word', ''))
-            if clean:
+            if clean and clean not in skip_words:
                 all_words.append({
                     'word': clean,
                     'key': repetition_compare_key(clean, language),
@@ -2287,9 +2289,18 @@ def filter_french_silent_plural_errors(result: dict, language: str) -> dict:
 
 
 _SHORT_PARTICLES = {
-    'en': {'a', 'an', 'the', 'i', 'to', 'of', 'in', 'is', 'it', 'as', 'at', 'by', 'or', 'if', 'up', 'do', 'so', 'we', 'he', 'my', 'on'},
-    'fr': {'a', 'à', 'au', 'le', 'la', 'de', 'du', 'je', 'il', 'un', 'ou', 'et', 'en', 'on', 'y', 'tu', 'ce', 'se', 'sa'},
-    'ar': set(),
+    'en': {'a', 'an', 'the', 'i', 'to', 'of', 'in', 'is', 'it', 'as', 'at', 'by', 'or', 'if', 'up', 'do', 'so',
+           'we', 'he', 'my', 'on', 'be', 'am', 'are', 'was', 'were', 'has', 'had', 'have', 'not', 'no',
+           'its', 'our', 'you', 'she', 'they', 'this', 'that', 'with', 'from', 'for', 'and', 'but'},
+    'fr': {'a', 'à', 'au', 'aux', 'le', 'la', 'les', 'de', 'du', 'des', 'un', 'une',
+           'je', 'il', 'elle', 'on', 'nous', 'vous', 'ils', 'elles', 'tu',
+           'ou', 'et', 'en', 'y', 'ce', 'se', 'sa', 'son', 'ses', 'leur', 'leurs',
+           'que', 'qui', 'ne', 'pas', 'plus', 'si', 'car', 'par', 'sur', 'dans',
+           'est', 'sont', 'était', 'ont', 'eu', 'été', 'me', 'te', 'lui',
+           'cet', 'cette', 'ces', 'mon', 'ton', 'ma', 'ta', 'mes', 'tes',
+           'mais', 'donc', 'or', 'ni', 'car', 'puis', 'avec'},
+    'ar': {'في', 'من', 'إلى', 'على', 'أن', 'هذا', 'هذه', 'التي', 'الذي', 'ما', 'كان', 'كانت',
+           'هو', 'هي', 'هم', 'لا', 'قد', 'كما', 'مع', 'أو', 'لم', 'عن', 'إن', 'لكن'},
 }
 
 
@@ -2305,12 +2316,16 @@ def detect_repetitions_timing_window(segments: list, language: str = 'ar',
     repetitions = []
     seen_keys = set()
     consumed_as_second = set()  # indices already matched as second occurrence
+    skip_words = _SHORT_PARTICLES.get(language, set())
 
     for i, w in enumerate(words):
         if i in consumed_as_second:
             continue
         word = normalize_repetition_word(w['word'])
         if len(word) < 2:
+            continue
+        # Skip function words — they repeat constantly in normal grammar
+        if word in skip_words:
             continue
         for j in range(i + 1, len(words)):
             nw = words[j]
