@@ -88,13 +88,15 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
                 'words': []
             })
 
+    clean_text = _clean_asr_text(result.text)
     return {
-        'full_text':           _clean_asr_text(result.text),
-        'language_detected':   language,
-        'language_confidence': 1.0,
-        'duration_seconds':    round(getattr(result, 'duration', 0) or 0, 1),
-        'segments':            segments,
-        'method':              'groq'
+        'full_text':            clean_text,
+        'no_speech_detected':   not bool(clean_text),
+        'language_detected':    language,
+        'language_confidence':  1.0,
+        'duration_seconds':     round(getattr(result, 'duration', 0) or 0, 1),
+        'segments':             segments,
+        'method':               'groq'
     }
 
 
@@ -146,12 +148,14 @@ def _transcribe_local(audio_path: str, language: str) -> dict:
             })
         all_segments.append(seg_data)
         full_text += seg.text + ' '
+    clean_text = _clean_asr_text(full_text)
     return {
-        'full_text': _clean_asr_text(full_text),
-        'language_detected': info.language,
+        'full_text':           clean_text,
+        'no_speech_detected':  not bool(clean_text),
+        'language_detected':   info.language,
         'language_confidence': round(info.language_probability, 3),
-        'duration_seconds': round(info.duration, 1),
-        'segments': all_segments,
+        'duration_seconds':    round(info.duration, 1),
+        'segments':            all_segments,
         'method': 'local'
     }
 

@@ -3272,6 +3272,15 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
         ? audioInput
         : new File([audioInput], 'recording.webm', { type: audioInput.type });
       const data = await transcribeAudio(fileToSend, language, sourceScript || '');
+      if (data.no_speech_detected || !data.full_text?.trim()) {
+        setError(language === 'ar'
+          ? 'لم يُكتشف كلام — تحقق من الميكروفون وأعد المحاولة.'
+          : language === 'fr'
+          ? 'Aucune parole détectée — vérifiez le microphone et réessayez.'
+          : 'No speech detected — check your microphone and try again.');
+        setStatus('error');
+        return;
+      }
       setResult(data);
       onTranscriptComplete?.({ ...data, language, sourceScript: sourceScript || '' });
       setStatus('success');
