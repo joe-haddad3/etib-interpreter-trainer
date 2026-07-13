@@ -23,6 +23,7 @@ import {
   getAdaptiveParams,
   getStoredGroqKey,
   saveGroqKey,
+  setCurrentUserId,
   validateGroqKey,
   saveAuthToken,
   sendChatMessage,
@@ -1643,6 +1644,7 @@ export default function App() {
 
   function handleGuest() {
     saveAuthToken(null);
+    setCurrentUserId('guest');
     setCurrentUser({ name: 'Guest', role: 'student', id: 'guest' });
     setIsAuthenticated(true);
   }
@@ -1658,6 +1660,7 @@ export default function App() {
         role: formData.get('role')
       });
       saveAuthToken(result.token);
+      setCurrentUserId(result.user.id);
       setCurrentUser(result.user);
       setIsAuthenticated(true);
     } catch (err) {
@@ -1677,6 +1680,7 @@ export default function App() {
         role: formData.get('role')
       });
       saveAuthToken(result.token);
+      setCurrentUserId(result.user.id);
       setCurrentUser(result.user);
       setIsAuthenticated(true);
     } catch (err) {
@@ -1687,6 +1691,7 @@ export default function App() {
   async function handleLogout() {
     await logoutUser().catch(() => {});
     saveAuthToken(null);
+    setCurrentUserId(null);
     setIsAuthenticated(false);
     setCurrentUser(null);
     setActivePanel('module-a');

@@ -18,12 +18,14 @@ export function saveAuthToken(token) {
   else localStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
-// ── Groq API key (stored in localStorage) ────────────────────────────────────
-const GROQ_KEY_STORAGE = 'etib_groq_api_key';
-export function getStoredGroqKey() { return localStorage.getItem(GROQ_KEY_STORAGE) || ''; }
+// ── Groq API key (stored per-user in localStorage) ───────────────────────────
+let _currentUserId = null;
+function groqKeyName() { return `etib_groq_api_key_${_currentUserId || 'anon'}`; }
+export function setCurrentUserId(id) { _currentUserId = id || null; }
+export function getStoredGroqKey() { return localStorage.getItem(groqKeyName()) || ''; }
 export function saveGroqKey(key) {
-  if (key) localStorage.setItem(GROQ_KEY_STORAGE, key.trim());
-  else localStorage.removeItem(GROQ_KEY_STORAGE);
+  if (key) localStorage.setItem(groqKeyName(), key.trim());
+  else localStorage.removeItem(groqKeyName());
 }
 
 // ── Body helpers (no custom headers — works with HF Spaces CORS proxy) ───────
