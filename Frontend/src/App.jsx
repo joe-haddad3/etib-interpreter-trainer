@@ -2597,7 +2597,7 @@ function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
           <p style={{ marginTop: '1rem', color: 'var(--warm-gray)' }}>{labels.generating}</p>
         </div>
       )}
-      {retrievalResult && <RetrievalResult data={retrievalResult} labels={labels} />}
+      {retrievalResult && <RetrievalResult data={retrievalResult} labels={labels} onDismiss={() => setRetrievalResult(null)} />}
       {result && <SpeechResult data={result} labels={labels} />}
 
       {showLibrary && (
@@ -2648,10 +2648,13 @@ function SummaryBlock({ text, isArabic }) {
   );
 }
 
-function RetrievalResult({ data, labels }) {
+function RetrievalResult({ data, labels, onDismiss }) {
   return (
     <section className="retrieval-result">
-      <h3>{labels.retrievedContext || 'Retrieved context'}</h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+        <h3 style={{ margin: 0 }}>{labels.retrievedContext || 'Retrieved context'}</h3>
+        {onDismiss && <button type="button" className="file-chip-remove" onClick={onDismiss} title="Clear context" style={{ fontSize: '1.1rem', padding: '0.1rem 0.4rem' }}>×</button>}
+      </div>
       <div className="result-meta">
         <span>{data.selected_chunk_count || 0} chunks</span>
         {(data.documents_processed || []).map((doc, index) => (
