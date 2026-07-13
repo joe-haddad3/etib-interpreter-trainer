@@ -2267,7 +2267,11 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
               <p style={{ fontSize: '0.82rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>
                 {labels?.srcUNUploadAfter}
               </p>
-              <label className="upload-zone">
+              <label
+                className="upload-zone"
+                onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={e => { e.preventDefault(); e.stopPropagation(); handleFileChosen(e.dataTransfer.files?.[0] || null); }}
+              >
                 <input
                   type="file"
                   accept=".pdf,.txt,.docx"
@@ -2286,7 +2290,11 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
 
         {tab === 'upload' && (
           <div className="library-results" style={{ padding: '0.9rem 0 0' }}>
-            <label className="upload-zone">
+            <label
+              className="upload-zone"
+              onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+              onDrop={e => { e.preventDefault(); e.stopPropagation(); handleFileChosen(e.dataTransfer.files?.[0] || null); }}
+            >
               <input
                 type="file"
                 accept=".txt,.docx,.pdf"
