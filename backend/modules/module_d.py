@@ -903,6 +903,7 @@ HESITATION_FILLERS = {
     'fr': {
         'euh', 'heu', 'euuh', 'euhm', 'hum', 'hm', 'hmm', 'ben', 'bah',
         'quoi', 'enfin', 'disons', 'comment', 'bref', 'voila', 'voilà',
+        'donc', 'alors', 'bon', 'eh', 'ah', 'oh', 'hein', 'nan',
     },
     'en': {
         'um', 'umm', 'uh', 'uhh', 'er', 'erm', 'hmm', 'hm', 'mm',
@@ -911,8 +912,10 @@ HESITATION_FILLERS = {
 }
 
 HESITATION_PHRASES = {
-    'fr': ['c est a dire', 'c est-à-dire', 'en fait', 'je veux dire'],
-    'en': ['you know', 'i mean', 'sort of', 'kind of'],
+    'fr': ['c est a dire', 'c est-à-dire', 'en fait', 'je veux dire',
+           'comment dire', 'comment dirais je', 'si vous voulez',
+           'en quelque sorte', 'pour ainsi dire'],
+    'en': ['you know', 'i mean', 'sort of', 'kind of', 'like i said'],
     'ar': ['you know', 'i mean', 'en fait'],
 }
 
@@ -2690,6 +2693,9 @@ def full_evaluation():
         # Strip ASR hallucination artifacts (e.g. one character stretched dozens
         # of times over unclear audio) so they are never treated as student speech.
         full_text, asr_artifacts = remove_asr_artifacts(full_text)
+        # Strip trailing ellipsis Groq/Whisper adds when audio trails off.
+        full_text = re.sub(r'\s*\.{2,}\s*$', '', full_text).strip()
+        full_text = re.sub(r'\s*…\s*$', '', full_text).strip()
         transcript = {
             'full_text':           full_text,
             'segment_text':        segment_text,

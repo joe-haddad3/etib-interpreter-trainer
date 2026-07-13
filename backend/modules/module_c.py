@@ -9,6 +9,7 @@ Endpoints:
   GET  /api/module-c/status       — check transcription method available
 """
 import os
+import re
 import uuid
 import json
 from flask import Blueprint, request, jsonify
@@ -18,6 +19,14 @@ from config import (GROQ_API_KEY, WHISPER_MODEL_SIZE, WHISPER_DEVICE,
 module_c_bp = Blueprint('module_c', __name__)
 
 _ALLOWED_AUDIO_EXTS = {'.mp3', '.wav', '.m4a', '.ogg', '.webm', '.flac', '.mp4', '.mpeg', '.mpga', '.opus'}
+
+def _clean_asr_text(text: str) -> str:
+    """Strip ASR artifacts: trailing ellipsis that Groq/Whisper adds on trailing-off audio."""
+    cleaned = str(text or '').strip()
+    cleaned = re.sub(r'\s*\.{2,}\s*$', '', cleaned)   # trailing ... or ....
+    cleaned = re.sub(r'\s*…\s*$', '', cleaned)          # trailing unicode ellipsis
+    return cleaned.strip()
+
 
 def _safe_audio_ext(filename: str) -> str:
     """Return a whitelisted audio extension from an untrusted filename."""
@@ -73,7 +82,7 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
             })
 
     return {
-        'full_text':           result.text.strip(),
+        'full_text':           _clean_asr_text(result.text),
         'language_detected':   language,
         'language_confidence': 1.0,
         'duration_seconds':    round(getattr(result, 'duration', 0) or 0, 1),
@@ -131,7 +140,7 @@ def _transcribe_local(audio_path: str, language: str) -> dict:
         all_segments.append(seg_data)
         full_text += seg.text + ' '
     return {
-        'full_text': full_text.strip(),
+        'full_text': _clean_asr_text(full_text),
         'language_detected': info.language,
         'language_confidence': round(info.language_probability, 3),
         'duration_seconds': round(info.duration, 1),
