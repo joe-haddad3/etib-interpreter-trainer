@@ -4222,19 +4222,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
-          {/* Transparency: evaluation criteria, reliability, data storage */}
-          <div className="card">
-            <details>
-              <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: '0.92rem' }}>
-                {labels.aboutEvalTitle}
-              </summary>
-              <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', lineHeight: 1.65, color: 'var(--ink, #333)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                <p>{labels.aboutEvalCriteria}</p>
-                <p>{labels.aboutEvalReliability}</p>
-                <p>{labels.aboutEvalStorage}</p>
-              </div>
-            </details>
-          </div>
         </div>
       )}
 
