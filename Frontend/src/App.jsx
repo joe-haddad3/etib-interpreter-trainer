@@ -3552,7 +3552,6 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
               <div className="result-meta" style={{ marginBottom: '0.75rem' }}>
                 {result.duration_seconds > 0 && <span>{result.duration_seconds}s</span>}
                 <span>{(result.language_detected || '').toUpperCase()}</span>
-                {result.method && <span className="method-badge">{result.method}</span>}
               </div>
 
               {lowConfWords.length > 0 && (
