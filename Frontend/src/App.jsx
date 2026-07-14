@@ -4150,19 +4150,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
-          {/* Language errors (grammar / syntax) */}
-          {(report.language_errors || []).length > 0 && (
-            <div className="card">
-              <h3 className="report-section-title">⚠️ {labels.languageErrors}</h3>
-              {report.language_errors.map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.6rem' }}>
-                  <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
-                  {item.explanation && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{item.explanation}</div>}
-                  {item.correction && <div className="eval-correction">✓ {labels.correction}: <strong className={isAr ? 'arabic' : ''}>{item.correction}</strong></div>}
-                </div>
-              ))}
-            </div>
-          )}
 
           {/* Auto-corrections (self-corrections the student made mid-speech) */}
           {(report.auto_corrections || []).length > 0 && (
