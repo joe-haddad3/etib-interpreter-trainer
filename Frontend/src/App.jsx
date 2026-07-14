@@ -389,6 +389,15 @@ const UI = {
     pnCorrect: 'Correct',
     pnDistorted: 'Distorted — likely mispronounced',
     pnMissing: 'Omitted',
+    llmFailedWarning: 'AI language analysis could not complete — showing automatic detections only. Scores may be incomplete.',
+    addSource: 'Add source',
+    micDenied: 'Microphone access denied — please allow permission and try again.',
+    simultaneousFailed: 'Could not start simultaneous mode — check microphone permission.',
+    topErrorSaid: 'said',
+    topErrorExpected: 'Expected',
+    topErrorMissing: 'Missing',
+    uploadAudioBtn: 'Upload audio file',
+    correctTashkeel: 'Correct tashkeel',
   },
   ar: {
     uiLanguage: 'لغة الواجهة',
@@ -748,6 +757,15 @@ const UI = {
     pnCorrect: 'صحيح',
     pnDistorted: 'محرَّف — نطق خاطئ على الأرجح',
     pnMissing: 'محذوف',
+    llmFailedWarning: 'لم يتمكن التحليل اللغوي بالذكاء الاصطناعي من الاكتمال — يُعرض الرصد التلقائي فقط. قد تكون الدرجات غير مكتملة.',
+    addSource: 'إضافة مصدر',
+    micDenied: 'تم رفض الوصول إلى الميكروفون — يرجى السماح بالإذن والمحاولة مجدداً.',
+    simultaneousFailed: 'تعذّر تشغيل الوضع الفوري — تحقق من إذن الميكروفون.',
+    topErrorSaid: 'ما قيل',
+    topErrorExpected: 'المتوقع',
+    topErrorMissing: 'مفقود',
+    uploadAudioBtn: 'رفع ملف صوتي',
+    correctTashkeel: 'تشكيل صحيح',
   },
   fr: {
     uiLanguage: 'Langue de l’interface',
@@ -1107,6 +1125,15 @@ const UI = {
     pnCorrect: 'Correct',
     pnDistorted: 'Déformé — probablement mal prononcé',
     pnMissing: 'Omis',
+    llmFailedWarning: "L'analyse linguistique IA n'a pas pu se terminer — seules les détections automatiques sont affichées. Les scores peuvent être incomplets.",
+    addSource: 'Ajouter une source',
+    micDenied: "Accès au microphone refusé — veuillez autoriser l'accès et réessayer.",
+    simultaneousFailed: 'Impossible de démarrer le mode simultané — vérifiez l\'autorisation du microphone.',
+    topErrorSaid: 'dit',
+    topErrorExpected: 'Attendu',
+    topErrorMissing: 'Manquant',
+    uploadAudioBtn: 'Déposer un fichier audio',
+    correctTashkeel: 'Tachkîl correct',
   }
 };
 
@@ -1350,7 +1377,7 @@ function TrendBadge({ trend, labels }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem',
       fontWeight: 700, color: d.color, background: d.color + '18', padding: '0.18rem 0.6rem',
-      borderRadius: '999px', marginLeft: '0.5rem' }}>
+      borderRadius: '999px', marginInlineStart: '0.5rem' }}>
       {d.icon} {d.text}
     </span>
   );
@@ -1366,6 +1393,8 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
   const [adaptive, setAdaptive] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
+  const dateLocale = document.documentElement.lang === 'ar' ? 'ar-SA'
+    : document.documentElement.lang === 'fr' ? 'fr-FR' : 'en-GB';
 
   useEffect(() => {
     setLoading(true);
@@ -1511,7 +1540,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                       <div className="trend-bar-inner" style={{ height: `${h}%`, background: color }} />
                     </div>
                     <div className="trend-lang-label">{LANG_FLAG[s.language] || '🌐'}</div>
-                    <div className="trend-date-label">{new Date(s.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</div>
+                    <div className="trend-date-label">{new Date(s.created_at).toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit' })}</div>
                   </div>
                 );
               })}
@@ -1544,7 +1573,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                 </ul>
               )}
               {onApplyParams && (
-                <div style={{ marginTop: '1.25rem', textAlign: 'right' }}>
+                <div style={{ marginTop: '1.25rem', textAlign: 'end' }}>
                   <button className="btn btn-primary" onClick={() => onApplyParams(adaptive.recommended_params)}>
                     {labels.progressApply}
                   </button>
@@ -1562,7 +1591,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                   onClick={() => setExpanded(expanded === i ? null : i)}>
                   <div className="session-row-main">
                     <span className="session-lang">{LANG_FLAG[s.language] || '🌐'} {(s.language || '').toUpperCase()}</span>
-                    <span className="session-date">{new Date(s.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="session-date">{new Date(s.created_at).toLocaleString(dateLocale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                     <div className="session-scores">
                       <span title="Overall"><ScoreBadge score={s.overall_score} /></span>
                       <MiniBar value={s.overall_score} color={s.overall_score >= 7 ? 'var(--sage)' : s.overall_score >= 5.5 ? 'var(--primary)' : 'var(--sienna)'} />
@@ -1605,9 +1634,9 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                           <ul style={{ margin: '0.25rem 0 0 1rem', fontSize: '0.78rem', color: 'var(--warm-gray)' }}>
                             {s.top_errors.map((e, j) => (
                               <li key={j}>
-                                {e.type === 'translation' && <><strong>{e.source}</strong> → said: <em>{e.said}</em></>}
-                                {e.type === 'number' && <>Expected <strong>{e.expected}</strong>, said: <em>{e.said}</em></>}
-                                {e.type === 'missing' && <>Missing: <em>{e.detail}</em></>}
+                                {e.type === 'translation' && <><strong>{e.source}</strong> → {labels.topErrorSaid}: <em>{e.said}</em></>}
+                                {e.type === 'number' && <>{labels.topErrorExpected}: <strong>{e.expected}</strong>, {labels.topErrorSaid}: <em>{e.said}</em></>}
+                                {e.type === 'missing' && <>{labels.topErrorMissing}: <em>{e.detail}</em></>}
                               </li>
                             ))}
                           </ul>
@@ -1769,7 +1798,7 @@ function ChatWidget({ labels }) {
   }
 
   return (
-    <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 1000 }}>
+    <div style={{ position: 'fixed', bottom: '1.5rem', insetInlineEnd: '1.5rem', zIndex: 1000 }}>
       {open && (
         <div style={{
           width: 340, height: 440, background: 'var(--surface, #fff)',
@@ -2553,7 +2582,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
         {/* ── Action buttons ── */}
         <div className="action-row">
           <button type="button" className="btn-un-library" onClick={() => setShowLibrary(true)} disabled={isLoading}>
-            📚 Add source
+            📚 {labels.addSource || 'Add source'}
           </button>
           {hasSources ? (
             <>
@@ -3249,6 +3278,8 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
   const timerRef = useRef(null);
   const fileInputRef = useRef(null);
   const referenceAudioRef = useRef(null);
+  const autoTranscribeRef = useRef(autoTranscribe);
+  useEffect(() => { autoTranscribeRef.current = autoTranscribe; }, [autoTranscribe]);
   const [simultaneousActive, setSimultaneousActive] = useState(false);
   // 3 practice modes (professor request): simultaneous | consecutive | sight
   const [interpMode, setInterpMode] = useState('consecutive');
@@ -3304,7 +3335,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
       player.onended = () => stopSimultaneous();
     } catch (err) {
       setSimultaneousActive(false);
-      setError('Could not start simultaneous mode — check microphone permission.');
+      setError(labels.simultaneousFailed);
     }
   }
 
@@ -3321,6 +3352,10 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
       const isConstraintObject = audioConstraints && typeof audioConstraints === 'object'
         && !('target' in audioConstraints);
       const constraints = { audio: isConstraintObject ? audioConstraints : true };
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError(labels.micDenied);
+        return false;
+      }
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus' : 'audio/webm';
@@ -3340,7 +3375,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
         onRecordingComplete?.(blob);
         if (recordedUrl) URL.revokeObjectURL(recordedUrl);
         setRecordedUrl(URL.createObjectURL(blob));
-        if (autoTranscribe) runTranscription(blob);
+        if (autoTranscribeRef.current) runTranscription(blob);
       };
 
       mr.start(250);
@@ -3348,7 +3383,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
       return true;
     } catch (err) {
-      setError('Microphone access denied — please allow microphone permission and try again.');
+      setError(labels.micDenied);
       return false;
     }
   }
@@ -3524,12 +3559,25 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
         {/* Note-taking space — consecutive mode only */}
         {interpMode === 'consecutive' && <NotesPad labels={labels} />}
 
-        {/* hidden file input kept for programmatic use */}
+        {/* Upload audio file — visible trigger */}
+        {!isRecording && !recordedUrl && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.4rem' }}>{labels.orUpload}</p>
+            <button type="button" className="btn-secondary btn-sm"
+              onClick={() => fileInputRef.current?.click()}>
+              📎 {labels.uploadAudioBtn || 'Upload audio file'}
+            </button>
+          </div>
+        )}
+
+        {/* hidden file input */}
         <input ref={fileInputRef} type="file" accept=".mp3,.wav,.m4a,.ogg,.webm" className="file-input" style={{ display: 'none' }}
           onChange={e => {
             const f = e.target.files[0];
             if (f) {
+              if (recordedUrl) URL.revokeObjectURL(recordedUrl);
               setRecordedBlob(f);
+              setRecordedUrl(URL.createObjectURL(f));
               onRecordingComplete?.(f);
               runTranscription(f);
             }
@@ -3578,7 +3626,9 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
 // ── Module D — Full Evaluation Report ────────────────────────────────────────
 
 function ScoreBar({ score, labels }) {
-  const pct = Math.round((score / 10) * 100);
+  const safeScore = Number.isFinite(Number(score)) ? Number(score) : 0;
+  const pct = Math.round((safeScore / 10) * 100);
+  score = safeScore;
   const color = score >= 7 ? '#2D5A4E' : score >= 5 ? '#1B3A6B' : '#8B3A2A';
   const circumference = 188.5;
   const offset = circumference - (circumference * pct / 100);
@@ -3721,7 +3771,7 @@ function PronunciationPanel({ labels, lastTranscript, lastGeneratedScript }) {
                   <div className="uncertain-word-header">
                     <span className="uncertain-word arabic">{err.word}</span>
                     {err.expected_form && (
-                      <span className="detail-label" style={{ marginLeft: '0.5rem' }}>
+                      <span className="detail-label" style={{ marginInlineStart: '0.5rem' }}>
                         → <span className="arabic" style={{ fontSize: '1.1rem', color: '#1a6b3c' }}>{err.expected_form}</span>
                       </span>
                     )}
@@ -3749,7 +3799,7 @@ function PronunciationPanel({ labels, lastTranscript, lastGeneratedScript }) {
             <div className="materials-section">
               <h4 style={{ color: '#1a6b3c', fontSize: '0.85rem', fontWeight: 700,
                 textTransform: 'uppercase', marginBottom: '0.6rem' }}>
-                ✅ Correct tashkeel ({result.tashkeel_correct.length})
+                ✅ {labels.correctTashkeel} ({result.tashkeel_correct.length})
               </h4>
               <div className="key-terms-list">
                 {result.tashkeel_correct.map((w, i) => (
@@ -3836,14 +3886,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
   const isAr = (lastTranscript.language || lastTranscript.language_detected) === 'ar';
   const llmNumberErrors = (report?.number_accuracy || [])
     .filter(item => item && item.correct === false)
-    .map(item => {
-      const src = item.source_value || '';
-      const said = item.student_said;
-      const msg = said && String(said).trim() && String(said).trim().toLowerCase() !== 'missing'
-        ? `${src} was said as ${said}`
-        : `${src} was not mentioned`;
-      return { ...item, message: msg.trim() };
-    });
+    .map(item => ({ ...item }));
   const displayNumberErrors = llmNumberErrors.length > 0 ? llmNumberErrors : (algo.number_errors || []);
 
   return (
@@ -3851,7 +3894,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
       <div className="card">
         <h2>{labels.moduleDTitle}</h2>
         <div className="info-tip" style={{ marginBottom: '1rem' }}>
-          📄 {labels.transcriptReady} ({lastTranscript.duration_seconds}s · {(lastTranscript.language_detected || '').toUpperCase()})
+          📄 {labels.transcriptReady} ({lastTranscript.duration_seconds ?? 0}s · {(lastTranscript.language_detected || '').toUpperCase()})
           {lastGeneratedScript && <> · {labels.source}: {lastGeneratedScript.domain}</>}
         </div>
         <button className="btn-primary" onClick={handleEvaluate} disabled={status === 'loading'}>
@@ -3867,6 +3910,13 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
 
       {report && (
         <div className="report-card">
+
+          {/* LLM partial failure warning */}
+          {report.llm_failed && (
+            <div className="warning-msg" style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+              ⚠️ {labels.llmFailedWarning}
+            </div>
+          )}
 
           {/* Score + Summary */}
           <div className="card report-header">
@@ -3953,7 +4003,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 <div className="algo-chips">
                   {algo.hesitation_words.map((h, i) => (
                     <span key={i} className="algo-chip">
-                      "{h.word}" <small>{h.at_seconds !== undefined ? `${h.at_seconds}s` : ''}</small>
+                      "{h?.word || h}" <small>{h?.at_seconds !== undefined ? `${h.at_seconds}s` : ''}</small>
                     </span>
                   ))}
                 </div>
@@ -3965,7 +4015,9 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 <div className="algo-chips">
                   {displayNumberErrors.map((n, i) => (
                     <span key={i} className="algo-chip algo-chip-err">
-                      {typeof n === 'string' ? n : (n.message || `${n.expected || ''} → ${n.heard || ''}`)}
+                      {typeof n === 'string'
+                        ? n
+                        : `${n.source_value || n.expected || ''} → ${n.student_said || n.heard || '—'}`}
                     </span>
                   ))}
                 </div>
@@ -3987,7 +4039,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 return (
                   <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginTop: '0.5rem' }}>
                     <strong style={{ fontSize: '0.84rem' }}>
-                      {duration}s {labels.longSilences.toLowerCase()}
+                      {duration ?? 0}s {labels.longSilences.toLowerCase()}
                       {Number.isFinite(Number(atSeconds)) && (
                         Number(atSeconds) === 0 ? ' — at start' : ` — at ${atSeconds}s`
                       )}
@@ -4019,7 +4071,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                     <strong style={{ color: 'var(--sage)' }} className={isAr ? 'arabic' : ''}>{n.expected_in_target}</strong>
                     <span style={{ color: 'var(--warm-gray)' }}> · {labels.studentSaidShort}: </span>
                     <strong style={{ color: n.correct ? 'var(--sage)' : 'var(--sienna)' }} className={isAr ? 'arabic' : ''}>{n.student_said || '—'}</strong>
-                    <span className={`importance-badge importance-${n.correct ? 'low' : 'high'}`} style={{ marginLeft: '0.5rem' }}>
+                    <span className={`importance-badge importance-${n.correct ? 'low' : 'high'}`} style={{ marginInlineStart: '0.5rem' }}>
                       {n.correct ? labels.numCorrect : labels.numIncorrect}
                     </span>
                   </div>
@@ -4082,10 +4134,10 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           )}
 
           {/* Coverage score */}
-          {report.coverage_score !== undefined && (
+          {report.coverage_score != null && (
             <div className="card">
               <h3 className="report-section-title">📊 {labels.coverageTitle}</h3>
-              <ScoreBar score={report.coverage_score} labels={labels} />
+              <ScoreBar score={report.coverage_score ?? 0} labels={labels} />
               <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--warm-gray)' }}>
                 {labels.coverageHint}
               </p>
@@ -4126,7 +4178,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                           <strong style={{ color }} className={isAr ? 'arabic' : ''}>{pn.student_said}</strong>
                         </>
                       )}
-                      <span className={`importance-badge importance-${status === 'correct' ? 'low' : 'high'}`} style={{ marginLeft: '0.5rem' }}>
+                      <span className={`importance-badge importance-${status === 'correct' ? 'low' : 'high'}`} style={{ marginInlineStart: '0.5rem' }}>
                         {statusLabel}
                       </span>
                     </div>
