@@ -3524,26 +3524,16 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
         {/* Note-taking space — consecutive mode only */}
         {interpMode === 'consecutive' && <NotesPad labels={labels} />}
 
-        {/* Upload fallback */}
-        <details className="upload-fallback">
-          <summary>{labels.orUpload}</summary>
-          <div className="upload-fallback-row" style={{ marginTop: '0.75rem' }}>
-            <input ref={fileInputRef} type="file" accept=".mp3,.wav,.m4a,.ogg,.webm" className="file-input"
-              onChange={e => {
-                const f = e.target.files[0];
-                if (f) {
-                  setRecordedBlob(f);
-                  onRecordingComplete?.(f);
-                  runTranscription(f);
-                }
-              }} />
-            {recordedBlob && (
-              <button className="btn-icon-danger" onClick={clearAudio} title={labels.deleteAudio}>
-                <IconTrash />
-              </button>
-            )}
-          </div>
-        </details>
+        {/* hidden file input kept for programmatic use */}
+        <input ref={fileInputRef} type="file" accept=".mp3,.wav,.m4a,.ogg,.webm" className="file-input" style={{ display: 'none' }}
+          onChange={e => {
+            const f = e.target.files[0];
+            if (f) {
+              setRecordedBlob(f);
+              onRecordingComplete?.(f);
+              runTranscription(f);
+            }
+          }} />
       </div>
 
       {/* Results card */}
