@@ -541,11 +541,19 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
     if language == 'fr':
         summary = normalize_french_summary(summary, script)
 
+    glossary = normalize_glossary(data.get('glossary'))
+    if language == 'ar':
+        for g in glossary:
+            if g.get('arabic'):
+                g['arabic'] = _clean_arabic_script(g['arabic'])
+            if g.get('term'):
+                g['term'] = _clean_arabic_script(g['term'])
+
     return {
         'script':   script,
         'summary':  summary,
         'mcqs':     normalize_mcqs(mcqs),
-        'glossary': normalize_glossary(data.get('glossary')),
+        'glossary': glossary,
         'metadata': data.get('metadata') if isinstance(data.get('metadata'), dict) else {},
     }
 

@@ -103,6 +103,28 @@ const UI = {
     progressStable: 'Stable',
     progressStrengths: 'Strengths',
     progressRecs: 'Recommendations',
+    severityHigh: 'HIGH', severityMedium: 'MED', severityLow: 'LOW',
+    problemLabel_translation: 'Translation accuracy',
+    problemLabel_numbers: 'Numbers & figures',
+    problemLabel_missing: 'Missing content',
+    problemLabel_silences: 'Long pauses',
+    problemLabel_repetitions: 'Repetitions & self-corrections',
+    problemLabel_fluency: 'Delivery fluency',
+    problemLabel_coverage: 'Content coverage',
+    problemTip_translation: 'Study terminology lists and practice active listening for key concepts.',
+    problemTip_numbers: 'Practice shadowing speeches with high number density.',
+    problemTip_missing: 'Improve note-taking and work on shorter speeches first.',
+    problemTip_silences: 'Practice décalage exercises to keep output flowing.',
+    problemTip_repetitions: 'Work on reformulation — commit to a rendering instead of backtracking.',
+    problemTip_fluency: 'Shadow native speakers and record yourself daily.',
+    problemTip_coverage: 'Focus on conveying main ideas before worrying about style.',
+    problemDetail_translation: 'Wrong equivalents in {count}/{total} sessions',
+    problemDetail_numbers: 'Number errors in {count}/{total} sessions',
+    problemDetail_missing: 'Key ideas omitted in {count}/{total} sessions',
+    problemDetail_silences: 'Excessive pauses in {count}/{total} sessions',
+    problemDetail_repetitions: 'High repetitions in {count}/{total} sessions',
+    problemDetail_fluency: 'Low fluency in {count}/{total} sessions',
+    problemDetail_coverage: 'Low coverage in {count}/{total} sessions',
     progressTopErrors: 'Specific errors',
     progressNoData: 'Not enough data yet',
     moduleATitle: 'Generate training speech',
@@ -471,6 +493,28 @@ const UI = {
     progressStable: 'مستقر',
     progressStrengths: 'نقاط القوة',
     progressRecs: 'التوصيات',
+    severityHigh: 'مرتفعة', severityMedium: 'متوسطة', severityLow: 'منخفضة',
+    problemLabel_translation: 'دقة الترجمة',
+    problemLabel_numbers: 'الأرقام والإحصاءات',
+    problemLabel_missing: 'المحتوى الفائت',
+    problemLabel_silences: 'التوقفات الطويلة',
+    problemLabel_repetitions: 'التكرارات والتصحيحات',
+    problemLabel_fluency: 'طلاقة الإلقاء',
+    problemLabel_coverage: 'تغطية المحتوى',
+    problemTip_translation: 'راجع قوائم المصطلحات ومارس الاستماع الفعّال للمفاهيم الأساسية.',
+    problemTip_numbers: 'تدرّب على محاذاة الخطابات ذات الكثافة العالية من الأرقام.',
+    problemTip_missing: 'طوّر مهاراتك في تدوين الملاحظات وابدأ بخطابات أقصر.',
+    problemTip_silences: 'مارس تمارين التأخير الزمني للحفاظ على انسيابية الإخراج.',
+    problemTip_repetitions: 'اعمل على إعادة الصياغة — التزم بترجمتك بدلاً من التراجع عنها.',
+    problemTip_fluency: 'استخدم المحاذاة الصوتية مع متحدثين أصليين وسجّل نفسك يومياً.',
+    problemTip_coverage: 'ركّز على نقل الأفكار الرئيسية قبل الاهتمام بالأسلوب.',
+    problemDetail_translation: 'أخطاء في الترجمة في {count}/{total} جلسات',
+    problemDetail_numbers: 'أخطاء في الأرقام في {count}/{total} جلسات',
+    problemDetail_missing: 'أفكار مفقودة في {count}/{total} جلسات',
+    problemDetail_silences: 'توقفات مفرطة في {count}/{total} جلسات',
+    problemDetail_repetitions: 'تكرارات مرتفعة في {count}/{total} جلسات',
+    problemDetail_fluency: 'درجة طلاقة منخفضة في {count}/{total} جلسات',
+    problemDetail_coverage: 'تغطية منخفضة في {count}/{total} جلسات',
     progressTopErrors: 'أخطاء محددة',
     progressNoData: 'بيانات غير كافية بعد',
     moduleATitle: 'توليد خطاب تدريبي',
@@ -839,6 +883,28 @@ const UI = {
     progressStable: 'Stable',
     progressStrengths: 'Points forts',
     progressRecs: 'Recommandations',
+    severityHigh: 'HAUTE', severityMedium: 'MOY.', severityLow: 'FAIBLE',
+    problemLabel_translation: 'Précision de la traduction',
+    problemLabel_numbers: 'Chiffres et statistiques',
+    problemLabel_missing: 'Contenu manquant',
+    problemLabel_silences: 'Longues pauses',
+    problemLabel_repetitions: 'Répétitions et autocorrections',
+    problemLabel_fluency: 'Fluidité',
+    problemLabel_coverage: 'Couverture du contenu',
+    problemTip_translation: "Révisez les listes de terminologie et pratiquez l'écoute active.",
+    problemTip_numbers: 'Entraînez-vous sur des discours à haute densité de chiffres.',
+    problemTip_missing: "Améliorez votre prise de notes et travaillez d'abord sur des discours courts.",
+    problemTip_silences: 'Pratiquez le décalage pour maintenir le flux de restitution.',
+    problemTip_repetitions: 'Travaillez la reformulation — engagez-vous dans un rendu sans revenir en arrière.',
+    problemTip_fluency: 'Faites du shadowing avec des locuteurs natifs et enregistrez-vous chaque jour.',
+    problemTip_coverage: 'Concentrez-vous sur les idées principales avant de vous soucier du style.',
+    problemDetail_translation: 'Équivalents erronés dans {count}/{total} sessions',
+    problemDetail_numbers: 'Erreurs numériques dans {count}/{total} sessions',
+    problemDetail_missing: 'Idées clés omises dans {count}/{total} sessions',
+    problemDetail_silences: 'Pauses excessives dans {count}/{total} sessions',
+    problemDetail_repetitions: 'Répétitions élevées dans {count}/{total} sessions',
+    problemDetail_fluency: 'Fluidité faible dans {count}/{total} sessions',
+    problemDetail_coverage: 'Couverture faible dans {count}/{total} sessions',
     progressTopErrors: 'Erreurs spécifiques',
     progressNoData: 'Pas encore assez de données',
     moduleATitle: 'Générer un discours d’entraînement',
@@ -1465,7 +1531,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
         <>
           {/* ── Latest session card ── */}
           {latest && (
-            <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
+            <div className="card" style={{ borderInlineStart: '4px solid var(--primary)' }}>
               <h2 className="b-section-title">🎓 {labels.progressLatest}</h2>
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
@@ -1483,17 +1549,17 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                   </div>
                 </div>
                 <div style={{ flex: 1, minWidth: 200 }}>
-                  {latest.summary && <p style={{ fontSize: '0.88rem', color: 'var(--warm-gray)', marginBottom: '0.5rem', fontStyle: 'italic' }}>"{latest.summary}"</p>}
+                  {latest.summary && <p dir="auto" style={{ fontSize: '0.88rem', color: 'var(--warm-gray)', marginBottom: '0.5rem', fontStyle: 'italic' }}>"{latest.summary}"</p>}
                   {(latest.strengths || []).length > 0 && (
                     <div style={{ marginBottom: '0.4rem' }}>
                       <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--sage)' }}>{labels.progressStrengths}: </span>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--warm-gray)' }}>{latest.strengths.join(' · ')}</span>
+                      <span dir="auto" style={{ fontSize: '0.82rem', color: 'var(--warm-gray)' }}>{latest.strengths.join(' · ')}</span>
                     </div>
                   )}
                   {(latest.recommendations || []).length > 0 && (
                     <div>
                       <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--gold)' }}>{labels.progressRecs}: </span>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--warm-gray)' }}>{latest.recommendations.slice(0, 2).join(' · ')}</span>
+                      <span dir="auto" style={{ fontSize: '0.82rem', color: 'var(--warm-gray)' }}>{latest.recommendations.slice(0, 2).join(' · ')}</span>
                     </div>
                   )}
                 </div>
@@ -1506,22 +1572,33 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
             <div className="card">
               <h2 className="b-section-title">🔍 {labels.progressProblems}</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                {problems.map((p) => (
+                {problems.map((p) => {
+                  const sevLabel = labels[`severity${p.severity === 'high' ? 'High' : p.severity === 'medium' ? 'Medium' : 'Low'}`] || p.severity.toUpperCase();
+                  const pLabel = labels[`problemLabel_${p.key}`] || p.label;
+                  const pTip = labels[`problemTip_${p.key}`] || p.tip;
+                  const detailTemplate = labels[`problemDetail_${p.key}`];
+                  const detailMatch = (p.detail || '').match(/(\d+)\/(\d+)/);
+                  const pDetail = detailTemplate && detailMatch
+                    ? detailTemplate.replace('{count}', detailMatch[1]).replace('{total}', detailMatch[2])
+                    : p.detail;
+                  return (
                   <div key={p.key} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
                     background: 'var(--bg-secondary, #f8f7f5)', borderRadius: '8px', padding: '0.75rem 1rem' }}>
-                    <SeverityDot severity={p.severity} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary, #1a1a1a)' }}>{p.label}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginTop: '0.1rem' }}>{p.detail}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--primary)', marginTop: '0.25rem' }}>💡 {p.tip}</div>
-                    </div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0,
                       color: p.severity === 'high' ? 'var(--sienna)' : p.severity === 'medium' ? 'var(--gold)' : 'var(--sage)',
-                      border: `1px solid currentColor`, borderRadius: '4px', padding: '0.15rem 0.4rem', flexShrink: 0 }}>
-                      {p.severity}
+                      border: `1px solid currentColor`, borderRadius: '4px', padding: '0.15rem 0.4rem',
+                      alignSelf: 'center' }}>
+                      {sevLabel}
                     </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary, #1a1a1a)' }}>{pLabel}</div>
+                      <div dir="auto" style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginTop: '0.1rem' }}>{pDetail}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--primary)', marginTop: '0.25rem' }}>💡 {pTip}</div>
+                    </div>
+                    <SeverityDot severity={p.severity} />
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
