@@ -39,36 +39,44 @@ def _safe_audio_ext(filename: str) -> str:
 _whisper_model = None
 _whisper_model_lock = __import__('threading').Lock()
 
-# Priming prompts containing disfluencies — Whisper imitates the style of the
-# initial prompt, making it far more likely to transcribe "euh"/"um"/"يعني"
-# verbatim instead of silently cleaning them out of the transcript.
+# Priming prompts — Whisper does NOT follow instructions in its prompt; it
+# imitates the STYLE of the text (treated as the previous transcript). To make
+# it keep immediate word repetitions ("climate climate") and fillers verbatim,
+# the prompt must itself BE a disfluent transcript full of doubled words.
+# These exact sentences are stripped from the output if Whisper hallucinates
+# them back (see _HALLUCINATION_RE below).
 DISFLUENCY_PROMPTS = {
-    'ar': 'إممم، آه، يعني، أقصد... طيب، يعني كيف أقول هاد الشي.',
-    'fr': "Euh, alors, ben, c'est-à-dire... voilà, donc, euh, comment dire.",
-    'en': "Um, well, uh, like, you know... so, I mean, er, how do I put this.",
+    'ar': 'طيب طيب، اممم، يعني يعني، التسجيل التسجيل يبدأ يبدأ الآن، آآ، سوف سوف أتحدث أتحدث بوضوح.',
+    'fr': "Alors alors, euh euh, le le test test commence commence maintenant, euh, je je vais vais parler parler clairement.",
+    'en': "Okay okay, so so, um, the the recording recording starts starts now, uh, I I will will speak speak clearly.",
 }
 
 
 # ── Groq hosted Whisper (fast) ───────────────────────────────────────────────
-
-_VERBATIM_EXAMPLES = {
-    'fr': "Transcription verbatim. Garder les mots répétés: 'climat climat action' → 'climat climat action'.",
-    'ar': "نسخ حرفي. الإبقاء على الكلمات المكررة كما هي.",
-    'en': "Transcribe verbatim. Keep repeated words: 'climate climate action' → 'climate climate action'.",
-}
 
 # Whisper sometimes hallucinates our injected prompt phrases into the transcript
 # when audio is unclear. Strip these phrases from text rather than dropping the
 # whole segment so surrounding real speech is preserved.
 _HALLUCINATION_RE = re.compile(
     r'(?:'
-    r'transcri(?:be|ption)\s+verbatim[^.!?]*[.!?]?'      # "Transcription verbatim. ..."
-    r'|garder\s+les\s+mots\s+r[eé]p[eé]t[eé][^.!?]*[.!?]?'  # "Garder les mots répétés ..."
-    r'|keep\s+repeated\s+words?[^.!?]*[.!?]?'             # "Keep repeated words ..."
+    # legacy instruction-style prompt phrases (old saved sessions)
+    r'transcri(?:be|ption)\s+verbatim[^.!?]*[.!?]?'
+    r'|garder\s+les\s+mots\s+r[eé]p[eé]t[eé][^.!?]*[.!?]?'
+    r'|keep\s+repeated\s+words?[^.!?]*[.!?]?'
     r'|→\s*[\'"]?climat\s+climat\s+action[\'"]?'
     r'|→\s*[\'"]?climate\s+climate\s+action[\'"]?'
     r'|الإبقاء\s+على\s+الكلمات\s+المكررة[^.!?]*[.!?]?'
     r'|نسخ\s+حرفي[^.!?]*[.!?]?'
+    # current style-priming prompt sentences (distinctive doubled phrases)
+    r'|okay\s+okay,?\s*so\s+so,?\s*um,?'
+    r'|the\s+the\s+recording\s+recording\s+starts?\s+starts?\s+now'
+    r'|i\s+i\s+will\s+will\s+speak\s+speak\s+clearly'
+    r'|alors\s+alors,?\s*euh\s+euh,?'
+    r'|le\s+le\s+test\s+test\s+commence\s+commence\s+maintenant'
+    r'|je\s+je\s+vais\s+vais\s+parler\s+parler\s+clairement'
+    r'|طيب\s+طيب،?\s*اممم،?\s*يعني\s+يعني،?'
+    r'|التسجيل\s+التسجيل\s+يبدأ\s+يبدأ\s+الآن'
+    r'|سوف\s+سوف\s+أتحدث\s+أتحدث\s+بوضوح'
     r')',
     re.IGNORECASE,
 )
@@ -98,10 +106,10 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
     if not key:
         raise RuntimeError('No Groq API key')
 
-    # Combine disfluency prompt + verbatim instruction so repeated words survive
-    disfluency = DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en'])
-    verbatim   = _VERBATIM_EXAMPLES.get(language, _VERBATIM_EXAMPLES['en'])
-    prompt     = f"{disfluency} {verbatim}"
+    # Style-priming only: Whisper imitates the prompt's style — a disfluent,
+    # repetition-heavy "previous transcript" makes it keep doubled words and
+    # fillers. Instruction text is NOT sent (Whisper ignores instructions).
+    prompt = DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en'])
 
     with open(audio_path, 'rb') as fh:
         resp = _requests.post(

@@ -1055,20 +1055,6 @@ def normalize_repetition_word(text: str) -> str:
     return re.sub(r'[^\w]', '', str(text or '').strip().casefold(), flags=re.UNICODE)
 
 
-def build_verbatim_asr_prompt(language: str) -> str:
-    """Prime Whisper to keep disfluencies and consecutive repeated words."""
-    examples = {
-        'en': "If the speaker says 'climate climate action', transcribe exactly: climate climate action.",
-        'fr': "If the speaker says 'climat climat action', transcribe exactly: climat climat action.",
-        'ar': "Keep repeated spoken words exactly as spoken.",
-    }
-    return (
-        "Transcribe verbatim. Do not clean up the student's speech. "
-        "Keep consecutive repeated words, repeated phrases, false starts, hesitations, fillers, and self-corrections. "
-        f"{examples.get(language, examples['en'])}"
-    )
-
-
 def build_repetition_hotwords(source_script: str, language: str = 'en') -> str:
     """
     Bias faster-whisper toward words that appear in the source speech.
@@ -2760,7 +2746,9 @@ def full_evaluation():
     try:
         from modules.module_c import DISFLUENCY_PROMPTS
         disfluency_prompt = DISFLUENCY_PROMPTS.get(language, DISFLUENCY_PROMPTS['en'])
-        verbatim_prompt = f"{disfluency_prompt} {build_verbatim_asr_prompt(language)}"
+        # Style-priming only — Whisper imitates the prompt's disfluent style;
+        # appending instruction text does nothing and wastes the prompt budget.
+        verbatim_prompt = disfluency_prompt
 
         # ASR strategy: Groq whisper-large-v3 with WORD timestamps first —
         # far better recognition (especially Arabic) and seconds instead of
