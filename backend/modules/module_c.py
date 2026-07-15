@@ -37,6 +37,7 @@ def _safe_audio_ext(filename: str) -> str:
 
 
 _whisper_model = None
+_whisper_model_lock = __import__('threading').Lock()
 
 # Priming prompts containing disfluencies — Whisper imitates the style of the
 # initial prompt, making it far more likely to transcribe "euh"/"um"/"يعني"
@@ -55,6 +56,39 @@ _VERBATIM_EXAMPLES = {
     'ar': "نسخ حرفي. الإبقاء على الكلمات المكررة كما هي.",
     'en': "Transcribe verbatim. Keep repeated words: 'climate climate action' → 'climate climate action'.",
 }
+
+# Whisper sometimes hallucinates our injected prompt phrases into the transcript
+# when audio is unclear. Strip these phrases from text rather than dropping the
+# whole segment so surrounding real speech is preserved.
+_HALLUCINATION_RE = re.compile(
+    r'(?:'
+    r'transcri(?:be|ption)\s+verbatim[^.!?]*[.!?]?'      # "Transcription verbatim. ..."
+    r'|garder\s+les\s+mots\s+r[eé]p[eé]t[eé][^.!?]*[.!?]?'  # "Garder les mots répétés ..."
+    r'|keep\s+repeated\s+words?[^.!?]*[.!?]?'             # "Keep repeated words ..."
+    r'|→\s*[\'"]?climat\s+climat\s+action[\'"]?'
+    r'|→\s*[\'"]?climate\s+climate\s+action[\'"]?'
+    r'|الإبقاء\s+على\s+الكلمات\s+المكررة[^.!?]*[.!?]?'
+    r'|نسخ\s+حرفي[^.!?]*[.!?]?'
+    r')',
+    re.IGNORECASE,
+)
+
+def _strip_prompt_hallucinations(text: str) -> str:
+    """Remove Whisper-hallucinated prompt phrases from text, preserving surrounding speech."""
+    cleaned = _HALLUCINATION_RE.sub(' ', str(text or ''))
+    return re.sub(r'\s{2,}', ' ', cleaned).strip()
+
+def _is_prompt_hallucination(text: str) -> bool:
+    """Return True if the segment is ENTIRELY hallucinated prompt text (nothing real left)."""
+    return not bool(_strip_prompt_hallucinations(str(text or '')))
+
+# Single-word tokens from the verbatim prompt that Whisper may hallucinate in
+# isolation (without the surrounding phrase that _HALLUCINATION_RE would catch).
+_HALLUCINATION_WORD_TOKENS = frozenset({
+    'transcribe', 'verbatim', 'transcription',
+    'نسخ', 'حرفي',
+})
+
 
 def _transcribe_groq(audio_path: str, language: str) -> dict:
     """Transcribe via Groq REST API with word-level timestamps to preserve repetitions."""
@@ -91,11 +125,22 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
     raw_segs   = data.get('segments') or []
     raw_words  = data.get('words') or []
 
-    # Build segments from segment-level data (used for silence/timing analysis)
+    # Build segments, stripping any hallucinated prompt text from within each
+    # segment rather than dropping the whole segment (preserves real speech that
+    # Whisper placed next to the hallucination in the same segment).
+    # Segments that become fully empty after stripping are tracked so their word
+    # tokens can also be excluded.
+    hallucinated_ranges: list[tuple[float, float]] = []
     segments = []
     for seg in raw_segs:
-        seg_text = _clean_asr_text(str(seg.get('text', '')).strip())
+        seg_text = _strip_prompt_hallucinations(
+            _clean_asr_text(str(seg.get('text', '')).strip())
+        )
         if not seg_text:
+            hallucinated_ranges.append((
+                float(seg.get('start', 0) or 0),
+                float(seg.get('end', 0) or 0),
+            ))
             continue
         segments.append({
             'start': round(float(seg.get('start', 0) or 0), 2),
@@ -109,8 +154,15 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
         token = _clean_asr_text(str(w.get('word', '')).strip())
         if not token:
             continue
+        # Drop lone hallucination tokens that slip through phrase-level stripping
+        # (e.g. Whisper returns "Transcribe" at 63s without the surrounding phrase)
+        if token.lower().rstrip('.,!?;:') in _HALLUCINATION_WORD_TOKENS:
+            continue
         start = round(float(w.get('start', 0) or 0), 2)
         end   = round(float(w.get('end', 0) or 0), 2)
+        # Skip words that fall within a hallucinated segment's time range
+        if any(r0 - 0.05 <= start < r1 + 0.05 for r0, r1 in hallucinated_ranges):
+            continue
         entry = {'word': token, 'start': start, 'end': end, 'probability': 1.0}
         for seg in segments:
             if seg['start'] - 0.05 <= start < seg['end'] + 0.05:
@@ -120,10 +172,21 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
             if segments:
                 segments[-1]['words'].append(entry)
 
-    # Build full_text from word timestamps — preserves repetitions Groq keeps
-    word_tokens = [w.get('word', '') for seg in segments for w in seg.get('words', [])]
-    clean_text  = re.sub(r'\s{2,}', ' ', ' '.join(word_tokens)).strip() if word_tokens \
-                  else _clean_asr_text(str(data.get('text', '')))
+    # Verbatim guarantee: Whisper sometimes deduplicates repeated words in the
+    # segment TEXT while keeping both occurrences in the word-timestamp list
+    # ("climat climat" → text "climat", words ["climat","climat"]). When the
+    # word list has MORE tokens than the text, the text was cleaned — rebuild
+    # it from the word tokens so the student sees exactly what they said.
+    for seg in segments:
+        if seg['words'] and len(seg['words']) > len(seg['text'].split()):
+            seg['text'] = re.sub(r'\s{2,}', ' ', ' '.join(w['word'] for w in seg['words'])).strip()
+
+    # Build full_text from segment texts — segment text preserves adjacent repetitions
+    # that Groq's model may collapse in the word-level timestamp list.
+    raw_full = re.sub(r'\s{2,}', ' ', ' '.join(seg['text'] for seg in segments)).strip() \
+               if segments else _clean_asr_text(str(data.get('text', '')))
+    # Final pass: strip any hallucination phrase that slipped through
+    clean_text = _strip_prompt_hallucinations(raw_full)
 
     return {
         'full_text':           clean_text,
@@ -141,12 +204,14 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
 def _get_local_model():
     global _whisper_model
     if _whisper_model is None:
-        from faster_whisper import WhisperModel
-        print(f'[Module C] Loading local Whisper {WHISPER_MODEL_SIZE}...')
-        _whisper_model = WhisperModel(
-            WHISPER_MODEL_SIZE, device=WHISPER_DEVICE, compute_type=WHISPER_COMPUTE_TYPE
-        )
-        print('[Module C] Local Whisper ready.')
+        with _whisper_model_lock:
+            if _whisper_model is None:  # double-check inside lock
+                from faster_whisper import WhisperModel
+                print(f'[Module C] Loading local Whisper {WHISPER_MODEL_SIZE}...')
+                _whisper_model = WhisperModel(
+                    WHISPER_MODEL_SIZE, device=WHISPER_DEVICE, compute_type=WHISPER_COMPUTE_TYPE
+                )
+                print('[Module C] Local Whisper ready.')
     return _whisper_model
 
 
@@ -184,7 +249,7 @@ def _transcribe_local(audio_path: str, language: str) -> dict:
             })
         all_segments.append(seg_data)
         full_text += seg.text + ' '
-    clean_text = _clean_asr_text(full_text)
+    clean_text = _strip_prompt_hallucinations(_clean_asr_text(full_text))
     return {
         'full_text':           clean_text,
         'no_speech_detected':  not bool(clean_text),
@@ -253,7 +318,7 @@ Student transcript:
                 },
                 {'role': 'user', 'content': user_prompt}
             ],
-            max_tokens=max(500, len(student_text) * 3),
+            max_tokens=min(max(500, len(student_text) * 3), 6000),
             temperature=0.1
         )
         return response.choices[0].message.content.strip()

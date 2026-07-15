@@ -521,6 +521,9 @@ AUTOMATICALLY DETECTED ISSUES (algorithmic):
 - Long silences (> 2.0s gaps): {silence_count} detected → details: {silence_examples}
 - Word repetitions: {repetition_count} detected → examples: {repetition_examples}
 - Hesitation markers: {hesitation_count} detected → examples: {hesitation_examples}
+  (A hesitation is ONLY a vocal filler — "euh", "um", "يعني", elongated sounds — or a word the
+  student cut mid-way and restarted. Normal discourse words like "donc", "alors", "en fait",
+  "like", "you know" are legitimate speech: NEVER count them as hesitations or disfluencies.)
 - Number reproduction errors: {number_errors} detected
 - Number error details: {number_error_details}
 - Coverage length check: {coverage_diagnostics}
@@ -958,39 +961,38 @@ module_d_bp = Blueprint('module_d', __name__)
 
 # ── Error detection (algorithmic — no LLM calls, always free) ────────────────
 
-# ── Hesitation word lists (all languages — Lebanese Arabic uses French fillers too) ──
+# ── Hesitation word lists — GENUINE vocal fillers only.
+# Discourse words that are legitimate speech ("donc", "alors", "like",
+# "en fait", "you know") must NEVER be flagged: in a formal interpretation
+# they are normal vocabulary, and flagging them buries real hesitations.
 HESITATION_PATTERNS = {
     'ar': [
         r'\bآ+\b', r'\bإ+\b', r'\bأممم+\b', r'\bممم+\b', r'\bيعني\b', r'\bأقصد\b',
         r'\beuh+\b', r'\bheu+\b', r'\bum+\b', r'\buh+\b', r'\bhmm+\b', r'\bhm+\b',
-        r'\bben\b', r'\bvoilà\b', r'\bdonc\b',
     ],
-    'fr': [r'\beuh+\b', r'\bheu+\b', r'\bhm+\b', r'\bvoil[aà]\b', r'\bdonc\b', r'\bben\b', r'\bquoi\b', r'\bhum\b'],
-    'en': [r'\bum+\b', r'\buh+\b', r'\ber+\b', r'\bhmm+\b', r'\bhm+\b', r'\blike\b'],
+    'fr': [r'\beuh+\b', r'\bheu+\b', r'\bhm+\b', r'\bhum+\b'],
+    'en': [r'\bum+\b', r'\buh+\b', r'\ber+m?\b', r'\bhmm+\b', r'\bhm+\b'],
 }
 
 HESITATION_FILLERS = {
     'ar': {
         'آ', 'إ', 'أقصد', 'يعني', 'آآ', 'إإ', 'أممم', 'ممم', 'اممم',
-        'euh', 'heu', 'um', 'uh', 'hmm', 'hm', 'erm', 'er', 'ben', 'bah',
+        'euh', 'heu', 'um', 'uh', 'hmm', 'hm', 'erm', 'er',
     },
     'fr': {
-        'euh', 'heu', 'euuh', 'euhm', 'hum', 'hm', 'hmm', 'ben', 'bah',
-        'quoi', 'enfin', 'disons', 'comment', 'bref', 'voila', 'voilà',
-        'donc', 'alors', 'bon', 'eh', 'ah', 'oh', 'hein', 'nan',
+        'euh', 'heu', 'euuh', 'euhm', 'hum', 'hm', 'hmm',
     },
     'en': {
         'um', 'umm', 'uh', 'uhh', 'er', 'erm', 'hmm', 'hm', 'mm',
-        'like',
     },
 }
 
+# Stalling phrases only — phrases a speaker says while searching for words.
+# Normal discourse phrases ("en fait", "you know", "i mean") are NOT here.
 HESITATION_PHRASES = {
-    'fr': ['c est a dire', 'c est-à-dire', 'en fait', 'je veux dire',
-           'comment dire', 'comment dirais je', 'si vous voulez',
-           'en quelque sorte', 'pour ainsi dire'],
-    'en': ['you know', 'i mean', 'sort of', 'kind of', 'like i said'],
-    'ar': ['you know', 'i mean', 'en fait'],
+    'fr': ['comment dire', 'comment dirais je'],
+    'en': [],
+    'ar': [],
 }
 
 
@@ -1017,7 +1019,7 @@ def detect_hesitations_from_text(full_text: str, language: str = 'ar') -> list:
     found = []
     for match in re.finditer(r'\w+', full_text or '', flags=re.IGNORECASE | re.UNICODE):
         token = normalize_hesitation_token(match.group())
-        if token in filler_set or re.fullmatch(r'(u+h+|u+m+|e+u+h+|h+m+|m+m+)', token):
+        if token in filler_set or re.fullmatch(r'(u+h+|u+m+|e+u+h+|h+m+|m+m+|آ+|إ+|[اأ]م{2,}|م{3,})', token):
             found.append({'word': match.group(), 'at_char': match.start(), 'source': 'text'})
 
     normalized_text = re.sub(r'[^\w]+', ' ', str(full_text or '').lower(), flags=re.UNICODE)
@@ -1352,11 +1354,12 @@ def build_transcript_from_word_timestamps(segments: list) -> str:
     return re.sub(r'\s+', ' ', ' '.join(words)).strip()
 
 
-def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds: float = 0.08, max_gap_seconds: float = 1.4) -> list:
+def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds: float = 0.35, max_gap_seconds: float = 1.4) -> list:
     """
     Detect likely filled pauses from the recording when ASR omits fillers.
-    A short gap between recognized words that still contains voiced audio is
-    usually a filler, false start, or hesitation rather than silence.
+    A gap between recognized words that still contains voiced audio is usually
+    a filler ("euhhh") the recognizer skipped. min_gap 0.35 s: anything shorter
+    is normal coarticulation/breath between words, not a hesitation.
     """
     try:
         words = get_word_timing_sequence(segments)
@@ -1630,7 +1633,7 @@ def detect_hesitation_words(segments: list, language: str = 'ar') -> list:
     for seg in segments:
         for w in seg.get('words', []) or []:
             clean = normalize_hesitation_token(w.get('word', ''))
-            if clean in filler_set or re.fullmatch(r'(u+h+|u+m+|e+u+h+|h+m+|m+m+)', clean):
+            if clean in filler_set or re.fullmatch(r'(u+h+|u+m+|e+u+h+|h+m+|m+m+|آ+|إ+|[اأ]م{2,}|م{3,})', clean):
                 found.append({
                     'word': str(w.get('word', '')).strip(),
                     'at_seconds': round(w.get('start', 0), 1),
@@ -2420,20 +2423,20 @@ def detect_repetitions_timing_window(segments: list, language: str = 'ar',
     return repetitions
 
 
-def detect_false_starts_from_words(segments: list, language: str = 'ar') -> list:
+def detect_cut_words(segments: list, language: str = 'ar') -> list:
     """
-    Detect false starts and mid-word stops from word-level timestamps.
-    A word is a likely false start when:
-      - Its duration is very short (< 0.15 s), AND
-      - It is immediately followed (gap < 0.5 s) by a word that begins with the
-        same first 2+ characters — the student started the word, stopped, then
-        restarted it.
-    These are returned in hesitation-compatible format so they appear in the
-    hesitation_words list under a 'false_start' source label.
+    Detect cut/restarted words from word-level timestamps: a very short word
+    (< 0.18 s) immediately followed (gap < 0.6 s) by a word starting with the
+    same first 2+ characters — the student cut the word mid-way and restarted
+    it ("clim- climate"). These count as hesitations per the cahier des
+    charges (D5 disfluency category).
+
+    The old ultra-short-blip branch (<0.10 s regardless of next word) was
+    removed: it flagged ASR timing noise, not real disfluencies.
     """
     words = get_word_timing_sequence(segments)
     particles = _SHORT_PARTICLES.get(language, set())
-    false_starts = []
+    cut_words = []
 
     for i, w in enumerate(words[:-1]):
         word = normalize_repetition_word(w['word'])
@@ -2447,25 +2450,19 @@ def detect_false_starts_from_words(segments: list, language: str = 'ar') -> list
         if gap > 0.6:
             continue
         next_word = normalize_repetition_word(nw['word'])
-        # Short word is a prefix of the next word → false start
+        # Short word is a prefix of the next (longer) word → cut + restart.
+        # next word must be strictly longer, otherwise "de de" (a repetition,
+        # not a cut word) would be double-counted here.
         prefix_len = min(len(word), 3)
-        if len(word) >= 2 and len(next_word) >= len(word) and next_word.startswith(word[:prefix_len]):
-            false_starts.append({
+        if len(word) >= 2 and len(next_word) > len(word) and next_word.startswith(word[:prefix_len]):
+            cut_words.append({
                 'word': w['word'],
                 'at_seconds': round(w['start'], 1),
                 'confidence': 1.0,
-                'source': 'false_start',
-            })
-        # Word is extremely short (<0.10 s) regardless of next word → truncated utterance
-        elif duration < 0.10 and gap < 0.35:
-            false_starts.append({
-                'word': w['word'],
-                'at_seconds': round(w['start'], 1),
-                'confidence': 1.0,
-                'source': 'false_start',
+                'source': 'cut_word',
             })
 
-    return false_starts
+    return cut_words
 
 
 def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar') -> dict:
@@ -2487,9 +2484,9 @@ def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar'
     # kept as separate entries in the word-timestamp list (Groq and faster-whisper).
     timing_reps = detect_repetitions_timing_window(segments, language)
 
-    # False starts / mid-word stops — appear in hesitation list since they are
-    # the same disfluency category (D5 in cahier des charges).
-    false_starts = detect_false_starts_from_words(segments, language)
+    # Cut/restarted words ("clim- climate") count as hesitations (D5 in
+    # cahier des charges) — a filler and a cut word are the same disfluency.
+    cut_words = detect_cut_words(segments, language)
 
     # Text-based detection (always works, even with Groq transcript)
     text_hesitations = detect_hesitations_from_text(full_text, language)
@@ -2498,9 +2495,10 @@ def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar'
     # Merge: timing-window reps win over word-level (more reliable for Groq),
     # text reps fill remaining gaps.
     all_hesitations = merge_hesitation_reports(word_hesitations, text_hesitations)
-    # False starts are not counted as hesitations — they are mid-word stops
-    # that are inherent to interpretation under pressure and should not inflate
-    # the hesitation/fluency penalty.
+    for cw in cut_words:
+        if not any(abs(float(h.get('at_seconds') or -99) - cw['at_seconds']) < 0.3
+                   for h in all_hesitations):
+            all_hesitations.append(cw)
     all_repetitions = merge_repetition_reports(timing_reps, word_reps, text_repetitions)
 
     return {
@@ -2804,15 +2802,15 @@ def full_evaluation():
             algo['long_silences'] = merge_silence_reports(algo.get('long_silences', []), audio_silences)
             algo['audio_silences'] = audio_silences
             algo.setdefault('summary', {})['silence_count'] = len(algo['long_silences'])
-        audio_hesitations  = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
-        audio_false_starts = detect_false_starts_from_audio(temp_path)
-        # Filler words AND word fragments (words cut in half) both count as hesitations
-        all_audio_hes = (audio_hesitations or []) + (audio_false_starts or [])
-        if all_audio_hes:
-            algo['audio_hesitations'] = all_audio_hes
+        # Voiced short gaps that ASR skipped = filled pauses ("euhhh") → hesitations.
+        # Audio-energy false starts are NOT merged: they flag noise bursts, not
+        # real disfluencies, and false starts are not hesitations anyway.
+        audio_hesitations = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
+        if audio_hesitations:
+            algo['audio_hesitations'] = audio_hesitations
             algo['hesitation_words'] = merge_hesitation_reports(
                 algo.get('hesitation_words', []),
-                all_audio_hes,
+                audio_hesitations,
             )
             algo.setdefault('summary', {})['hesitation_count'] = len(algo['hesitation_words'])
         s    = algo.get('summary', {})
