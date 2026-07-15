@@ -420,11 +420,36 @@ _MONTH_NUMBERS = {
 _ARABIC_INDIC_TO_WESTERN = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
 
 
+# Magnitude words multiply the number they follow — they are part of the VALUE,
+# not formatting. 'billion(s)' deliberately reads as 1e9 in this AR/FR/EN
+# training context: a student saying "billion" in French is almost always the
+# English false-friend (1e9), and the accepted French for 1e12 is
+# "mille milliards" / "2 000 milliards" — long-scale French "billion"=1e12 is
+# NOT accepted as a rendering of English "trillion".
+_MAGNITUDE_WORDS = {
+    'thousand': 1e3, 'thousands': 1e3, 'mille': 1e3, 'milliers': 1e3,
+    'ألف': 1e3, 'الف': 1e3, 'آلاف': 1e3, 'الاف': 1e3,
+    'million': 1e6, 'millions': 1e6, 'مليون': 1e6, 'ملايين': 1e6,
+    'billion': 1e9, 'billions': 1e9, 'milliard': 1e9, 'milliards': 1e9,
+    'مليار': 1e9, 'مليارات': 1e9, 'بليون': 1e9, 'بلايين': 1e9,
+    'trillion': 1e12, 'trillions': 1e12, 'تريليون': 1e12, 'ترليون': 1e12, 'تريليونات': 1e12,
+}
+
+_MAGNITUDE_ALT = '|'.join(sorted(map(re.escape, _MAGNITUDE_WORDS), key=len, reverse=True))
+_NUMBER_WITH_SCALE_RE = re.compile(
+    rf'(\d{{1,3}}(?:[  ]\d{{3}})+|\d+(?:[.,]\d+)?)'   # 2 000 / 8,8 / 2026
+    rf'((?:\s+(?:{_MAGNITUDE_ALT})\b)*)',                    # trailing scale words
+    re.UNICODE,
+)
+
+
 def extract_numeric_fingerprint(text: str) -> list[float]:
     """
     Extract every numeric value in a text (digits in any script, decimal comma
-    or point, and month names) as a sorted list — a format-independent
-    fingerprint. Two renderings of the same date/number produce equal lists.
+    or point, space-grouped thousands, month names, AND magnitude words) as a
+    sorted list — a format-independent fingerprint. "8.8 billion" and
+    "8,8 milliards" fingerprint identically (8.8e9); "2 trillion" (2e12) and
+    "2 billions" (2e9) do NOT — magnitude is value, not format.
     """
     normalized = str(text or '').translate(_ARABIC_INDIC_TO_WESTERN).lower()
     values: list[float] = []
@@ -434,45 +459,70 @@ def extract_numeric_fingerprint(text: str) -> list[float]:
             values.append(float(month_number))
             normalized = normalized.replace(phrase, ' ')
 
-    for match in re.finditer(r'\d+(?:[.,]\d+)?', normalized):
-        raw = match.group(0)
-        # A comma followed by exactly 3 digits is a thousands separator;
-        # otherwise treat both , and . as decimal separators.
-        if re.fullmatch(r'\d+,\d{3}', raw):
-            raw = raw.replace(',', '')
+    for match in _NUMBER_WITH_SCALE_RE.finditer(normalized):
+        raw, scales_text = match.group(1), match.group(2) or ''
+        if re.search(r'[  ]', raw):
+            raw = re.sub(r'[  ]', '', raw)   # 2 000 → 2000
+        elif re.fullmatch(r'\d+,\d{3}', raw):
+            raw = raw.replace(',', '')            # 2,000 → 2000
         else:
-            raw = raw.replace(',', '.')
+            raw = raw.replace(',', '.')           # 8,8 → 8.8
         try:
-            values.append(float(raw))
+            value = float(raw)
         except ValueError:
             continue
+        for scale_word in re.findall(rf'{_MAGNITUDE_ALT}', scales_text):
+            value *= _MAGNITUDE_WORDS.get(scale_word, 1)
+        values.append(value)
 
     return sorted(values)
 
 
 def filter_equivalent_number_renderings(result: dict) -> dict:
     """
-    Un-flag number_accuracy items where the student said the same values in a
-    different valid format: date word-order across languages, Arabic-Indic vs
-    Western digits, or decimal comma vs point.
+    Two-way reconciliation of number_accuracy items against value fingerprints:
+    - Un-flag items where the student said the SAME value in a different valid
+      format (date word-order, Arabic-Indic vs Western digits, decimal comma
+      vs point, milliard vs billion at the same magnitude).
+    - RE-flag items the LLM marked correct when the actual VALUES differ —
+      e.g. source "2 trillion" (2e12) rendered as "2 billions" (2e9, the
+      English false-friend): a 1000x magnitude error is never 'correct'.
     """
     items = result.get('number_accuracy') if isinstance(result, dict) else None
     if not isinstance(items, list):
         return result
 
     for item in items:
-        if not isinstance(item, dict) or item.get('correct'):
+        if not isinstance(item, dict):
             continue
+        source_raw = item.get('source_value', '')
         source_values = extract_numeric_fingerprint(
-            item.get('source_value', '') or item.get('expected_in_target', '')
+            source_raw or item.get('expected_in_target', '')
         )
         student_values = extract_numeric_fingerprint(item.get('student_said', ''))
-        if source_values and source_values == student_values:
-            item['correct'] = True
-            item['note'] = (
-                'Same value in a different valid format (date order, digit script, '
-                'or decimal separator differ between languages) — not an error.'
-            )
+        if not source_values or not student_values:
+            continue
+
+        if source_values == student_values:
+            if not item.get('correct'):
+                item['correct'] = True
+                item['note'] = (
+                    'Same value in a different valid format (date order, digit script, '
+                    'or decimal separator differ between languages) — not an error.'
+                )
+        elif item.get('correct') and source_raw:
+            # Only override the LLM on unambiguous single-value comparisons
+            strict_source = extract_numeric_fingerprint(source_raw)
+            if (len(strict_source) == 1 and len(student_values) == 1
+                    and strict_source != student_values):
+                item['correct'] = False
+                item['note'] = (
+                    f'Magnitude/value mismatch: the source says {source_raw} but the '
+                    f'student\'s rendering expresses a different value. Beware false '
+                    f'friends: English "billion" = French "milliard" (10^9); English '
+                    f'"trillion" = French "mille milliards" (10^12) — French "billion" '
+                    f'used for English "billion" or "trillion" is a magnitude error.'
+                )
     return result
 
 
@@ -679,6 +729,14 @@ CRITICAL — do NOT flag format-only differences as errors:
 - Decimal separators differ: "8.8 billion" (EN) = "8,8 milliards" (FR) → correct.
 - Arabic-Indic digits (٢٠٢٦) and Western digits (2026) are the same number → correct.
 Only flag a number/date when the VALUE the listener hears is actually different.
+
+CRITICAL — MAGNITUDE FALSE FRIENDS are VALUE errors, never format differences:
+- English "billion" (10^9) = French "milliard" = Arabic "مليار".
+- English "trillion" (10^12) = French "mille milliards" / "2 000 milliards" = Arabic "تريليون".
+- A student saying French "billion(s)" when the source says English "trillion" is using the
+  English false-friend: the listener hears 10^9 — a 1000x magnitude ERROR. Mark it incorrect.
+- Any billion↔trillion, million↔milliard, or مليون↔مليار substitution changes the value by
+  a factor of 1000 or more — always flag it, even when the leading digits match.
 
 TASK 11 — PRONUNCIATION IN {target_language}:
 LOW-CONFIDENCE WORDS the speech recognizer was unsure about: {uncertain_words}
