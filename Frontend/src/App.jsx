@@ -271,6 +271,10 @@ const UI = {
     copyText: 'Copy',
     copied: 'Copied!',
     topicPlaceholder: 'Enter a topic or paste text to generate a speech…',
+    namePlaceholder: 'Your full name',
+    librarySearchPlaceholder: 'e.g. climate change, AI governance…',
+    removeSource: 'Remove source',
+    addSourceFirst: 'Add at least one source document first.',
     moreSettings: 'More ⚙',
     lessSettings: 'Less ⚙',
     optConsecutive: 'Consecutive',
@@ -661,6 +665,10 @@ const UI = {
     copyText: 'نسخ',
     copied: 'تم النسخ!',
     topicPlaceholder: 'أدخل موضوعاً أو الصق نصاً لتوليد خطاب...',
+    namePlaceholder: 'اسمك الكامل',
+    librarySearchPlaceholder: 'مثال: تغير المناخ، حوكمة الذكاء الاصطناعي…',
+    removeSource: 'إزالة المصدر',
+    addSourceFirst: 'أضف مستنداً مصدرياً واحداً على الأقل أولاً.',
     moreSettings: 'المزيد ⚙',
     lessSettings: 'أقل ⚙',
     optConsecutive: 'تتابعي',
@@ -1051,6 +1059,10 @@ const UI = {
     copyText: 'Copier',
     copied: 'Copié !',
     topicPlaceholder: 'Saisissez un sujet ou collez un texte pour générer un discours…',
+    namePlaceholder: 'Votre nom complet',
+    librarySearchPlaceholder: "ex. changement climatique, gouvernance de l'IA…",
+    removeSource: 'Retirer la source',
+    addSourceFirst: "Ajoutez d'abord au moins un document source.",
     moreSettings: 'Plus ⚙',
     lessSettings: 'Moins ⚙',
     optConsecutive: 'Consécutive',
@@ -1451,7 +1463,7 @@ function TrendBadge({ trend, labels }) {
 
 function SeverityDot({ severity }) {
   const c = severity === 'high' ? 'var(--sienna)' : severity === 'medium' ? 'var(--gold)' : 'var(--sage)';
-  return <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: c, marginRight: '0.4rem', flexShrink: 0 }} />;
+  return <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: c, marginInlineEnd: '0.4rem', flexShrink: 0 }} />;
 }
 
 function ModuleProgress({ labels, refresh, onApplyParams }) {
@@ -2135,7 +2147,7 @@ function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
           {isSignup && (
             <div className="field">
               <label htmlFor="login-name">{labels.name}</label>
-              <input id="login-name" name="name" type="text" autoComplete="name" required placeholder="Your full name" />
+              <input id="login-name" name="name" type="text" autoComplete="name" required placeholder={labels.namePlaceholder || 'Your full name'} />
             </div>
           )}
           <div className="field">
@@ -2354,7 +2366,7 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
                 className="library-search-input"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="e.g. climate change, AI governance…"
+                placeholder={labels.librarySearchPlaceholder || 'e.g. climate change, AI governance…'}
                 onKeyDown={e => { if (e.key === 'Enter') window.open(unSearchUrl, '_blank'); }}
               />
               <a
@@ -2497,7 +2509,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
     setStatus('loading'); setError(''); setResult(null);
     try {
       const allFiles = buildAllSourceFiles();
-      if (!allFiles.length) throw new Error('Add at least one source document first.');
+      if (!allFiles.length) throw new Error(labels.addSourceFirst || 'Add at least one source document first.');
       const topicFallback = form.topic || librarySources[0]?.title || '';
       const data = await generateSpeechFromDocument(allFiles, { ...form, topic: topicFallback });
       setResult(data); onGenerated(data); setStatus('success');
@@ -2546,7 +2558,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
             <button type="button" className="file-chip-remove" onClick={() => {
               setLibrarySources(prev => prev.filter((_, idx) => idx !== i));
               setResult(null); setError('');
-            }} title="Remove source">×</button>
+            }} title={labels.removeSource || 'Remove source'}>×</button>
           </div>
         ))}
 
@@ -3548,7 +3560,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
 
         {/* Simultaneous — source plays while the student records */}
         {interpMode === 'simultaneous' && (
-          <div className="record-section" style={{ borderLeft: '3px solid var(--primary, #1a3a5c)', paddingLeft: '0.9rem', marginBottom: '1rem' }}>
+          <div className="record-section" style={{ borderInlineStart: '3px solid var(--primary, #1a3a5c)', paddingInlineStart: '0.9rem', marginBottom: '1rem' }}>
             <p className="record-section-label">{labels.simulTitle}</p>
             <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', margin: '0.3rem 0 0.6rem' }}>
               {referenceAudioUrl ? labels.simulHint : labels.simulNeedsAudio}
@@ -4114,7 +4126,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 const duration = detectedPause.duration_seconds ?? p.duration_seconds;
                 const atSeconds = detectedPause.at_seconds ?? p.at_seconds;
                 return (
-                  <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginTop: '0.5rem' }}>
+                  <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--sienna)', paddingInlineStart: '0.75rem', marginTop: '0.5rem' }}>
                     <strong style={{ fontSize: '0.84rem' }}>
                       {duration ?? 0}s {labels.longSilences.toLowerCase()}
                       {Number.isFinite(Number(atSeconds)) && (
@@ -4141,7 +4153,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="card">
               <h3 className="report-section-title">🔢 {labels.numberAccuracyTitle}</h3>
               {report.number_accuracy.map((n, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: `3px solid ${n.correct ? 'var(--sage)' : 'var(--sienna)'}`, paddingLeft: '0.75rem', marginBottom: '0.6rem' }}>
+                <div key={i} className="eval-item" style={{ borderInlineStart: `3px solid ${n.correct ? 'var(--sage)' : 'var(--sienna)'}`, paddingInlineStart: '0.75rem', marginBottom: '0.6rem' }}>
                   <div style={{ fontSize: '0.84rem' }}>
                     <strong>{n.source_value}</strong>
                     <span style={{ color: 'var(--warm-gray)' }}> — {labels.expectedLabel}: </span>
@@ -4164,7 +4176,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               <h3 className="report-section-title">🗣️ {labels.pronunciationAssessmentTitle}</h3>
               <p className={isAr ? 'arabic' : ''} style={{ fontSize: '0.85rem', color: 'var(--ink)', marginBottom: '0.6rem' }}>{report.pronunciation_assessment.comment}</p>
               {(report.pronunciation_assessment.issues || []).map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--gold)', paddingInlineStart: '0.75rem', marginBottom: '0.5rem' }}>
                   <strong className={isAr ? 'arabic' : ''}>"{item.word}"</strong>
                   {item.issue && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{item.issue}</div>}
                   {item.correction && <div className="eval-correction">✓ {labels.correction}: <strong className={isAr ? 'arabic' : ''}>{item.correction}</strong></div>}
@@ -4226,7 +4238,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="card">
               <h3 className="report-section-title">🔄 {labels.translationErrors}</h3>
               {(report.translation_errors || []).map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginBottom: '0.75rem' }}>
+                <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--sienna)', paddingInlineStart: '0.75rem', marginBottom: '0.75rem' }}>
                   <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.sourceSaid}:</div>
                   <div className="eval-text" style={{ marginBottom: '0.25rem' }}>"{item.source_text}"</div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.studentSaid}: <strong style={{ color: 'var(--sienna)' }}>{item.student_said}</strong></div>
@@ -4246,7 +4258,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 const color = status === 'correct' ? 'var(--sage)' : status === 'missing' ? 'var(--warm-gray)' : 'var(--sienna)';
                 const statusLabel = status === 'correct' ? labels.pnCorrect : status === 'missing' ? labels.pnMissing : labels.pnDistorted;
                 return (
-                  <div key={i} className="eval-item" style={{ borderLeft: `3px solid ${color}`, paddingLeft: '0.75rem', marginBottom: '0.6rem' }}>
+                  <div key={i} className="eval-item" style={{ borderInlineStart: `3px solid ${color}`, paddingInlineStart: '0.75rem', marginBottom: '0.6rem' }}>
                     <div style={{ fontSize: '0.84rem' }}>
                       <strong>{pn.source_name}</strong>
                       {pn.student_said && status !== 'missing' && (
@@ -4285,7 +4297,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="card">
               <h3 className="report-section-title">✏️ {labels.autoCorrections}</h3>
               {report.auto_corrections.map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sage)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--sage)', paddingInlineStart: '0.75rem', marginBottom: '0.5rem' }}>
                   <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
                 </div>
               ))}
@@ -4297,7 +4309,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="card">
               <h3 className="report-section-title">↩️ {labels.falseStarts}</h3>
               {report.false_starts.map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--sienna)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--sienna)', paddingInlineStart: '0.75rem', marginBottom: '0.5rem' }}>
                   <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
                 </div>
               ))}
@@ -4309,7 +4321,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="card">
               <h3 className="report-section-title">👅 {labels.lapsusLinguae}</h3>
               {report.lapsus_linguae.map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderLeft: '3px solid var(--gold)', paddingLeft: '0.75rem', marginBottom: '0.5rem' }}>
+                <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--gold)', paddingInlineStart: '0.75rem', marginBottom: '0.5rem' }}>
                   <div className={`eval-text ${isAr ? 'arabic' : ''}`}>"{item.text}"</div>
                   {item.likely_intended && <div className="eval-correction">→ {labels.correction}: <strong className={isAr ? 'arabic' : ''}>{item.likely_intended}</strong></div>}
                 </div>
