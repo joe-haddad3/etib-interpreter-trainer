@@ -174,11 +174,23 @@ def _transcribe_groq(audio_path: str, language: str) -> dict:
 
     # Verbatim guarantee: Whisper sometimes deduplicates repeated words in the
     # segment TEXT while keeping both occurrences in the word-timestamp list
-    # ("climat climat" → text "climat", words ["climat","climat"]). When the
-    # word list has MORE tokens than the text, the text was cleaned — rebuild
-    # it from the word tokens so the student sees exactly what they said.
+    # ("climat climat" → text "climat", words ["climat","climat"]). Rebuild the
+    # text from the word tokens when the words carry MORE tokens than the text,
+    # OR when the words contain an adjacent repetition the text lost — the
+    # student must see exactly what they said, never a cleaned version.
+    def _norm_tok(t):
+        return re.sub(r'[^\w]', '', str(t).casefold(), flags=re.UNICODE)
+
+    def _has_adjacent_dup(tokens):
+        return any(a and a == b for a, b in zip(tokens, tokens[1:]))
+
     for seg in segments:
-        if seg['words'] and len(seg['words']) > len(seg['text'].split()):
+        if not seg['words']:
+            continue
+        word_toks = [_norm_tok(w['word']) for w in seg['words']]
+        text_toks = [_norm_tok(t) for t in seg['text'].split()]
+        dedup_in_text = _has_adjacent_dup(word_toks) and not _has_adjacent_dup(text_toks)
+        if len(seg['words']) > len(text_toks) or dedup_in_text:
             seg['text'] = re.sub(r'\s{2,}', ' ', ' '.join(w['word'] for w in seg['words'])).strip()
 
     # Build full_text from segment texts — segment text preserves adjacent repetitions

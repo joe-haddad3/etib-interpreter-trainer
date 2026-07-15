@@ -614,9 +614,15 @@ NEVER flag these as pronunciation errors:
 Only report genuine mispronunciations where the student clearly said the wrong sounds.
 
 TASK 4 — FLUENCY ISSUES IN {target_language}:
-- Hesitations: آ، يعني، أقصد (Arabic) / euh, heu, ben (French) / um, uh, er (English)
+- Hesitations: vocal fillers only — آ، يعني، أقصد (Arabic) / euh, heu (French) / um, uh, er (English),
+  plus words cut mid-way and restarted. Discourse words (donc, alors, en fait, like, you know) are
+  legitimate speech — never hesitations.
 - Repetitions: words said twice in a row
-- False starts: phrases that stop abruptly
+- False starts: ONLY a genuinely abandoned multi-word phrase — the student starts a sentence,
+  abandons it entirely, and says something different (e.g. "The delegates have... We must act now.").
+  A single cut word, a filler, or a repeated word is NOT a false start — those are hesitations
+  or repetitions and must not be duplicated here. If there is no clearly abandoned phrase in the
+  transcript, return an EMPTY false_starts list. Never invent one.
 - Auto-corrections: student corrects themselves mid-sentence
 - Lapsus linguae: wrong word slipped out
 
@@ -710,7 +716,11 @@ For EVERY proper noun in the source, classify the student's rendering as one of:
 Names are identity-critical in interpretation — a distorted head-of-state or organization name
 can be a diplomatic incident. Flag every genuine mispronunciation and omission.
 
-Give overall_score 0-10 and coverage_score 0-10. Be strict — most student interpretations score 4–7:
+Give overall_score 0-10 and coverage_score 0-10.
+STRICTNESS APPLIES TO overall_score ONLY. coverage_score follows the MANDATORY rubric in TASK 2:
+empty missing_content = coverage 9-10, no exceptions. A complete interpretation gets full coverage
+credit even when other error types (grammar, pronunciation, hesitations) lower the overall_score.
+Be strict on overall_score — most student interpretations score 4–7:
 - 9-10: Exceptional — virtually no errors, complete coverage, professional fluency
 - 7-8: Good — only 1-2 minor errors, no significant meaning loss
 - 5-6: Acceptable — several errors but core meaning mostly preserved
@@ -1354,12 +1364,14 @@ def build_transcript_from_word_timestamps(segments: list) -> str:
     return re.sub(r'\s+', ' ', ' '.join(words)).strip()
 
 
-def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds: float = 0.35, max_gap_seconds: float = 1.4) -> list:
+def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds: float = 0.30, max_gap_seconds: float = 2.0) -> list:
     """
     Detect likely filled pauses from the recording when ASR omits fillers.
     A gap between recognized words that still contains voiced audio is usually
-    a filler ("euhhh") the recognizer skipped. min_gap 0.35 s: anything shorter
-    is normal coarticulation/breath between words, not a hesitation.
+    a filler ("euhhh") the recognizer skipped. min_gap 0.30 s: anything shorter
+    is normal coarticulation/breath between words, not a hesitation. max_gap
+    2.0 s: a long drawn-out "euhhhhh" still counts (beyond that it overlaps
+    with the silence detector).
     """
     try:
         words = get_word_timing_sequence(segments)
@@ -1374,7 +1386,9 @@ def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds:
         if global_db == float('-inf'):
             return []
 
-        silence_thresh = max(global_db - 14, -42)
+        # -18 dB below global level: soft "euhhh" spoken quieter than normal
+        # speech must still register as voiced.
+        silence_thresh = max(global_db - 18, -45)
         candidates = []
 
         for previous, current in zip(words, words[1:]):
@@ -1405,20 +1419,24 @@ def detect_audio_filled_pauses(audio_path: str, segments: list, min_gap_seconds:
         return []
 
 
-def detect_false_starts_from_audio(audio_path: str,
-                                    min_burst_ms: int = 40,
-                                    max_burst_ms: int = 380,
-                                    min_gap_ms: int = 40,
-                                    max_gap_ms: int = 700) -> list:
+def detect_cut_words_from_audio(audio_path: str,
+                                 min_burst_ms: int = 80,
+                                 max_burst_ms: int = 350,
+                                 min_gap_ms: int = 60,
+                                 max_gap_ms: int = 700) -> list:
     """
-    Detect mid-word stops (false starts) directly from audio energy.
+    Detect mid-word interruptions (cut words) directly from audio energy.
 
     Pattern looked for:
-      SHORT voiced burst (40–380 ms)  →  silence gap (40–700 ms)  →  longer voiced segment
+      SHORT voiced burst (80–350 ms)  →  silence gap (60–700 ms)  →  longer voiced segment
 
     This catches the case where the student starts a word, stops mid-syllable,
     and restarts — even when the ASR removes the partial word entirely from the
-    transcript (which Groq whisper-large-v3 almost always does).
+    transcript (which Groq whisper-large-v3 almost always does). These count
+    as hesitations (D5 disfluency category).
+
+    Thresholds are deliberately conservative (min burst 80 ms, restart must be
+    a solid speech segment) so lip noise and breaths are not flagged.
 
     Returns items in the same shape as hesitation_words so they merge cleanly.
     """
@@ -1457,7 +1475,7 @@ def detect_false_starts_from_audio(audio_path: str,
                 t_start = i
         segs.append((kind, t_start * window_ms, len(voiced_flags) * window_ms))
 
-        false_starts = []
+        cut_words = []
         # Look for: voiced(short) → silent → voiced(longer)
         for i in range(len(segs) - 2):
             s0, s1, s2 = segs[i], segs[i + 1], segs[i + 2]
@@ -1472,21 +1490,22 @@ def detect_false_starts_from_audio(audio_path: str,
                 continue
             if not (min_gap_ms <= gap_ms <= max_gap_ms):
                 continue
-            # The restart must be meaningfully longer than the false start burst
-            if next_ms <= burst_ms * 0.8:
+            # The restart must be a solid speech segment, meaningfully longer
+            # than the interrupted burst — filters clicks/breaths.
+            if next_ms < max(300, burst_ms * 1.2):
                 continue
 
-            false_starts.append({
-                'word':             '[false start]',
+            cut_words.append({
+                'word':             '[cut word]',
                 'at_seconds':       round(s0[1] / 1000, 1),
                 'duration_seconds': round(burst_ms / 1000, 3),
                 'confidence':       1.0,
-                'source':           'audio_false_start',
+                'source':           'audio_cut_word',
             })
 
-        return false_starts
+        return cut_words
     except Exception as exc:
-        print(f'[Module D] Audio false-start detection failed: {exc}')
+        print(f'[Module D] Audio cut-word detection failed: {exc}')
         return []
 
 
@@ -1841,6 +1860,45 @@ def estimate_length_coverage(source_script: str, transcript_text: str) -> dict:
         'length_ratio': round(ratio, 3),
         'score_cap': cap,
     }
+
+
+def reconcile_coverage_with_missing_content(result: dict) -> dict:
+    """
+    Enforce the coverage rubric in code: coverage_score must match the LLM's
+    OWN missing_content evidence. LLMs habitually return a 'safe' 5-6 coverage
+    even when their missing_content list is empty — i.e. they found nothing
+    missing but scored as if a third of the speech was lost. If everything was
+    covered, the score is raised to what the rubric mandates. Never lowers.
+    """
+    if not isinstance(result, dict):
+        return result
+
+    weights = {'high': 1.5, 'medium': 0.8, 'low': 0.4, 'minor': 0.4}
+    penalty = 0.0
+
+    missing = result.get('missing_content')
+    if isinstance(missing, list):
+        for item in missing:
+            imp = str(item.get('importance', 'medium')).lower() if isinstance(item, dict) else 'medium'
+            penalty += weights.get(imp, 0.8)
+
+    info_loss = result.get('information_loss')
+    if isinstance(info_loss, list):
+        for item in info_loss:
+            imp = str(item.get('importance', 'medium')).lower() if isinstance(item, dict) else 'medium'
+            penalty += weights.get(imp, 0.8) * 0.6
+
+    evidence_score = max(2.0, min(10.0, round(10.0 - penalty, 1)))
+
+    try:
+        current = float(result.get('coverage_score'))
+    except (TypeError, ValueError):
+        current = None
+
+    if current is None or current < evidence_score:
+        result['coverage_score'] = evidence_score
+        result['coverage_reconciled_from_evidence'] = True
+    return result
 
 
 def apply_coverage_guardrail(result: dict, source_script: str, transcript_text: str) -> dict:
@@ -2646,6 +2704,7 @@ def generate_feedback():
         llm_result = filter_number_only_translation_errors(llm_result)
         llm_result = reclassify_garbage_translation_errors(llm_result)
         llm_result = filter_equivalent_number_renderings(llm_result)
+        llm_result = reconcile_coverage_with_missing_content(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, transcript_text)
         if asr_artifacts:
             llm_result['unclear_audio_tokens'] = asr_artifacts
@@ -2802,15 +2861,23 @@ def full_evaluation():
             algo['long_silences'] = merge_silence_reports(algo.get('long_silences', []), audio_silences)
             algo['audio_silences'] = audio_silences
             algo.setdefault('summary', {})['silence_count'] = len(algo['long_silences'])
-        # Voiced short gaps that ASR skipped = filled pauses ("euhhh") → hesitations.
-        # Audio-energy false starts are NOT merged: they flag noise bursts, not
-        # real disfluencies, and false starts are not hesitations anyway.
-        audio_hesitations = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
-        if audio_hesitations:
-            algo['audio_hesitations'] = audio_hesitations
+        # Hesitations from audio (what the ASR silently cleaned out):
+        # - voiced short gaps = filled pauses ("euhhh") the recognizer skipped
+        # - short burst→silence→speech = a word cut mid-way and restarted
+        # Both are genuine hesitations (D5).
+        audio_filled  = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
+        audio_cut     = detect_cut_words_from_audio(temp_path)
+        # A voiced burst inside a word gap can trigger both detectors for the
+        # same event — keep the filled-pause reading, drop the duplicate.
+        audio_cut = [c for c in (audio_cut or [])
+                     if not any(abs(c['at_seconds'] - f.get('at_seconds', -99)) < 0.6
+                                for f in (audio_filled or []))]
+        all_audio_hes = (audio_filled or []) + audio_cut
+        if all_audio_hes:
+            algo['audio_hesitations'] = all_audio_hes
             algo['hesitation_words'] = merge_hesitation_reports(
                 algo.get('hesitation_words', []),
-                audio_hesitations,
+                all_audio_hes,
             )
             algo.setdefault('summary', {})['hesitation_count'] = len(algo['hesitation_words'])
         s    = algo.get('summary', {})
@@ -2895,6 +2962,7 @@ def full_evaluation():
         llm_result = filter_number_only_translation_errors(llm_result)
         llm_result = reclassify_garbage_translation_errors(llm_result)
         llm_result = filter_equivalent_number_renderings(llm_result)
+        llm_result = reconcile_coverage_with_missing_content(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, full_text)
         if asr_artifacts:
             llm_result['unclear_audio_tokens'] = asr_artifacts

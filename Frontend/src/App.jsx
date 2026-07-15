@@ -211,6 +211,8 @@ const UI = {
     longSilences: 'Long silences',
     repetitions: 'Repetitions',
     hesitations: 'Hesitations',
+    filledPause: 'filled pause (euh…)',
+    cutWord: 'cut word',
     numberErrors: 'Number errors',
     llmTitle: 'AI language analysis',
     languageErrors: 'Language errors',
@@ -605,6 +607,8 @@ const UI = {
     longSilences: 'صمت طويل',
     repetitions: 'تكرارات',
     hesitations: 'تردد',
+    filledPause: 'تردد صوتي (اممم…)',
+    cutWord: 'كلمة مقطوعة',
     numberErrors: 'أخطاء في الأرقام',
     llmTitle: 'التحليل اللغوي بالذكاء الاصطناعي',
     languageErrors: 'أخطاء لغوية',
@@ -999,6 +1003,8 @@ const UI = {
     longSilences: 'Longs silences',
     repetitions: 'Répétitions',
     hesitations: 'Hésitations',
+    filledPause: 'pause remplie (euh…)',
+    cutWord: 'mot coupé',
     numberErrors: 'Erreurs de chiffres',
     llmTitle: 'Analyse linguistique IA',
     languageErrors: 'Erreurs linguistiques',
@@ -4090,11 +4096,17 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               <div className="algo-detail-block">
                 <p className="algo-detail-title">🗣️ {labels.hesitations}</p>
                 <div className="algo-chips">
-                  {algo.hesitation_words.map((h, i) => (
-                    <span key={i} className="algo-chip">
-                      "{h?.word || h}" <small>{h?.at_seconds !== undefined ? `${h.at_seconds}s` : ''}</small>
-                    </span>
-                  ))}
+                  {algo.hesitation_words.map((h, i) => {
+                    const raw = h?.word || h;
+                    const display = raw === '[filled pause]' ? (labels.filledPause || 'filled pause')
+                      : (raw === '[cut word]' || raw === '[false start]') ? (labels.cutWord || 'cut word')
+                      : raw;
+                    return (
+                      <span key={i} className="algo-chip">
+                        "{display}" <small>{h?.at_seconds !== undefined ? `${h.at_seconds}s` : ''}</small>
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
