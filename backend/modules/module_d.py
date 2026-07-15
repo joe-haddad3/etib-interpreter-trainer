@@ -192,9 +192,9 @@ def _compute_adaptive_params(sessions: list) -> dict:
         p_avg  = sum(s.get('overall_score', 0) for s in prev)  / len(prev)
         delta  = r_avg - p_avg
         improvement_pct = round(delta, 2)
-        if delta >= 0.4:
+        if delta >= 0.8:
             trend = 'improving'
-        elif delta <= -0.4:
+        elif delta <= -0.8:
             trend = 'declining'
         else:
             trend = 'stable'
@@ -302,6 +302,15 @@ def _extract_json(text: str) -> dict:
     if s >= 0 and e > s:
         text = text[s:e]
     return json.loads(text)
+
+
+def _safe_format(template: str, **kwargs) -> str:
+    """Format a prompt template without risking KeyError or prompt-injection when
+    user-supplied speech text contains literal { or } characters.
+    Strategy: double-escape braces in every value before calling str.format() so
+    Python's format parser sees {{ / }} (literal braces) instead of format specs."""
+    safe = {k: str(v).replace('{', '{{').replace('}', '}}') for k, v in kwargs.items()}
+    return template.format(**safe)
 
 
 # ── ASR artifact / garbage-token filtering ────────────────────────────────────
@@ -547,6 +556,13 @@ Flag ALL of the following as translation_errors:
 
 IMPORTANT: Do NOT put number, percentage, statistic, or date errors here — those are handled exclusively in TASK 10 (number_accuracy). translation_errors is only for meaning/wording errors.
 
+CRITICAL EXCEPTION — official target-language abbreviations and equivalents:
+When the student interprets into {target_language}, using the official {target_language}-language
+name or abbreviation for an international body is ALWAYS correct — do NOT flag it as an error.
+Examples (EN → FR): ESCWA → CESAO, SDGs → ODD, WHO → OMS, UNDP → PNUD, EU → UE.
+Stating BOTH the source-language and target-language abbreviation together (e.g. "CESAO-ESCWA")
+is also standard bilingual UN practice and must NOT be flagged as an error.
+
 Do NOT accept these excuses:
 - "close enough" — if meaning shifted, it is an error
 - "approximate" — approximation is an error in interpretation
@@ -573,13 +589,26 @@ coverage_score rubric (0–10, base this ONLY on content, not length or style):
 - 3–4: Some main ideas missing; significant information loss
 - 0–2: Most content absent; interpretation is fragmentary
 
+MANDATORY scoring rule: if missing_content is EMPTY (you found nothing genuinely missing),
+coverage_score MUST be 9 or 10. If missing_content has only 1 minor item, coverage_score
+MUST be at least 8. Do NOT give 7 or lower unless you can explicitly list multiple important
+ideas that are completely absent. Condensed phrasing, paraphrase, or shorter wording are NOT
+reasons to lower the score — interpretation is always shorter than the source.
+
 Only add an item to missing_content if an important idea or fact is genuinely and completely absent.
 
 TASK 3 — PRONUNCIATION FLAGS:
 The uncertain words listed above are words Whisper was not confident about.
-This often means the student pronounced them unclearly or incorrectly.
-For each uncertain word, note: what word was likely intended, and what the likely pronunciation issue is.
-In {target_language}: check gender agreement, liaison errors (French), or case endings (Arabic).
+IMPORTANT: low ASR confidence does NOT mean the word was mispronounced — ASR is often uncertain
+about rare words, technical terms, proper nouns, or words with silent letters even when spoken
+correctly. Only flag a word as a pronunciation issue if you have CLEAR EVIDENCE the student said
+it incorrectly — not just because the confidence score is low.
+NEVER flag these as pronunciation errors:
+- French silent final letters (s, t, d, x, p, g, ent) — they are CORRECT French pronunciation.
+  "délégués" sounds identical to "délégué" — this is correct, not a mistake.
+- Correct target-language renderings of proper nouns or acronyms.
+- Words that were simply unfamiliar to the ASR engine.
+Only report genuine mispronunciations where the student clearly said the wrong sounds.
 
 TASK 4 — FLUENCY ISSUES IN {target_language}:
 - Hesitations: آ، يعني، أقصد (Arabic) / euh, heu, ben (French) / um, uh, er (English)
@@ -594,6 +623,11 @@ Grammar errors in the INTERPRETATION language (not the source):
 - French: gender agreement, wrong tense, wrong preposition. Do not penalize silent final plural "s"
   inferred only from ASR spelling.
 - English: tense, subject-verb agreement
+STRICT EXCLUSIONS — do NOT flag any of the following as language errors:
+- Capitalization differences (e.g. "conférence des parties" vs "Conférence des Parties") — capitalization is a typographic convention, not a spoken-language error.
+- Official proper-noun casing for UN bodies, treaty names, or institutional titles — if the student said the right words, do not flag casing.
+- Stylistic or register variation where the meaning is the same (e.g. formal vs informal equivalents of the same correct idea).
+- Paraphrases that convey the correct meaning even if worded differently from the source.
 Do NOT flag number formatting as a language error (e.g. "8,8 milliards" is correct French —
 French uses a comma as the decimal separator, English uses a period). Whether the NUMBER VALUE
 itself is correct is judged separately in TASK 10, not here.
@@ -638,8 +672,13 @@ CRITICAL — do NOT flag format-only differences as errors:
 Only flag a number/date when the VALUE the listener hears is actually different.
 
 TASK 11 — PRONUNCIATION IN {target_language}:
-LOW-CONFIDENCE WORDS the speech recognizer was unsure about (often a sign of unclear or incorrect
-pronunciation): {uncertain_words}
+LOW-CONFIDENCE WORDS the speech recognizer was unsure about: {uncertain_words}
+CRITICAL: low ASR confidence ≠ mispronunciation. ASR is routinely uncertain about rare words,
+technical terms, proper nouns, and words with silent letters even when spoken perfectly correctly.
+Do NOT flag a word as mispronounced just because ASR scored it low.
+For French: silent final letters (s, t, d, x, p, ent) are CORRECT — "partenaires" and
+"partenaire" sound identical; this is correct French pronunciation, not an error.
+Only give pronunciation feedback when you have clear evidence the student said the sounds wrong.
 Give specific, actionable pronunciation feedback for {target_language}:
 - Arabic: تشكيل/إعراب (case endings), emphatic vs plain consonants (ص/س، ض/د، ط/ت، ظ/ذ، ق/ك),
   hamza ء placement, تاء مربوطة pronunciation, vowel length (مد/قصر)
@@ -653,12 +692,20 @@ For EVERY proper noun in the source, classify the student's rendering as one of:
 - "correct": the name is present and recognizably right in {target_language}. A legitimate
   target-language form counts as correct (e.g. "United Nations" → "ONU" or "الأمم المتحدة";
   transliteration into Arabic script is correct rendering, NOT distortion).
-- "distorted": the name appears but altered (e.g. "Mobuto Seko" instead of "Mobutu Sese Seko").
-  In a spoken exam a distorted name usually means the student MISPRONOUNCED it — quote exactly
+  Official target-language abbreviations are always correct: ESCWA → CESAO (FR), SDGs → ODD (FR),
+  WHO → OMS (FR), UNDP → PNUD (FR). Capitalisation differences NEVER make a name "distorted".
+  A correct translation or paraphrase of a name is "correct", not "distorted".
+- "distorted": the name appears but clearly MISPRONOUNCED or garbled — wrong syllables, wrong
+  letters, clearly altered sound (e.g. "Mobuto Seko" instead of "Mobutu Sese Seko").
+  Do NOT use "distorted" for: capitalisation variants, accepted target-language equivalents,
+  bilingual dual abbreviations (e.g. "CESAO-ESCWA"), or stylistic name variants with correct meaning.
+  Hyphenation differences are NEVER errors: "Jean-Pierre" vs "Jean Pierre", "New-York" vs "New York",
+  or any hyphen-vs-space variant must be marked "correct", not "distorted".
+  In a spoken exam a distorted name means the student got the sounds/syllables wrong — quote exactly
   what the recognizer heard so the student can compare.
 - "missing": the name was omitted entirely.
 Names are identity-critical in interpretation — a distorted head-of-state or organization name
-can be a diplomatic incident. Flag every distortion and omission.
+can be a diplomatic incident. Flag every genuine mispronunciation and omission.
 
 Give overall_score 0-10 and coverage_score 0-10. Be strict — most student interpretations score 4–7:
 - 9-10: Exceptional — virtually no errors, complete coverage, professional fluency
@@ -1097,7 +1144,9 @@ def detect_repetitions_from_text(full_text: str, language: str = 'ar') -> list:
         for i in range(len(words) - (phrase_len * 2) + 1):
             first = [item['key'] for item in words[i:i + phrase_len]]
             second = [item['key'] for item in words[i + phrase_len:i + (phrase_len * 2)]]
-            if first == second:
+            # Require at least one substantial word (≥5 chars) to avoid false positives
+            # from short content words that happen to appear twice in sequence
+            if first == second and any(len(k) >= 5 for k in first):
                 repetitions.append({
                     'word': ' '.join(item['word'] for item in words[i:i + phrase_len]),
                     'position': words[i]['position'],
@@ -1157,7 +1206,7 @@ def detect_long_silences(segments: list, threshold_seconds: float = 2.0) -> list
             })
 
     words.sort(key=lambda item: item['start'])
-    word_gap_threshold = max(threshold_seconds + 0.3, 1.5)
+    word_gap_threshold = threshold_seconds
     for i in range(len(words) - 1):
         gap = round(words[i + 1]['start'] - words[i]['end'], 2)
         if gap >= word_gap_threshold:
@@ -1507,7 +1556,8 @@ def detect_repetitions(segments: list, language: str = 'ar') -> list:
                 continue
             first = [item['key'] for item in all_words[i:i + phrase_len]]
             second = [item['key'] for item in all_words[i + phrase_len:i + (phrase_len * 2)]]
-            if first == second:
+            # Mirror the text-detector's guard: require at least one substantial word
+            if first == second and any(len(k) >= 5 for k in first):
                 repetitions.append({
                     'word': ' '.join(item['word'] for item in all_words[i:i + phrase_len]),
                     'at_seconds': round(all_words[i]['start'], 1),
@@ -1942,14 +1992,17 @@ def detect_number_errors(source_script: str, transcript_text: str) -> list:
     """
     # Match integers, decimals, and grouped thousands such as 150 000 / 150,000.
     digit_chars = r'\d٠-٩'
-    number_pattern = rf'(?<![\w])(?:[{digit_chars}]{{1,3}}(?:[ \u00a0\u202f,][{digit_chars}]{{3}})+|[{digit_chars}]+(?:[.][{digit_chars}]+)?)(?![\w])'
+    # Separators: space, NBSP (U+00A0), narrow NBSP (U+202F), comma,
+    # Arabic thousands separator \u066c (U+066C).
+    number_pattern = rf'(?<![\w])(?:[{digit_chars}]{{1,3}}(?:[ \u00a0\u202f,\u066c][{digit_chars}]{{3}})+|[{digit_chars}]+(?:[.\u066b][{digit_chars}]+)?)(?![\w])'
     source_numbers = [match.group(0) for match in re.finditer(number_pattern, source_script or '')]
     transcript_numbers = [match.group(0) for match in re.finditer(number_pattern, transcript_text or '')]
 
     def normalize_number(value: str) -> str:
-        translation = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+        translation = str.maketrans('٠١٢٣٤٥٦٧٨٩٫', '0123456789.')
         normalized = str(value or '').translate(translation)
-        normalized = re.sub(r'[\s\u00a0\u202f,](?=\d{3}(?:\D|$))', '', normalized)
+        # Strip thousands separators including Arabic \u066c (U+066C)
+        normalized = re.sub(r'[\s\u00a0\u202f\u066c,](?=\d{3}(?:\D|$))', '', normalized)
         return normalized.replace(',', '.')
 
     def canonical_number(value: str) -> str:
@@ -2080,10 +2133,20 @@ def normalize_eval_text(text: str) -> str:
 
 def content_words(text: str) -> list[str]:
     stopwords = {
+        # English
         'the', 'a', 'an', 'and', 'or', 'of', 'to', 'for', 'in', 'on', 'with', 'by',
-        'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'd', 'et', 'ou', 'a',
-        'au', 'aux', 'pour', 'dans', 'sur', 'avec', 'par', 'du', 'des', 'du',
-        'this', 'that', 'ce', 'cet', 'cette', 'ces',
+        'this', 'that', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had',
+        'not', 'from', 'as', 'at', 'but', 'its', 'it',
+        # French
+        'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'd', 'et', 'ou', 'au',
+        'aux', 'pour', 'dans', 'sur', 'avec', 'par', 'ce', 'cet', 'cette', 'ces',
+        'qui', 'que', 'ne', 'pas', 'est', 'sont', 'en', 'y', 'se', 'si', 'il', 'elle',
+        'ils', 'elles', 'je', 'tu', 'nous', 'vous', 'on', 'me', 'te', 'lui', 'leur',
+        # Arabic common function words (after normalize_eval_text removes diacritics)
+        'في', 'من', 'إلى', 'على', 'أن', 'هذا', 'هذه', 'التي', 'الذي', 'ما', 'كان',
+        'كانت', 'هو', 'هي', 'هم', 'لا', 'قد', 'كما', 'مع', 'أو', 'لم', 'عن', 'إن',
+        'لكن', 'ذلك', 'تلك', 'هؤلاء', 'بين', 'عند', 'حتى', 'بعد', 'قبل', 'خلال',
+        'ان', 'في', 'من', 'الى', 'على', 'هذا', 'هذه', 'التي', 'الذي',
     }
     return [
         word for word in normalize_eval_text(text).split()
@@ -2151,32 +2214,29 @@ def clean_translation_error_items(result: dict) -> dict:
         result['missing_content'] = missing
 
     non_actionable_terms = [
-        'nothing needs to be fixed',
-        'nothing to fix',
-        'no correction needed',
-        'no correction is needed',
-        'correct translation',
-        'translation is correct',
-        'accurate translation',
-        'not wrong',
-        'no error',
-        'pas d erreur',
-        'pas de correction',
-        'aucune correction',
-        'traduction correcte',
+        # English
+        'nothing needs to be fixed', 'nothing to fix', 'no correction needed',
+        'no correction is needed', 'correct translation', 'translation is correct',
+        'accurate translation', 'not wrong', 'no error', 'well translated',
+        'correctly translated', 'faithful translation', 'good translation',
+        # French
+        'pas d erreur', 'pas de correction', 'aucune correction', 'traduction correcte',
+        'bien traduit', 'bien rendu', 'fidele', 'traduction fidele', 'traduction fidèle',
+        'aucune erreur', 'pas d erreurs', 'rendu correct', 'traduction accurate',
+        # Arabic
+        'لا يوجد خطأ', 'لا توجد أخطاء', 'لا توجد اخطاء', 'ترجمة صحيحة',
+        'ترجمة دقيقة', 'ترجمة سليمة', 'لا حاجة للتصحيح', 'مترجم بشكل صحيح',
+        'لا خطأ', 'صحيح', 'ترجمة أمينة',
     ]
-    omission_terms = ['completely omitted', 'omitted', 'missing', 'not mentioned', 'student said nothing', 'absence', 'manquant']
+    omission_terms = [
+        'completely omitted', 'omitted', 'missing', 'not mentioned',
+        'student said nothing', 'absence', 'manquant', 'omis', 'absent',
+        'غائب', 'محذوف', 'لم يذكر',
+    ]
     wrong_terms = [
-        'wrong',
-        'incorrect',
-        'mistranslat',
-        'substitution',
-        'wrong number',
-        'number error',
-        'nombre incorrect',
-        'faux nombre',
-        'contresens',
-        'faux sens',
+        'wrong', 'incorrect', 'mistranslat', 'substitution',
+        'wrong number', 'number error', 'nombre incorrect', 'faux nombre',
+        'contresens', 'faux sens', 'خطأ', 'غلط', 'مغلوط',
     ]
 
     for item in result.get('translation_errors', []) or []:
@@ -2320,21 +2380,22 @@ def detect_repetitions_timing_window(segments: list, language: str = 'ar',
     max_gap_seconds in the word timestamp list, it's a repetition — even when
     the ASR segment text has already been deduplicated (Groq and faster-whisper
     both normalize consecutive repeated words in the text output).
+
+    _SHORT_PARTICLES are skipped to avoid flagging frequent function words
+    ("the the", "le le") that ASR sometimes duplicates in timestamps even when
+    the student said them only once.
     """
+    skip_words = _SHORT_PARTICLES.get(language, set())
     words = get_word_timing_sequence(segments)
     repetitions = []
     seen_keys = set()
     consumed_as_second = set()  # indices already matched as second occurrence
-    skip_words = _SHORT_PARTICLES.get(language, set())
 
     for i, w in enumerate(words):
         if i in consumed_as_second:
             continue
         word = normalize_repetition_word(w['word'])
-        if len(word) < 2:
-            continue
-        # Skip function words — they repeat constantly in normal grammar
-        if word in skip_words:
+        if len(word) < 2 or word in skip_words:
             continue
         for j in range(i + 1, len(words)):
             nw = words[j]
@@ -2437,11 +2498,9 @@ def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar'
     # Merge: timing-window reps win over word-level (more reliable for Groq),
     # text reps fill remaining gaps.
     all_hesitations = merge_hesitation_reports(word_hesitations, text_hesitations)
-    # Add false starts to the hesitation list (they are disfluency D5)
-    for fs in false_starts:
-        if not any(abs(float(h.get('at_seconds') or 0) - float(fs['at_seconds'])) < 0.3
-                   for h in all_hesitations):
-            all_hesitations.append(fs)
+    # False starts are not counted as hesitations — they are mid-word stops
+    # that are inherent to interpretation under pressure and should not inflate
+    # the hesitation/fluency penalty.
     all_repetitions = merge_repetition_reports(timing_reps, word_reps, text_repetitions)
 
     return {
@@ -2545,7 +2604,8 @@ def generate_feedback():
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English', 'unknown': 'an unknown language'}
         _raw_src = data.get('source_language', '')
         _src_key = _raw_src if _raw_src and _raw_src != language else 'unknown'
-        prompt = LLM_ANALYSIS_PROMPT.format(
+        prompt = _safe_format(
+            LLM_ANALYSIS_PROMPT,
             source_language=lang_names.get(_src_key, _src_key),
             target_language=lang_names.get(language, language),
             source=source_script or '(source speech not provided)',
@@ -2577,13 +2637,12 @@ def generate_feedback():
                 },
                 {'role': 'user', 'content': prompt}
             ],
-            max_tokens=3500,
+            max_tokens=6000,
             temperature=0.2
         )
 
         llm_result = _extract_json(response.choices[0].message.content)
         llm_result = strip_foreign_script_chars(llm_result)
-        llm_result = filter_french_silent_plural_errors(llm_result, language)
         llm_result = remove_false_missing_translation_errors(llm_result, transcript_text)
         llm_result = clean_translation_error_items(llm_result)
         llm_result = filter_number_only_translation_errors(llm_result)
@@ -2604,7 +2663,7 @@ def generate_feedback():
     except json.JSONDecodeError as e:
         return jsonify({'error': f'JSON parse error: {e}', 'algorithmic': algo}), 500
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e), 'algorithmic': algo}), 500
 
 
 @module_d_bp.route('/full-evaluation', methods=['POST'])
@@ -2745,8 +2804,9 @@ def full_evaluation():
             algo['long_silences'] = merge_silence_reports(algo.get('long_silences', []), audio_silences)
             algo['audio_silences'] = audio_silences
             algo.setdefault('summary', {})['silence_count'] = len(algo['long_silences'])
-        audio_hesitations = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
+        audio_hesitations  = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
         audio_false_starts = detect_false_starts_from_audio(temp_path)
+        # Filler words AND word fragments (words cut in half) both count as hesitations
         all_audio_hes = (audio_hesitations or []) + (audio_false_starts or [])
         if all_audio_hes:
             algo['audio_hesitations'] = all_audio_hes
@@ -2777,7 +2837,8 @@ def full_evaluation():
             ) or 'none flagged'
         coverage_diagnostics = estimate_length_coverage(source_script, full_text)
 
-        prompt = LLM_ANALYSIS_PROMPT.format(
+        prompt = _safe_format(
+            LLM_ANALYSIS_PROMPT,
             source_language=lang_names.get(source_language, source_language),
             target_language=lang_names.get(language, language),
             source=source_script or '(source speech not provided)',
@@ -2797,19 +2858,39 @@ def full_evaluation():
             proper_nouns_block=build_proper_nouns_block(source_script),
         )
 
-        response = client.chat.completions.create(
-            model=PRIMARY_LLM_MODEL,
-            messages=[
-                {'role': 'system', 'content':
-                 'You are an expert interpreter training evaluator at ETIB Beirut. '
-                 'Return only valid JSON. Be thorough — detect ALL error types listed.'},
-                {'role': 'user', 'content': prompt}
-            ],
-            max_tokens=3500,
-            temperature=0.2
-        )
+        # Base result returned even if LLM step fails below
+        _algo_payload = {
+            'long_silences':    algo.get('long_silences', []),
+            'repetitions':      algo.get('repetitions', []),
+            'hesitation_words': algo.get('hesitation_words', []),
+            'number_errors':    algo.get('number_errors', []),
+            'summary':          s,
+        }
 
-        llm_result = _extract_json(response.choices[0].message.content)
+        try:
+            response = client.chat.completions.create(
+                model=PRIMARY_LLM_MODEL,
+                messages=[
+                    {'role': 'system', 'content':
+                     'You are an expert interpreter training evaluator at ETIB Beirut. '
+                     'Return only valid JSON. Be thorough — detect ALL error types listed.'},
+                    {'role': 'user', 'content': prompt}
+                ],
+                max_tokens=6000,
+                temperature=0.2
+            )
+            llm_result = _extract_json(response.choices[0].message.content)
+        except Exception as llm_err:
+            import traceback; traceback.print_exc()
+            return jsonify({
+                'error': f'LLM evaluation unavailable: {llm_err}',
+                'llm_failed': True,
+                'algorithmic': _algo_payload,
+                'fluency':     fluency,
+                'asr_method':  asr_method,
+                'transcript':  transcript,
+            }), 207
+
         llm_result = strip_foreign_script_chars(llm_result)
         llm_result = remove_false_missing_translation_errors(llm_result, full_text)
         llm_result = clean_translation_error_items(llm_result)
@@ -2819,20 +2900,13 @@ def full_evaluation():
         llm_result = apply_coverage_guardrail(llm_result, source_script, full_text)
         if asr_artifacts:
             llm_result['unclear_audio_tokens'] = asr_artifacts
-        llm_result['algorithmic'] = {
-            'long_silences':    algo.get('long_silences', []),
-            'repetitions':      algo.get('repetitions', []),
-            'hesitation_words': algo.get('hesitation_words', []),
-            'number_errors':    algo.get('number_errors', []),
-            'summary':          s
-        }
+        llm_result['algorithmic'] = _algo_payload
         llm_result['fluency'] = fluency
         llm_result['asr_method'] = asr_method
 
         # Step 4: Pronunciation report (whisper confidence + language-specific patterns)
         pronun_report = build_pronunciation_report(all_word_scores, language=language)
         llm_result['pronunciation'] = pronun_report
-        llm_result = filter_french_silent_plural_errors(llm_result, language)
         llm_result['transcript'] = transcript
 
         # Step 5: Persist session for history / adaptive difficulty (D11-D12).
@@ -3037,7 +3111,10 @@ def list_sessions():
     if user_id == 'anonymous':
         # Guests have no account — no history (and no shared anonymous pool).
         return jsonify({'sessions': [], 'count': 0, 'guest': True})
-    limit = min(int(request.args.get('limit', 20)), 50)
+    try:
+        limit = min(int(request.args.get('limit', 20)), 50)
+    except (ValueError, TypeError):
+        limit = 20
     sessions = _load_sessions(user_id, limit=limit)
     return jsonify({'sessions': sessions, 'count': len(sessions)})
 
