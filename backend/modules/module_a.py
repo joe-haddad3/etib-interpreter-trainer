@@ -64,6 +64,21 @@ WORD_COUNT_RANGES = {
 DEFAULT_WORD_COUNT_RANGE = 'medium'
 
 
+def _truncate_at_sentence(text: str, max_chars: int) -> str:
+    """Truncate text to max_chars at the last sentence boundary before the limit."""
+    if len(text) <= max_chars:
+        return text
+    chunk = text[:max_chars]
+    # Find the last sentence-ending punctuation before the limit
+    for punct in ('.', '؟', '!', '?', '،', '…'):
+        idx = chunk.rfind(punct)
+        if idx > max_chars // 2:  # must be at least halfway in
+            return chunk[:idx + 1].strip()
+    # Fallback: truncate at last whitespace
+    idx = chunk.rfind(' ')
+    return (chunk[:idx] if idx > 0 else chunk).strip()
+
+
 def get_word_count_settings(params: dict) -> dict:
     """Return normalized word-count range settings, supporting old numeric requests."""
     requested_range = params.get('word_count_range')
@@ -89,7 +104,7 @@ def get_word_count_settings(params: dict) -> dict:
 
 def build_structured_material_prompt(params: dict, topic: str, excerpts: list[str] | None = None) -> str:
     language        = params.get('language', 'ar')
-    target_language = params.get('target_language', 'fr')
+    target_language = params.get('target_language') or params.get('language', 'fr')
     domain          = params.get('domain', 'politics')
     word_count_settings = get_word_count_settings(params)
     word_count      = word_count_settings['target']
@@ -420,7 +435,7 @@ def _clean_arabic_script(text: str) -> str:
 
 
 _MCQ_PREFIX_RE = re.compile(r'^\s*[A-Da-dأ-د]\s*[.)\-:،]\s*')
-_ARABIC_ANSWER_LETTERS = {'أ': 0, 'ا': 0, 'ب': 1, 'ج': 2, 'د': 3}
+_ARABIC_ANSWER_LETTERS = {'أ': 0, 'ا': 0, 'آ': 0, 'إ': 0, 'ب': 1, 'ج': 2, 'د': 3}
 
 
 def normalize_mcqs(mcqs: list) -> list:
@@ -452,9 +467,21 @@ def normalize_mcqs(mcqs: list) -> list:
         if index is not None and index >= len(options):
             index = None
         if index is None:
+            # Handle formats like "A.", "أ.", "(A)", "(أ)" — strip punctuation/parens to get bare letter
+            bare = re.sub(r'[\s.)\-:،(،؟!]', '', answer_raw).strip()
+            if re.fullmatch(r'[A-Da-d]', bare):
+                index = 'ABCD'.index(bare.upper())
+            elif bare in _ARABIC_ANSWER_LETTERS:
+                index = _ARABIC_ANSWER_LETTERS[bare]
+        if index is not None and index >= len(options):
+            index = None
+        if index is None:
+            # Try full-text match; normalize Eastern/Western digits for Arabic
             answer_text = _MCQ_PREFIX_RE.sub('', answer_raw).strip()
+            answer_normalized = answer_text.translate(_WESTERN_TO_ARABIC_INDIC)
             for i, opt in enumerate(options):
-                if opt == answer_text:
+                opt_normalized = opt.translate(_WESTERN_TO_ARABIC_INDIC)
+                if opt == answer_text or opt_normalized == answer_normalized:
                     index = i
                     break
         if index is None:
@@ -1256,7 +1283,7 @@ def find_wikipedia_grounding_source(params: dict) -> dict | None:
 
             log.info('[Wikipedia Grounding] Found: "%s" (%s, %d words)', title, wiki_lang, len(text.split()))
             return {
-                'text':    text[:8000],
+                'text':    _truncate_at_sentence(text, 8000),
                 'title':   title,
                 'un_id':   '',
                 'web_url': f'https://{wiki_lang}.wikipedia.org/wiki/{title.replace(" ", "_")}',
@@ -1352,8 +1379,13 @@ def generate_speech():
         topic = params.get('topic', '').strip()
         prompt = build_structured_material_prompt(params, topic=topic, excerpts=excerpts)
         word_count_val = get_word_count_settings(params)['max']
-        # Scale max_tokens: speech tokens ≈ 1.5× word count for Arabic, plus ~800 for MCQ+glossary JSON
-        max_tok = min(6000, max(2800, int(word_count_val * 2) + 1200))
+        _lang = params.get('language', 'ar')
+        if _lang == 'ar':
+            # Arabic uses ~3 tokens/word on LLaMA; +1500 for MCQ+glossary+summary JSON
+            max_tok = min(6000, max(3500, int(word_count_val * 3) + 1500))
+        else:
+            # Latin scripts: ~1.5 tokens/word; +1000 for JSON overhead
+            max_tok = min(6000, max(2800, int(word_count_val * 2) + 1000))
         raw_output = generate_text(
             messages=[
                 {
@@ -1529,7 +1561,11 @@ def generate_from_document():
         prompt = build_structured_material_prompt(params, topic=topic, excerpts=selected_chunks)
 
         word_count_val = get_word_count_settings(params)['max']
-        max_tok = min(6000, max(2800, int(word_count_val * 2) + 1200))
+        _lang = params.get('language', 'ar')
+        if _lang == 'ar':
+            max_tok = min(6000, max(3500, int(word_count_val * 3) + 1500))
+        else:
+            max_tok = min(6000, max(2800, int(word_count_val * 2) + 1000))
         raw_output = generate_text(
             messages=[
                 {
