@@ -1924,30 +1924,32 @@ def reconcile_coverage_with_missing_content(result: dict) -> dict:
     if not isinstance(result, dict):
         return result
 
-    weights = {'high': 1.5, 'medium': 0.8, 'low': 0.4, 'minor': 0.4}
-    penalty = 0.0
-
     missing = result.get('missing_content')
-    if isinstance(missing, list):
-        for item in missing:
-            imp = str(item.get('importance', 'medium')).lower() if isinstance(item, dict) else 'medium'
-            penalty += weights.get(imp, 0.8)
-
+    missing = missing if isinstance(missing, list) else []
     info_loss = result.get('information_loss')
-    if isinstance(info_loss, list):
-        for item in info_loss:
-            imp = str(item.get('importance', 'medium')).lower() if isinstance(item, dict) else 'medium'
-            penalty += weights.get(imp, 0.8) * 0.6
+    info_loss = info_loss if isinstance(info_loss, list) else []
 
-    evidence_score = max(2.0, min(10.0, round(10.0 - penalty, 1)))
+    # Only enforce the rubric's UNAMBIGUOUS cases; with 2+ omissions the
+    # LLM's own coverage judgment stands (a penalty formula here would
+    # manufacture a constant score — e.g. 3 items × 1.5 = always 5.5).
+    floor = None
+    if not missing and not info_loss:
+        floor = 9.5   # nothing missing at all → rubric mandates 9-10
+    elif len(missing) + len(info_loss) == 1:
+        item = (missing or info_loss)[0]
+        imp = str(item.get('importance', 'medium')).lower() if isinstance(item, dict) else 'medium'
+        floor = 8.0 if imp in ('low', 'minor', 'medium') else 7.0
+
+    if floor is None:
+        return result
 
     try:
         current = float(result.get('coverage_score'))
     except (TypeError, ValueError):
         current = None
 
-    if current is None or current < evidence_score:
-        result['coverage_score'] = evidence_score
+    if current is None or current < floor:
+        result['coverage_score'] = floor
         result['coverage_reconciled_from_evidence'] = True
     return result
 
