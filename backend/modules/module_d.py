@@ -101,6 +101,10 @@ def _extract_top_errors(data: dict) -> list:
 
 def _save_session(user_id: str, data: dict):
     """Persist one evaluation session; falls back to in-memory if no MongoDB."""
+    # Never persist a session without a real overall score (failed/partial
+    # evaluations) — it would pollute averages, the trend chart, and history.
+    if not (data.get('overall_score') or 0) > 0:
+        return
     algo = data.get('algorithmic', {}) or {}
     doc = {
         'id':              str(uuid.uuid4()),
@@ -155,6 +159,9 @@ def _load_sessions(user_id: str, limit: int = 20) -> list:
 
 def _compute_adaptive_params(sessions: list) -> dict:
     """Analyse sessions → recommended Module A params + problems to work on + trend."""
+    # Sessions saved before a failed AI analysis carry 0 scores — they are not
+    # real results and must not drag the averages or the trend down.
+    sessions = [s for s in (sessions or []) if (s.get('overall_score') or 0) > 0]
     if not sessions:
         return {
             'message': 'No sessions yet — complete at least one full evaluation to start tracking.',

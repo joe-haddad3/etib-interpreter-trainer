@@ -1437,11 +1437,12 @@ const TOPIC_AS_SOURCE_THRESHOLD = 300;
 
 // ── Module E — Progress & Adaptive Difficulty ─────────────────────────────────
 function ScoreBadge({ score }) {
-  const pct = Math.round((score || 0) * 10);
-  const color = score >= 8 ? 'var(--sage)' : score >= 6.5 ? 'var(--primary)' : 'var(--sienna)';
+  const num = Number(score);
+  const valid = Number.isFinite(num) && num > 0;
+  const color = num >= 8 ? 'var(--sage)' : num >= 6.5 ? 'var(--primary)' : 'var(--sienna)';
   return (
     <span style={{ fontWeight: 700, color, fontFamily: 'Playfair Display, serif', fontSize: '1rem' }}>
-      {score?.toFixed(1) ?? '—'}
+      {valid ? num.toFixed(1) : '—'}
     </span>
   );
 }
@@ -1498,14 +1499,29 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
   }, [refresh]);
 
   const LANG_FLAG = { ar: '🇱🇧', fr: '🇫🇷', en: '🇬🇧' };
-  const recentTen = sessions.slice(0, 10).reverse();
 
-  const n = sessions.length;
-  const avgOverall  = n ? (sessions.reduce((s, x) => s + (x.overall_score || 0), 0) / n).toFixed(2) : null;
-  const avgFluency  = n ? (sessions.reduce((s, x) => s + (x.fluency_score || 0), 0) / n).toFixed(2) : null;
-  const avgNumbers  = n ? (sessions.reduce((s, x) => s + (x.error_counts?.number_errors || 0), 0) / n).toFixed(1) : null;
+  // Sessions saved before a failed AI analysis carry 0/null scores — they are
+  // not real results and must not drag averages down or show as "0.0" cards.
+  const fmtScore = v => {
+    const num = Number(v);
+    return Number.isFinite(num) && num > 0 ? num.toFixed(1) : '—';
+  };
+  const avgOf = key => {
+    const vals = sessions.map(s => Number(s?.[key])).filter(v => Number.isFinite(v) && v > 0);
+    return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : null;
+  };
+  const scoredSessions = sessions.filter(s => Number(s?.overall_score) > 0);
+  const recentTen = scoredSessions.slice(0, 10).reverse();
 
-  const latest   = sessions[0] || null;
+  const n = scoredSessions.length;
+  const avgOverall = avgOf('overall_score');
+  const avgFluency = avgOf('fluency_score');
+  const numberSessions = sessions.filter(s => s?.error_counts && Number.isFinite(Number(s.error_counts.number_errors)));
+  const avgNumbers = numberSessions.length
+    ? (numberSessions.reduce((s, x) => s + Number(x.error_counts.number_errors), 0) / numberSessions.length).toFixed(1)
+    : null;
+
+  const latest   = scoredSessions[0] || sessions[0] || null;
   const trend    = adaptive?.trend;
   const problems = adaptive?.problems_to_work_on || [];
 
@@ -1561,15 +1577,15 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                   <div className="progress-stat-card" style={{ minWidth: 90 }}>
                     <div className="progress-stat-label">{labels.progressOverall}</div>
-                    <div className="progress-stat-value" style={{ color: latest.overall_score >= 7 ? 'var(--sage)' : latest.overall_score >= 5.5 ? 'var(--gold)' : 'var(--sienna)' }}>{latest.overall_score?.toFixed(1) ?? '—'}</div>
+                    <div className="progress-stat-value" style={{ color: Number(latest.overall_score) >= 7 ? 'var(--sage)' : Number(latest.overall_score) >= 5.5 ? 'var(--gold)' : 'var(--sienna)' }}>{fmtScore(latest.overall_score)}</div>
                   </div>
                   <div className="progress-stat-card" style={{ minWidth: 90 }}>
                     <div className="progress-stat-label">{labels.progressFluency}</div>
-                    <div className="progress-stat-value" style={{ color: latest.fluency_score >= 7 ? 'var(--sage)' : 'var(--gold)' }}>{latest.fluency_score?.toFixed(1) ?? '—'}</div>
+                    <div className="progress-stat-value" style={{ color: Number(latest.fluency_score) >= 7 ? 'var(--sage)' : 'var(--gold)' }}>{fmtScore(latest.fluency_score)}</div>
                   </div>
                   <div className="progress-stat-card" style={{ minWidth: 90 }}>
                     <div className="progress-stat-label">{labels.progressCoverage}</div>
-                    <div className="progress-stat-value" style={{ color: latest.coverage_score >= 7 ? 'var(--sage)' : 'var(--gold)' }}>{latest.coverage_score?.toFixed(1) ?? '—'}</div>
+                    <div className="progress-stat-value" style={{ color: Number(latest.coverage_score) >= 7 ? 'var(--sage)' : 'var(--gold)' }}>{fmtScore(latest.coverage_score)}</div>
                   </div>
                 </div>
                 <div style={{ flex: 1, minWidth: 200 }}>
@@ -1636,7 +1652,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                 const color = s.overall_score >= 8 ? 'var(--sage)' : s.overall_score >= 6.5 ? 'var(--primary)' : 'var(--sienna)';
                 return (
                   <div key={i} className="trend-bar-wrap">
-                    <div className="trend-score-label" style={{ color }}>{s.overall_score?.toFixed(1)}</div>
+                    <div className="trend-score-label" style={{ color }}>{fmtScore(s.overall_score)}</div>
                     <div className="trend-bar-outer">
                       <div className="trend-bar-inner" style={{ height: `${h}%`, background: color }} />
                     </div>
@@ -1687,7 +1703,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
           <div className="card">
             <h2 className="b-section-title">📋 {labels.progressSessions}</h2>
             <div className="session-list">
-              {sessions.map((s, i) => (
+              {scoredSessions.map((s, i) => (
                 <div key={i} className={`session-row ${expanded === i ? 'session-row--open' : ''}`}
                   onClick={() => setExpanded(expanded === i ? null : i)}>
                   <div className="session-row-main">
