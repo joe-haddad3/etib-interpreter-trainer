@@ -791,7 +791,13 @@ Be strict on overall_score — most student interpretations score 4–7:
 - 5-6: Acceptable — several errors but core meaning mostly preserved
 - 3-4: Weak — multiple mistranslations or significant information loss
 - 0-2: Very poor — major errors, incomplete, or incomprehensible
-If you found 3+ translation errors or missing_content items, overall_score cannot exceed 6.
+If you found 3+ SERIOUS translation errors (each one changing the meaning the listener receives)
+or 3+ HIGH-importance omissions, overall_score cannot exceed 6. Stylistic preferences, minor
+wording nuances, and acceptable paraphrases do NOT count toward this rule.
+MANDATORY consistency rule: the score must match the errors you actually listed.
+- translation_errors empty + missing_content empty + numbers/names correct → overall_score MUST be at least 8.
+- only 1-2 minor issues in total → overall_score MUST be at least 7.
+Do not default to 5-6 "to be safe" when your own findings show a good interpretation.
 
 Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
 {{
@@ -1954,6 +1960,77 @@ def reconcile_coverage_with_missing_content(result: dict) -> dict:
     return result
 
 
+def reconcile_overall_with_evidence(result: dict) -> dict:
+    """
+    Enforce overall_score consistency with the LLM's OWN cleaned findings.
+    The LLM habitually clamps overall to 5.5-6 because it always lists ~3
+    marginal items; when its own evidence shows a good interpretation, the
+    score must reflect that. Runs AFTER the error-filtering passes so counts
+    are based on the cleaned lists. Only raises, never lowers.
+    """
+    if not isinstance(result, dict):
+        return result
+
+    # Floors only apply when coverage says the content actually arrived —
+    # a partial interpretation with few "errors" is still a partial one.
+    try:
+        coverage = float(result.get('coverage_score'))
+    except (TypeError, ValueError):
+        coverage = None
+    if coverage is None or coverage < 7.0:
+        return result
+
+    trans_errors = result.get('translation_errors')
+    trans_count = len(trans_errors) if isinstance(trans_errors, list) else 0
+
+    missing = result.get('missing_content')
+    missing = missing if isinstance(missing, list) else []
+    high_missing = sum(
+        1 for m in missing
+        if isinstance(m, dict) and str(m.get('importance', '')).lower() == 'high'
+    )
+    minor_missing = len(missing) - high_missing
+
+    numbers = result.get('number_accuracy')
+    wrong_numbers = sum(
+        1 for n in (numbers if isinstance(numbers, list) else [])
+        if isinstance(n, dict) and n.get('correct') is False
+    )
+
+    proper = result.get('proper_nouns')
+    bad_names = sum(
+        1 for p in (proper if isinstance(proper, list) else [])
+        if isinstance(p, dict) and str(p.get('status', '')).lower() in ('distorted', 'missing')
+    )
+
+    term = result.get('terminology_problems')
+    term_count = len(term) if isinstance(term, list) else 0
+
+    major = trans_count + high_missing + wrong_numbers
+    minor = minor_missing + bad_names + term_count
+
+    if major == 0 and minor == 0:
+        floor = 8.5
+    elif major == 0 and minor <= 2:
+        floor = 7.5
+    elif major <= 1 and minor <= 2:
+        floor = 7.0
+    elif major <= 2 and minor <= 3:
+        floor = 6.5
+    else:
+        return result   # real error volume — the LLM's judgment stands
+
+    try:
+        current = float(result.get('overall_score'))
+    except (TypeError, ValueError):
+        current = None
+
+    if current is None or current < floor:
+        result['overall_score'] = floor
+        result['overall_reconciled_from_evidence'] = True
+    return result
+
+
 def apply_coverage_guardrail(result: dict, source_script: str, transcript_text: str) -> dict:
     if not isinstance(result, dict):
         return result
@@ -2759,6 +2836,7 @@ def generate_feedback():
         llm_result = filter_equivalent_number_renderings(llm_result)
         llm_result = reconcile_coverage_with_missing_content(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, transcript_text)
+        llm_result = reconcile_overall_with_evidence(llm_result)
         if asr_artifacts:
             llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = {
@@ -3019,6 +3097,7 @@ def full_evaluation():
         llm_result = filter_equivalent_number_renderings(llm_result)
         llm_result = reconcile_coverage_with_missing_content(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, full_text)
+        llm_result = reconcile_overall_with_evidence(llm_result)
         if asr_artifacts:
             llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = _algo_payload
