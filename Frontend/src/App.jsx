@@ -418,6 +418,8 @@ const UI = {
     pnDistorted: 'Distorted — likely mispronounced',
     pnMissing: 'Omitted',
     llmFailedWarning: 'AI language analysis could not complete — showing automatic detections only. Scores may be incomplete.',
+    llmQuotaError: 'Your Groq API tokens are used up for now — wait for the limit to reset (or add another API key in Settings), then run the evaluation again.',
+    llmDownError: 'The AI evaluation service did not respond — try again in a moment.',
     addSource: 'Add source',
     micDenied: 'Microphone access denied — please allow permission and try again.',
     simultaneousFailed: 'Could not start simultaneous mode — check microphone permission.',
@@ -814,6 +816,8 @@ const UI = {
     pnDistorted: 'محرَّف — نطق خاطئ على الأرجح',
     pnMissing: 'محذوف',
     llmFailedWarning: 'لم يتمكن التحليل اللغوي بالذكاء الاصطناعي من الاكتمال — يُعرض الرصد التلقائي فقط. قد تكون الدرجات غير مكتملة.',
+    llmQuotaError: 'انتهت حصة رموز Groq API الخاصة بك حالياً — انتظر إعادة تعيين الحد (أو أضف مفتاح API آخر في الإعدادات)، ثم أعد تشغيل التقييم.',
+    llmDownError: 'لم تستجب خدمة التقييم بالذكاء الاصطناعي — حاول مرة أخرى بعد قليل.',
     addSource: 'إضافة مصدر',
     micDenied: 'تم رفض الوصول إلى الميكروفون — يرجى السماح بالإذن والمحاولة مجدداً.',
     simultaneousFailed: 'تعذّر تشغيل الوضع الفوري — تحقق من إذن الميكروفون.',
@@ -1210,6 +1214,8 @@ const UI = {
     pnDistorted: 'Déformé — probablement mal prononcé',
     pnMissing: 'Omis',
     llmFailedWarning: "L'analyse linguistique IA n'a pas pu se terminer — seules les détections automatiques sont affichées. Les scores peuvent être incomplets.",
+    llmQuotaError: "Vos jetons Groq API sont épuisés pour le moment — attendez la réinitialisation de la limite (ou ajoutez une autre clé API dans les Paramètres), puis relancez l'évaluation.",
+    llmDownError: "Le service d'évaluation IA n'a pas répondu — réessayez dans un instant.",
     addSource: 'Ajouter une source',
     micDenied: "Accès au microphone refusé — veuillez autoriser l'accès et réessayer.",
     simultaneousFailed: 'Impossible de démarrer le mode simultané — vérifiez l\'autorisation du microphone.',
@@ -3371,7 +3377,6 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
-  const fileInputRef = useRef(null);
   const referenceAudioRef = useRef(null);
   const autoTranscribeRef = useRef(autoTranscribe);
   useEffect(() => { autoTranscribeRef.current = autoTranscribe; }, [autoTranscribe]);
@@ -3500,7 +3505,6 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
     setRecordedUrl(null);
     setResult(null);
     setError('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
     onRecordingComplete?.(null);
   }
 
@@ -3654,29 +3658,6 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
         {/* Note-taking space — consecutive mode only */}
         {interpMode === 'consecutive' && <NotesPad labels={labels} />}
 
-        {/* Upload audio file — visible trigger */}
-        {!isRecording && !recordedUrl && (
-          <div style={{ marginTop: '0.75rem' }}>
-            <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.4rem' }}>{labels.orUpload}</p>
-            <button type="button" className="btn-secondary btn-sm"
-              onClick={() => fileInputRef.current?.click()}>
-              📎 {labels.uploadAudioBtn || 'Upload audio file'}
-            </button>
-          </div>
-        )}
-
-        {/* hidden file input */}
-        <input ref={fileInputRef} type="file" accept=".mp3,.wav,.m4a,.ogg,.webm" className="file-input" style={{ display: 'none' }}
-          onChange={e => {
-            const f = e.target.files[0];
-            if (f) {
-              if (recordedUrl) URL.revokeObjectURL(recordedUrl);
-              setRecordedBlob(f);
-              setRecordedUrl(URL.createObjectURL(f));
-              onRecordingComplete?.(f);
-              runTranscription(f);
-            }
-          }} />
       </div>
 
       {/* Results card */}
@@ -3949,6 +3930,15 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           glossary:        lastGeneratedScript?.glossary || []
         });
       }
+      // LLM step failed (HTTP 207) — no scores exist, so a partial report with
+      // "0.0" would mislead the student. Show a clear error instead.
+      if (data.llm_failed) {
+        const errText = String(data.error || '').toLowerCase();
+        const isQuota = /rate.?limit|quota|429|tokens per|tpd|tpm|capacity/.test(errText);
+        throw new Error(isQuota
+          ? (labels.llmQuotaError || 'Your Groq API tokens are used up for now — wait for the limit to reset (or use another API key in Settings), then run the evaluation again.')
+          : (labels.llmDownError || 'The AI evaluation service did not respond — try again in a moment.'));
+      }
       // Attach pronunciation report for the pronunciation panel
       if (data.pronunciation) {
         data._pronunciationForPanel = {
@@ -4145,7 +4135,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                         Number(atSeconds) === 0 ? ' — at start' : ` — at ${atSeconds}s`
                       )}
                     </strong>
-                    {p.impact && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{p.impact}</div>}
+                    {p.impact && <div className="eval-explanation" dir="auto">{p.impact}</div>}
                   </div>
                 );
               })}
@@ -4176,7 +4166,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                       {n.correct ? labels.numCorrect : labels.numIncorrect}
                     </span>
                   </div>
-                  {n.note && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{n.note}</div>}
+                  {n.note && <div className="eval-explanation" dir="auto">{n.note}</div>}
                 </div>
               ))}
             </div>
@@ -4190,7 +4180,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               {(report.pronunciation_assessment.issues || []).map((item, i) => (
                 <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--gold)', paddingInlineStart: '0.75rem', marginBottom: '0.5rem' }}>
                   <strong className={isAr ? 'arabic' : ''}>"{item.word}"</strong>
-                  {item.issue && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{item.issue}</div>}
+                  {item.issue && <div className="eval-explanation" dir="auto">{item.issue}</div>}
                   {item.correction && <div className="eval-correction">✓ {labels.correction}: <strong className={isAr ? 'arabic' : ''}>{item.correction}</strong></div>}
                 </div>
               ))}
@@ -4255,7 +4245,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                   <div className="eval-text" style={{ marginBottom: '0.25rem' }}>"{item.source_text}"</div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.studentSaid}: <strong style={{ color: 'var(--sienna)' }}>{item.student_said}</strong></div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.correctTranslation}: <strong style={{ color: 'var(--sage)' }}>{item.correct_translation}</strong></div>
-                  {item.explanation && <div className="eval-explanation">{item.explanation}</div>}
+                  {item.explanation && <div className="eval-explanation" dir="auto">{item.explanation}</div>}
                 </div>
               ))}
             </div>
@@ -4283,7 +4273,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                         {statusLabel}
                       </span>
                     </div>
-                    {pn.note && <div className={`eval-explanation ${isAr ? 'arabic' : ''}`}>{pn.note}</div>}
+                    {pn.note && <div className="eval-explanation" dir="auto">{pn.note}</div>}
                   </div>
                 );
               })}
