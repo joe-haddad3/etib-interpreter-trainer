@@ -1498,7 +1498,9 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
       .finally(() => setLoading(false));
   }, [refresh]);
 
-  const LANG_FLAG = { ar: '🇱🇧', fr: '🇫🇷', en: '🇬🇧' };
+  // Plain language codes — flag emojis render as raw country codes (LB/GB/FR)
+  // on Windows browsers, which reads as a mistake.
+  const LANG_FLAG = { ar: 'AR', fr: 'FR', en: 'EN' };
 
   // Sessions saved before a failed AI analysis carry 0/null scores — they are
   // not real results and must not drag averages down or show as "0.0" cards.
@@ -1707,7 +1709,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                 <div key={i} className={`session-row ${expanded === i ? 'session-row--open' : ''}`}
                   onClick={() => setExpanded(expanded === i ? null : i)}>
                   <div className="session-row-main">
-                    <span className="session-lang">{LANG_FLAG[s.language] || '🌐'} {(s.language || '').toUpperCase()}</span>
+                    <span className="session-lang">{LANG_FLAG[s.language] || (s.language || '').toUpperCase()}</span>
                     <span className="session-date">{new Date(s.created_at).toLocaleString(dateLocale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                     <div className="session-scores">
                       <span title="Overall"><ScoreBadge score={s.overall_score} /></span>
