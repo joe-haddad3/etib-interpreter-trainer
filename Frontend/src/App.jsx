@@ -1500,7 +1500,7 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
 
   // Plain language codes — flag emojis render as raw country codes (LB/GB/FR)
   // on Windows browsers, which reads as a mistake.
-  const LANG_FLAG = { ar: 'AR', fr: 'FR', en: 'EN' };
+  const LANG_FLAG = { ar: 'AR', fr: 'FR', en: 'ENG' };
 
   // Sessions saved before a failed AI analysis carry 0/null scores — they are
   // not real results and must not drag averages down or show as "0.0" cards.
