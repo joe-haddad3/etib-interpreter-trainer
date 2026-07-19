@@ -791,11 +791,15 @@ Be strict on overall_score — most student interpretations score 4–7:
 - 5-6: Acceptable — several errors but core meaning mostly preserved
 - 3-4: Weak — multiple mistranslations or significant information loss
 - 0-2: Very poor — major errors, incomplete, or incomprehensible
-If you found 3+ SERIOUS translation errors (each one changing the meaning the listener receives)
-or 3+ HIGH-importance omissions, overall_score cannot exceed 6. Stylistic preferences, minor
-wording nuances, and acceptable paraphrases do NOT count toward this rule.
+SCORING PHILOSOPHY — an interpreter transmits MEANING, not words. Never grade against a
+word-for-word machine-translation ideal: judge whether the LISTENER received the same message.
+If you found 3+ HIGH-importance omissions or 3+ wrong numbers/names, overall_score cannot
+exceed 6. Stylistic preferences, wording nuances, and acceptable paraphrases NEVER lower the score.
+Only fill translation_errors when the student's rendering says something factually DIFFERENT
+from the source (the listener is misled) — a valid paraphrase or a more general term that keeps
+the message intact is NOT a translation error.
 MANDATORY consistency rule: the score must match the errors you actually listed.
-- translation_errors empty + missing_content empty + numbers/names correct → overall_score MUST be at least 8.
+- missing_content empty + numbers/names correct → overall_score MUST be at least 8.
 - only 1-2 minor issues in total → overall_score MUST be at least 7.
 Do not default to 5-6 "to be safe" when your own findings show a good interpretation.
 
@@ -1980,9 +1984,10 @@ def reconcile_overall_with_evidence(result: dict) -> dict:
     if coverage is None or coverage < 7.0:
         return result
 
-    trans_errors = result.get('translation_errors')
-    trans_count = len(trans_errors) if isinstance(trans_errors, list) else 0
-
+    # translation_errors deliberately NOT counted (16 July professor feedback):
+    # word-level source-vs-target comparison is machine-translation logic —
+    # an interpreter transmits meaning; meaning loss shows up in
+    # missing_content / information_loss, which ARE counted.
     missing = result.get('missing_content')
     missing = missing if isinstance(missing, list) else []
     high_missing = sum(
@@ -2006,7 +2011,7 @@ def reconcile_overall_with_evidence(result: dict) -> dict:
     term = result.get('terminology_problems')
     term_count = len(term) if isinstance(term, list) else 0
 
-    major = trans_count + high_missing + wrong_numbers
+    major = high_missing + wrong_numbers
     minor = minor_missing + bad_names + term_count
 
     if major == 0 and minor == 0:
@@ -2149,6 +2154,12 @@ NUMBER_SCALE_TERMS = {
     'trillions': 'trillion',
     'billion_fr': 'trillion',
     'billions_fr': 'trillion',
+    # Arabic scale words — without these, a French "4,9 millions" interpreted
+    # into Arabic "٤٫٩ مليون" flagged "millions missing" (16 July feedback).
+    'ألف': 'thousand', 'الف': 'thousand', 'آلاف': 'thousand', 'الاف': 'thousand',
+    'مليون': 'million', 'ملايين': 'million',
+    'مليار': 'billion', 'مليارات': 'billion', 'بليون': 'billion', 'بلايين': 'billion',
+    'تريليون': 'trillion', 'ترليون': 'trillion', 'تريليونات': 'trillion',
 }
 
 
@@ -2185,7 +2196,10 @@ def detect_number_errors(source_script: str, transcript_text: str) -> list:
     digit_chars = r'\d٠-٩'
     # Separators: space, NBSP (U+00A0), narrow NBSP (U+202F), comma,
     # Arabic thousands separator \u066c (U+066C).
-    number_pattern = rf'(?<![\w])(?:[{digit_chars}]{{1,3}}(?:[ \u00a0\u202f,\u066c][{digit_chars}]{{3}})+|[{digit_chars}]+(?:[.\u066b][{digit_chars}]+)?)(?![\w])'
+    # French decimal comma ("4,9 millions") must parse as ONE number 4.9 \u2014
+    # the comma-decimal alternative accepts 1-2 digits after the comma so it
+    # never swallows a 3-digit thousands group (handled by the first branch).
+    number_pattern = rf'(?<![\w])(?:[{digit_chars}]{{1,3}}(?:[ \u00a0\u202f,\u066c][{digit_chars}]{{3}})+|[{digit_chars}]+(?:[.\u066b][{digit_chars}]+|,[{digit_chars}]{{1,2}})?)(?![\w])'
     source_numbers = [match.group(0) for match in re.finditer(number_pattern, source_script or '')]
     transcript_numbers = [match.group(0) for match in re.finditer(number_pattern, transcript_text or '')]
 

@@ -417,8 +417,12 @@ def _to_arabic_indic(text: str) -> str:
 
 
 def _clean_arabic_script(text: str) -> str:
-    """Remove stray Latin/CJK characters from an Arabic script field, then convert digits."""
-    import unicodedata
+    """Remove stray Latin/CJK characters from an Arabic script field, then convert digits.
+
+    A stray foreign character is DROPPED, not replaced by a space: replacing it
+    with a space used to split the surrounding Arabic word in half
+    ("وال官ية" → "وال ية", professor's 16 July example). Dropping heals the word.
+    """
     result = []
     for char in text:
         block = ord(char)
@@ -427,8 +431,6 @@ def _clean_arabic_script(text: str) -> str:
         is_digit = char.isdigit()
         if is_arabic or is_space or is_digit:
             result.append(char)
-        else:
-            result.append(' ')
     import re as _re
     cleaned = _re.sub(r' {2,}', ' ', ''.join(result)).strip()
     return _to_arabic_indic(cleaned)
@@ -1108,12 +1110,53 @@ def _trim_script_to_word_count(script: str, target_word_count: int, language: st
     return script
 
 
+def _proofread_arabic_script(script: str) -> str:
+    """
+    Second-pass Arabic proofread (16 July professor feedback). The generation
+    model's recurring Arabic faults — English calques, wrong verb choice,
+    gender agreement, missing prepositions, truncated words — are corrected by
+    a focused review call. Content, rhetoric, numbers, and length must be
+    preserved; the original script is returned on any failure or if the
+    rewrite changed the length materially.
+    """
+    words = len(str(script or '').split())
+    if words < 30:
+        return script
+    try:
+        fixed = generate_text(
+            messages=[
+                {'role': 'system', 'content': (
+                    'You are an expert Modern Standard Arabic proofreader for conference speeches. '
+                    'Correct ONLY genuine language errors: English calques (لا يملكون وصولاً إلى → لا يحصلون على), '
+                    'wrong verb choice (تعنيها البلاد → تعانيها البلاد), gender/number agreement '
+                    '(تتعين على الأمم المتحدة → يتعين على الأمم المتحدة), missing prepositions '
+                    '(فيما يتعلق توفير → فيما يتعلق بتوفير), broken or truncated words, and '
+                    'relative-pronoun agreement. Preserve the content, style, rhetoric, statistics '
+                    '(keep Eastern Arabic-Indic digits), proper nouns, and length EXACTLY. '
+                    'Return ONLY the corrected speech text — no commentary, no JSON.'
+                )},
+                {'role': 'user', 'content': script},
+            ],
+            max_tokens=min(6000, max(1500, words * 3 + 300)),
+            temperature=0.1,
+        )
+        fixed = _clean_arabic_script(str(fixed or '').strip())
+        fixed_words = len(fixed.split())
+        if fixed_words and abs(fixed_words - words) / words <= 0.15:
+            return fixed
+    except Exception:
+        pass
+    return script
+
+
 def build_generation_response(generated: dict, params: dict, mode: str = 'generated', extra: dict | None = None) -> dict:
     script = generated['script']
     word_count_settings = get_word_count_settings(params)
     target_word_count = word_count_settings['target']
     script = _expand_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
     script = _trim_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
+    if params.get('language', 'ar') == 'ar':
+        script = _proofread_arabic_script(script)
     generated['script'] = script
     word_count = len(script.split())
     wpm = params.get('wpm', DEFAULT_WPM)

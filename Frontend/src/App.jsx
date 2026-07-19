@@ -419,6 +419,11 @@ const UI = {
     pnMissing: 'Omitted',
     llmFailedWarning: 'AI language analysis could not complete — showing automatic detections only. Scores may be incomplete.',
     llmQuotaError: 'Your Groq API tokens are used up for now — wait for the limit to reset (or add another API key in Settings), then run the evaluation again.',
+    keyRequired: 'A personal (free) Groq API key is required — create yours at console.groq.com (2 minutes, no credit card) and add it in Settings.',
+    simulSourceEnded: 'The source speech has ended — finish your interpretation, then press stop. Recording stops automatically after one minute.',
+    consecFlowHint: 'Step 1: listen to the speech and take notes. Step 2: record your interpretation from your notes below.',
+    downloadRecording: 'Download recording',
+    downloadAudio: 'Download audio',
     llmDownError: 'The AI evaluation service did not respond — try again in a moment.',
     addSource: 'Add source',
     micDenied: 'Microphone access denied — please allow permission and try again.',
@@ -817,6 +822,11 @@ const UI = {
     pnMissing: 'محذوف',
     llmFailedWarning: 'لم يتمكن التحليل اللغوي بالذكاء الاصطناعي من الاكتمال — يُعرض الرصد التلقائي فقط. قد تكون الدرجات غير مكتملة.',
     llmQuotaError: 'انتهت حصة رموز Groq API الخاصة بك حالياً — انتظر إعادة تعيين الحد (أو أضف مفتاح API آخر في الإعدادات)، ثم أعد تشغيل التقييم.',
+    keyRequired: 'مفتاح Groq API شخصي (مجاني) مطلوب — أنشئ مفتاحك على console.groq.com (دقيقتان، بدون بطاقة ائتمان) وأضفه في الإعدادات.',
+    simulSourceEnded: 'انتهى الخطاب المصدر — أكمل ترجمتك ثم اضغط إيقاف. يتوقف التسجيل تلقائياً بعد دقيقة واحدة.',
+    consecFlowHint: 'الخطوة ١: استمع إلى الخطاب ودوّن ملاحظاتك. الخطوة ٢: سجّل ترجمتك اعتماداً على ملاحظاتك أدناه.',
+    downloadRecording: 'تنزيل التسجيل',
+    downloadAudio: 'تنزيل الصوت',
     llmDownError: 'لم تستجب خدمة التقييم بالذكاء الاصطناعي — حاول مرة أخرى بعد قليل.',
     addSource: 'إضافة مصدر',
     micDenied: 'تم رفض الوصول إلى الميكروفون — يرجى السماح بالإذن والمحاولة مجدداً.',
@@ -1215,6 +1225,11 @@ const UI = {
     pnMissing: 'Omis',
     llmFailedWarning: "L'analyse linguistique IA n'a pas pu se terminer — seules les détections automatiques sont affichées. Les scores peuvent être incomplets.",
     llmQuotaError: "Vos jetons Groq API sont épuisés pour le moment — attendez la réinitialisation de la limite (ou ajoutez une autre clé API dans les Paramètres), puis relancez l'évaluation.",
+    keyRequired: "Une clé Groq API personnelle (gratuite) est requise — créez la vôtre sur console.groq.com (2 minutes, sans carte bancaire) et ajoutez-la dans les Paramètres.",
+    simulSourceEnded: "Le discours source est terminé — achevez votre interprétation puis appuyez sur stop. L'enregistrement s'arrête automatiquement après une minute.",
+    consecFlowHint: "Étape 1 : écoutez le discours et prenez des notes. Étape 2 : enregistrez votre interprétation à partir de vos notes ci-dessous.",
+    downloadRecording: 'Télécharger l\'enregistrement',
+    downloadAudio: 'Télécharger l\'audio',
     llmDownError: "Le service d'évaluation IA n'a pas répondu — réessayez dans un instant.",
     addSource: 'Ajouter une source',
     micDenied: "Accès au microphone refusé — veuillez autoriser l'accès et réessayer.",
@@ -2506,6 +2521,12 @@ const [showAdvanced, setShowAdvanced] = useState(true);
 
   async function handleSubmit(event) {
     event.preventDefault();
+    // Personal Groq key is mandatory (16 July feedback) — no shared-quota use.
+    if (!getStoredGroqKey()) {
+      setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
+      setStatus('error');
+      return;
+    }
     setStatus('loading'); setError(''); setResult(null);
     try {
       let params = form;
@@ -2536,6 +2557,11 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   const hasSources = documentFiles.length > 0 || librarySources.length > 0;
 
   async function handleDocumentGenerate() {
+    if (!getStoredGroqKey()) {
+      setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
+      setStatus('error');
+      return;
+    }
     setStatus('loading'); setError(''); setResult(null);
     try {
       const allFiles = buildAllSourceFiles();
@@ -2941,7 +2967,7 @@ function McqQuiz({ mcqs, labels, isArabic }) {
 // Continuous vertical scroll at a words/min pace with a live dashboard
 // (elapsed / remaining), like the University of Bologna Scroller tool.
 
-function SightScroller({ script, isArabic, labels }) {
+function SightScroller({ script, isArabic, labels, isRecording, onToggleRecord, recordTime }) {
   const [playing, setPlaying] = useState(false);
   const [wpm, setWpm] = useState(120);
   const [fontSize, setFontSize] = useState(1.15);   // rem
@@ -3055,6 +3081,13 @@ function SightScroller({ script, isArabic, labels }) {
             {playing ? labels.scrollerPause : labels.scrollerPlay}
           </button>
           <button type="button" className="btn-secondary" onClick={reset}>{labels.scrollerReset}</button>
+          {/* Recording at the same level as scrolling (16 July feedback) — no
+              page scroll needed between starting the text and starting to speak */}
+          {onToggleRecord && (
+            <button type="button" className={`btn-record ${isRecording ? 'recording-active' : ''}`} onClick={onToggleRecord}>
+              {isRecording ? <><span className="rec-dot" /> {labels.stopBtn} — {recordTime}</> : labels.recordBtn}
+            </button>
+          )}
         </div>
       </div>
 
@@ -3192,7 +3225,15 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
           {audioStatus === 'loading' ? labels.generatingAudio : `▷ ${labels.generateAudio}`}
         </button>
         {audioError && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{labels.errorPrefix}: {audioError}</div>}
-        {audioUrl && <div style={{ marginTop: '1rem' }}><audio key={audioUrl} controls src={audioUrl} style={{ width: '100%' }} /></div>}
+        {audioUrl && (
+          <div style={{ marginTop: '1rem' }}>
+            <audio key={audioUrl} controls src={audioUrl} style={{ width: '100%' }} />
+            <a className="btn-secondary btn-sm" href={audioUrl} download={`speech_${language}.mp3`}
+              style={{ display: 'inline-block', marginTop: '0.5rem' }}>
+              ⬇ {labels.downloadAudio}
+            </a>
+          </div>
+        )}
       </div>
 
       {/* ── Summary ── */}
@@ -3399,6 +3440,8 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
   const autoTranscribeRef = useRef(autoTranscribe);
   useEffect(() => { autoTranscribeRef.current = autoTranscribe; }, [autoTranscribe]);
   const [simultaneousActive, setSimultaneousActive] = useState(false);
+  const [simulSourceEnded, setSimulSourceEnded] = useState(false);
+  const graceTimerRef = useRef(null);
   // 3 practice modes (professor request): simultaneous | consecutive | sight
   const [interpMode, setInterpMode] = useState('consecutive');
   const sourceIsArabic = /[؀-ۿ]/.test(sourceScript || '');
@@ -3447,10 +3490,17 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
     try {
       player.currentTime = 0;
       setSimultaneousActive(true);
+      setSimulSourceEnded(false);
       const started = await startRecording({ echoCancellation: true, noiseSuppression: true });
       if (!started) { setSimultaneousActive(false); return; }
       await player.play();
-      player.onended = () => stopSimultaneous();
+      // The interpreter necessarily finishes AFTER the speaker (décalage) —
+      // when the source ends, keep recording for up to 60s so the student can
+      // complete the interpretation; they can stop earlier manually.
+      player.onended = () => {
+        setSimulSourceEnded(true);
+        graceTimerRef.current = setTimeout(() => stopSimultaneous(), 60000);
+      };
     } catch (err) {
       setSimultaneousActive(false);
       setError(labels.simultaneousFailed);
@@ -3460,6 +3510,8 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
   function stopSimultaneous() {
     const player = referenceAudioRef.current;
     if (player) { player.pause(); player.onended = null; }
+    clearTimeout(graceTimerRef.current);
+    setSimulSourceEnded(false);
     setSimultaneousActive(false);
     stopRecording();
   }
@@ -3599,9 +3651,14 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
                   {labels.simulStart}
                 </button>
               ) : (
-                <button className="btn-record recording-active" onClick={stopSimultaneous}>
-                  <span className="rec-dot" /> {labels.simulStop} — {formatTime(recordingTime)}
-                </button>
+                <>
+                  <button className="btn-record recording-active" onClick={stopSimultaneous}>
+                    <span className="rec-dot" /> {labels.simulStop} — {formatTime(recordingTime)}
+                  </button>
+                  {simulSourceEnded && (
+                    <div className="info-tip" style={{ marginTop: '0.6rem' }}>⏳ {labels.simulSourceEnded}</div>
+                  )}
+                </>
               )
             )}
           </div>
@@ -3611,11 +3668,24 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
         {interpMode === 'sight' && (
           <div className="record-section" style={{ marginBottom: '1rem' }}>
             {sourceScript ? (
-              <SightScroller key={sourceScript.slice(0, 50)} script={sourceScript} isArabic={sourceIsArabic} labels={labels} />
+              <SightScroller key={sourceScript.slice(0, 50)} script={sourceScript} isArabic={sourceIsArabic} labels={labels}
+                isRecording={isRecording}
+                recordTime={formatTime(recordingTime)}
+                onToggleRecord={() => (isRecording ? stopRecording() : startRecording())} />
             ) : (
               <div className="info-tip">ℹ️ {labels.needsSource}</div>
             )}
           </div>
+        )}
+
+        {/* Consecutive — pedagogical order (16 July feedback): the student
+            FIRST listens and takes notes, THEN interprets from the notes.
+            Notes therefore come before the recording section. */}
+        {interpMode === 'consecutive' && (
+          <>
+            <div className="info-tip" style={{ marginBottom: '0.75rem' }}>📝 {labels.consecFlowHint}</div>
+            <NotesPad labels={labels} />
+          </>
         )}
 
         {/* Recording section */}
@@ -3649,6 +3719,14 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
             <div style={{ marginTop: '0.75rem' }}>
               <div className="recorded-audio-row">
                 <audio controls src={recordedUrl} style={{ width: '100%' }} />
+                {/* Recordings are deleted server-side after processing — this
+                    download is the student's only copy (for sharing with peers
+                    or a teacher, 16 July feedback) */}
+                <a className="btn-secondary btn-sm" href={recordedUrl}
+                  download={`interpretation_${new Date().toISOString().slice(0, 10)}.webm`}
+                  style={{ whiteSpace: 'nowrap', alignSelf: 'center' }}>
+                  ⬇ {labels.downloadRecording}
+                </a>
                 <button className="btn-icon-danger" onClick={clearAudio} title={labels.deleteAudio}>
                   <IconTrash />
                 </button>
@@ -3673,8 +3751,6 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
           )}
         </div>
 
-        {/* Note-taking space — consecutive mode only */}
-        {interpMode === 'consecutive' && <NotesPad labels={labels} />}
 
       </div>
 
@@ -3921,6 +3997,11 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
   const language = lastTranscript?.language || lastTranscript?.language_detected || 'ar';
 
   async function handleEvaluate() {
+    if (!getStoredGroqKey()) {
+      setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
+      setStatus('error');
+      return;
+    }
     setStatus('loading');
     setError('');
     setReport(null);
@@ -4037,14 +4118,14 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               {(report.strengths || []).length > 0 && (
                 <div className="report-strengths">
                   <p className="report-label">✅ {labels.strengths}</p>
-                  <ul>{(report.strengths || []).map((s, i) => <li key={i}>{s}</li>)}</ul>
+                  <ul>{(report.strengths || []).map((s, i) => <li key={i} dir="auto">{s}</li>)}</ul>
                 </div>
               )}
             </div>
             {report.summary && (
               <div className="report-summary">
                 <p className="report-label">📋 {labels.evalSummary}</p>
-                <p className={isAr ? 'arabic' : ''}>{report.summary}</p>
+                <p dir="auto" style={{ textAlign: 'start' }}>{report.summary}</p>
               </div>
             )}
           </div>
@@ -4118,7 +4199,9 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 </div>
               </div>
             )}
-            {displayNumberErrors.length > 0 && (
+            {/* Raw number chips only when the AI Numbers & dates section is absent —
+                two number blocks side by side confused evaluators (16 July feedback) */}
+            {displayNumberErrors.length > 0 && !(report.number_accuracy || []).length && (
               <div className="algo-detail-block">
                 <p className="algo-detail-title">🔢 {labels.numberErrors}</p>
                 <div className="algo-chips">
@@ -4253,21 +4336,11 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             </div>
           )}
 
-          {/* Translation errors */}
-          {(report.translation_errors || []).length > 0 && (
-            <div className="card">
-              <h3 className="report-section-title">🔄 {labels.translationErrors}</h3>
-              {(report.translation_errors || []).map((item, i) => (
-                <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--sienna)', paddingInlineStart: '0.75rem', marginBottom: '0.75rem' }}>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.sourceSaid}:</div>
-                  <div className="eval-text" style={{ marginBottom: '0.25rem' }}>"{item.source_text}"</div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.studentSaid}: <strong style={{ color: 'var(--sienna)' }}>{item.student_said}</strong></div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.2rem' }}>{labels.correctTranslation}: <strong style={{ color: 'var(--sage)' }}>{item.correct_translation}</strong></div>
-                  {item.explanation && <div className="eval-explanation" dir="auto">{item.explanation}</div>}
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Translation errors section REMOVED (professor feedback 16 July):
+              word-level source-vs-target comparison is machine-translation
+              thinking — an interpreter transmits meaning, not words. Meaning-
+              level feedback lives in missing content, terminology (vs the
+              approved glossary), numbers, and proper nouns. */}
 
           {/* Proper nouns — names of people, organizations, places */}
           {(report.proper_nouns || []).length > 0 && (
@@ -4354,7 +4427,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             <div className="card">
               <h3 className="report-section-title">💡 {labels.recommendations}</h3>
               <ul className="recommendations-list">
-                {report.recommendations.map((r, i) => <li key={i}>{r}</li>)}
+                {report.recommendations.map((r, i) => <li key={i} dir="auto">{r}</li>)}
               </ul>
             </div>
           )}
