@@ -57,8 +57,12 @@ MODE_INSTRUCTIONS = {
 WORD_COUNT_RANGES = {
     'short': {'label': 'Short', 'min': 120, 'max': 180, 'target': 150},
     'medium': {'label': 'Medium', 'min': 220, 'max': 320, 'target': 270},
-    'long': {'label': 'Long', 'min': 400, 'max': 550, 'target': 475},
-    'extended': {'label': 'Extended', 'min': 650, 'max': 800, 'target': 725},
+    'long': {'label': 'Long', 'min': 400, 'max': 550, 'target': 500},
+    'extended': {'label': 'Extended', 'min': 650, 'max': 800, 'target': 750},
+    # Professional-interpreter feedback (18 July): the four options felt too
+    # close together and real assignments are much longer — this range gives
+    # a genuinely long speech (~9-11 min spoken) within one LLM call's budget.
+    'very_long': {'label': 'Very long', 'min': 1100, 'max': 1400, 'target': 1250},
 }
 
 DEFAULT_WORD_COUNT_RANGE = 'medium'
@@ -328,11 +332,19 @@ SPEECH WRITING RULES
    - The 3 wrong options must be plausible but clearly contradicted by the speech.
    - NEVER ask "what is the topic?" or "who gave this speech?".
 
-7. Glossary: 8–12 key terms, each with Arabic, French, English, and a brief definition.
+7. Glossary: 12–18 key terms, each with Arabic, French, English, and a brief definition.
 
+   - PRIORITIZE domain-specific and technical terms from the speech (institutional bodies,
+     treaty names, economic/legal/medical terminology, specialized processes) over general
+     vocabulary. A professional interpreter's glossary is technical, not generic.
+   - OFFICIAL INSTITUTIONAL TERMINOLOGY IS MANDATORY — use the established UN/UNTERM
+     equivalents, never improvised translations. Examples of required official forms:
+     - UNHCR → AR: "مفوضية الأمم المتحدة السامية لشؤون اللاجئين" / FR: "Haut-Commissariat des Nations Unies pour les réfugiés (HCR)"
+     - poverty line → AR: "خط الفقر" (NOT "حد الفقر") / FR: "seuil de pauvreté"
+     - GIEC/IPCC → AR: "الهيئة الحكومية الدولية المعنية بتغير المناخ"
+     - Apply the same standard to every UN body, programme, and convention mentioned.
    - Arabic equivalents must be correct, complete Modern Standard Arabic terms.
    - Do not output malformed Arabic words or split one Arabic term across unrelated lines.
-   - For GIEC/IPCC, use Arabic: "الهيئة الحكومية الدولية المعنية بتغير المناخ".
 
 8. Summary: A polished thematic summary in the speech language:
    - 3 to 5 short bullet points, each a complete sentence.

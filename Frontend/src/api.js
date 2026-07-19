@@ -44,8 +44,17 @@ async function safeFetch(url, options = {}) {
   try {
     return await fetch(url, options);
   } catch {
-    throw new Error('Cannot reach the server. Check your internet connection and try again.');
+    // Free-tier hosting sleeps after ~15 min idle and takes 2-3 min to wake —
+    // most "cannot reach" failures during testing were exactly this.
+    throw new Error('Cannot reach the server — it may be waking up from sleep (free hosting takes 2–3 minutes). Please wait a moment and try again; also check your internet connection.');
   }
+}
+
+// Wake the backend as soon as the app opens and keep it awake during the
+// session (free hosting sleeps after ~15 min idle; a sleeping server made
+// transcriptions fail for testers). Fire-and-forget — errors ignored.
+export function pingServer() {
+  fetch(SERVER_BASE, { method: 'GET', mode: 'no-cors' }).catch(() => {});
 }
 
 async function parseJsonResponse(res) {

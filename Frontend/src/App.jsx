@@ -21,6 +21,7 @@ import {
   getSessionHistory,
   getAdaptiveParams,
   getStoredGroqKey,
+  pingServer,
   saveGroqKey,
   setCurrentUserId,
   validateGroqKey,
@@ -309,10 +310,11 @@ const UI = {
     diffHint: 'Beginner: simple vocabulary, short sentences, 1–2 numbers, slow pace. Intermediate: moderate terminology, several statistics, mixed sentences. Advanced: dense terminology, frequent numbers and names, complex syntax, fast pace.',
     demoKeyBanner: 'This platform uses a free AI service (Groq) to generate and evaluate speeches. Right now you are using the platform\'s shared demonstration key, which works but is slower and has shared daily limits. Creating your own free key (2 minutes, no credit card) gives you faster responses and your own quota.',
     demoKeyBtn: 'Add my free key in Settings',
-    wordRangeShortFull: 'Short — 120–180 words (≈ 1–1.5 min at 120 wpm)',
-    wordRangeMediumFull: 'Medium — 220–320 words (≈ 2–2.5 min)',
-    wordRangeLongFull: 'Long — 400–550 words (≈ 3.5–4.5 min)',
-    wordRangeExtendedFull: 'Extended — 650–800 words (≈ 5.5–6.5 min)',
+    wordRangeShortFull: 'Short — 120–180 words (≈ 1 min)',
+    wordRangeMediumFull: 'Medium — 220–320 words (≈ 1.5–2.5 min)',
+    wordRangeLongFull: 'Long — 400–550 words (≈ 3–4 min)',
+    wordRangeExtendedFull: 'Extended — 650–800 words (≈ 4.5–6 min)',
+    wordRangeVeryLongFull: 'Very long — 1100–1400 words (≈ 8–11 min)',
     optSemiStructured: 'Semi-structured',
     optDisorganizedFull: 'Deliberately disorganized',
     scenarioLabel: 'Speaker style / setting',
@@ -712,10 +714,11 @@ const UI = {
     diffHint: 'مبتدئ: مفردات بسيطة، جمل قصيرة، رقم أو رقمان، إيقاع بطيء. متوسط: مصطلحات معتدلة، عدة إحصاءات، جمل متنوعة. متقدم: مصطلحات كثيفة، أرقام وأسماء متكررة، تراكيب معقدة، إيقاع سريع.',
     demoKeyBanner: 'تعتمد المنصة على خدمة ذكاء اصطناعي مجانية (Groq) لتوليد الخطابات وتقييمها. أنت تستخدم حالياً المفتاح التجريبي المشترك للمنصة، وهو يعمل لكنه أبطأ وله حدود استخدام مشتركة. إنشاء مفتاحك المجاني الخاص (دقيقتان، دون بطاقة ائتمان) يمنحك استجابات أسرع وحصة خاصة بك.',
     demoKeyBtn: 'أضف مفتاحي المجاني في الإعدادات',
-    wordRangeShortFull: 'قصير — 120–180 كلمة (≈ 1–1.5 دقيقة بسرعة 120 كلمة/د)',
-    wordRangeMediumFull: 'متوسط — 220–320 كلمة (≈ 2–2.5 دقيقة)',
-    wordRangeLongFull: 'طويل — 400–550 كلمة (≈ 3.5–4.5 دقيقة)',
-    wordRangeExtendedFull: 'ممتد — 650–800 كلمة (≈ 5.5–6.5 دقيقة)',
+    wordRangeShortFull: 'قصير — 120–180 كلمة (≈ دقيقة واحدة)',
+    wordRangeMediumFull: 'متوسط — 220–320 كلمة (≈ 1.5–2.5 دقيقة)',
+    wordRangeLongFull: 'طويل — 400–550 كلمة (≈ 3–4 دقائق)',
+    wordRangeExtendedFull: 'ممتد — 650–800 كلمة (≈ 4.5–6 دقائق)',
+    wordRangeVeryLongFull: 'طويل جداً — 1100–1400 كلمة (≈ 8–11 دقيقة)',
     optSemiStructured: 'شبه منظَّم',
     optDisorganizedFull: 'غير منظَّم عمداً',
     scenarioLabel: 'أسلوب المتحدث / السياق',
@@ -1115,10 +1118,11 @@ const UI = {
     diffHint: 'Débutant : vocabulaire simple, phrases courtes, 1–2 chiffres, débit lent. Intermédiaire : terminologie modérée, plusieurs statistiques, phrases variées. Avancé : terminologie dense, chiffres et noms fréquents, syntaxe complexe, débit rapide.',
     demoKeyBanner: 'La plateforme utilise un service d\'IA gratuit (Groq) pour générer et évaluer les discours. Vous utilisez actuellement la clé de démonstration partagée de la plateforme : elle fonctionne, mais elle est plus lente et soumise à des limites d\'usage partagées. Créer votre propre clé gratuite (2 minutes, sans carte bancaire) vous donne des réponses plus rapides et un quota personnel.',
     demoKeyBtn: 'Ajouter ma clé gratuite dans Paramètres',
-    wordRangeShortFull: 'Court — 120–180 mots (≈ 1–1,5 min à 120 mots/min)',
-    wordRangeMediumFull: 'Moyen — 220–320 mots (≈ 2–2,5 min)',
-    wordRangeLongFull: 'Long — 400–550 mots (≈ 3,5–4,5 min)',
-    wordRangeExtendedFull: 'Étendu — 650–800 mots (≈ 5,5–6,5 min)',
+    wordRangeShortFull: 'Court — 120–180 mots (≈ 1 min)',
+    wordRangeMediumFull: 'Moyen — 220–320 mots (≈ 1,5–2,5 min)',
+    wordRangeLongFull: 'Long — 400–550 mots (≈ 3–4 min)',
+    wordRangeExtendedFull: 'Étendu — 650–800 mots (≈ 4,5–6 min)',
+    wordRangeVeryLongFull: 'Très long — 1100–1400 mots (≈ 8–11 min)',
     optSemiStructured: 'Semi-structuré',
     optDisorganizedFull: 'Volontairement désorganisé',
     scenarioLabel: 'Style d\'orateur / contexte',
@@ -1796,6 +1800,15 @@ export default function App() {
   const [lastGeneratedScript, setLastGeneratedScript] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const L = UI[uiLang];
+
+  // Wake the free-tier backend immediately and keep it awake during the
+  // session — a sleeping server (2-3 min cold start) caused testers'
+  // transcription failures (18 July feedback).
+  useEffect(() => {
+    pingServer();
+    const keepAlive = setInterval(pingServer, 10 * 60 * 1000);
+    return () => clearInterval(keepAlive);
+  }, []);
 
   useEffect(() => {
     const isAr = uiLang === 'ar';
@@ -2657,7 +2670,8 @@ const [showAdvanced, setShowAdvanced] = useState(true);
                 <option value="short">{labels.wordRangeShortFull || 'Short — 120–180 words (≈1–1.5 min)'}</option>
                 <option value="medium">{labels.wordRangeMediumFull || 'Medium — 220–320 words (≈2–2.5 min)'}</option>
                 <option value="long">{labels.wordRangeLongFull || 'Long — 400–550 words (≈3.5–4.5 min)'}</option>
-                <option value="extended">{labels.wordRangeExtendedFull || 'Extended — 650–800 words (≈5.5–6.5 min)'}</option>
+                <option value="extended">{labels.wordRangeExtendedFull || 'Extended — 650–800 words (≈4.5–6 min)'}</option>
+                <option value="very_long">{labels.wordRangeVeryLongFull || 'Very long — 1100–1400 words (≈8–11 min)'}</option>
               </SelectField>
               <SelectField label={labels.domain} id="f-domain" name="domain" value={form.domain} onChange={updateField}>
                 <option value="politics">{labels.domPolitics || 'Politics'}</option>

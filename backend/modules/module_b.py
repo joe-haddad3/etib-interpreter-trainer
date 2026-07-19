@@ -51,12 +51,37 @@ async def _tts_async(text: str, voice: str, output_path: str, rate: str = '+0%')
     communicate = edge_tts.Communicate(text, voice, rate=rate)
     await communicate.save(output_path)
 
+
+_AR_D = r'[0-9٠-٩]'   # Western + Eastern Arabic-Indic digits
+
+
+def _prepare_arabic_tts_text(text: str) -> str:
+    """
+    Make numbers read correctly by the Arabic TTS voice (student feedback,
+    18 July): edge-tts reads "٨٫٢" / "8.2" as "eight two" — the decimal
+    separator must be spoken as the word فاصلة so the listener hears
+    "eight POINT two". Thousands separators are removed so grouped numbers
+    ("١٬٤٠٠") are read as one value.
+    """
+    text = str(text or '')
+    # Arabic thousands separator ٬ (U+066C) between digits → drop
+    text = re.sub(rf'({_AR_D})٬(?={_AR_D})', r'\1', text)
+    # Comma/dot as thousands group (separator + exactly 3 digits) → drop separator
+    text = re.sub(rf'({_AR_D})[.,](?={_AR_D}{{3}}(?!{_AR_D}))', r'\1', text)
+    # Remaining decimal separators (٫ U+066B, Arabic comma ،, dot, comma)
+    # between digits → the spoken word فاصلة
+    text = re.sub(rf'({_AR_D})\s*[٫،.,]\s*(?={_AR_D})', r'\1 فاصلة ', text)
+    return text
+
+
 def run_tts(text: str, language: str, accent: str = None,
             rate_adjustment: int = 0) -> str:
     """
     Convert text to speech. Returns path to the generated MP3 file.
     rate_adjustment: percentage change from normal speed (-50 to +50)
     """
+    if language == 'ar':
+        text = _prepare_arabic_tts_text(text)
     voice = get_voice(language, accent)
     rate_str = f'{rate_adjustment:+d}%' if rate_adjustment != 0 else '+0%'
     filename = f'speech_{uuid.uuid4().hex[:8]}.mp3'
