@@ -2958,10 +2958,14 @@ def full_evaluation():
     # Avoid telling the LLM source==target (monolingual confusion) when not explicitly set
     source_language  = _raw_src_lang if _raw_src_lang and _raw_src_lang != language else 'unknown'
 
-    from modules.module_c import _safe_audio_ext
+    from modules.module_c import _safe_audio_ext, normalize_audio_for_asr
     ext       = _safe_audio_ext(audio_file.filename)
     temp_path = os.path.join(UPLOAD_FOLDER, f'eval_{uuid.uuid4().hex[:8]}{ext}')
     audio_file.save(temp_path)
+    # Fix the MediaRecorder WebM no-duration truncation so the WHOLE recording
+    # is transcribed and analysed (Mariam feedback: single-sentence transcript
+    # → false silences/omissions). Audio-energy detectors below also read this.
+    asr_path = normalize_audio_for_asr(temp_path)
 
     try:
         from modules.module_c import DISFLUENCY_PROMPTS
@@ -2975,7 +2979,7 @@ def full_evaluation():
         # minutes. Local faster-whisper (medium) is the fallback; it also
         # provides per-word confidence, which the cloud API does not.
         asr_method = 'local_faster_whisper_medium'
-        groq_asr = transcribe_eval_with_groq(temp_path, language, verbatim_prompt)
+        groq_asr = transcribe_eval_with_groq(asr_path, language, verbatim_prompt)
 
         if groq_asr is not None:
             asr_method = 'groq_whisper_large_v3'
@@ -2991,7 +2995,7 @@ def full_evaluation():
             repetition_hotwords = build_repetition_hotwords(source_script, language)
 
             segments_iter, info = model.transcribe(
-                temp_path,
+                asr_path,
                 language=language,
                 task='transcribe',
                 word_timestamps=True,
@@ -3068,7 +3072,7 @@ def full_evaluation():
         # threshold so EVS lag in simultaneous mode isn't re-flagged by this
         # second, independent silence detector.
         audio_silence_ms = int(SILENCE_THRESHOLD_BY_MODE.get(mode, 2.0) * 1000)
-        audio_silences = detect_audio_silences(temp_path, threshold_ms=audio_silence_ms)
+        audio_silences = detect_audio_silences(asr_path, threshold_ms=audio_silence_ms)
         if audio_silences:
             algo['long_silences'] = merge_silence_reports(algo.get('long_silences', []), audio_silences)
             algo['audio_silences'] = audio_silences
@@ -3077,8 +3081,8 @@ def full_evaluation():
         # - voiced short gaps = filled pauses ("euhhh") the recognizer skipped
         # - short burst→silence→speech = a word cut mid-way and restarted
         # Both are genuine hesitations (D5).
-        audio_filled  = detect_audio_filled_pauses(temp_path, transcript.get('segments', []))
-        audio_cut     = detect_cut_words_from_audio(temp_path)
+        audio_filled  = detect_audio_filled_pauses(asr_path, transcript.get('segments', []))
+        audio_cut     = detect_cut_words_from_audio(asr_path)
         # A voiced burst inside a word gap can trigger both detectors for the
         # same event — keep the filled-pause reading, drop the duplicate.
         audio_cut = [c for c in (audio_cut or [])
@@ -3208,8 +3212,9 @@ def full_evaluation():
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        for _p in {temp_path, asr_path}:
+            if _p and os.path.exists(_p):
+                os.remove(_p)
 
 
 TASHKEEL_COMPARE_PROMPT = """You are an Arabic linguistics expert for ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).

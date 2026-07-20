@@ -29,6 +29,45 @@ def _clean_asr_text(text: str) -> str:
     return cleaned.strip()
 
 
+def normalize_audio_for_asr(audio_path: str) -> str:
+    """
+    Re-decode the uploaded audio to a clean 16 kHz mono WAV before ASR.
+
+    THE CRITICAL FIX (Mariam feedback, July): browser MediaRecorder produces
+    WebM with NO duration written in its header (a known Chromium limitation).
+    Many decoders — including the one behind the cloud recognizer — then stop
+    after the first cluster (~40 s), so a multi-minute Arabic interpretation
+    came back as a single sentence, which in turn made the evaluator report
+    false silences, omissions, and missing content.
+
+    PyAV decodes the WebM frame-by-frame to EOF (immune to the missing header),
+    and a proper WAV (with a real data-size/duration) makes every downstream
+    recognizer read the WHOLE recording. Returns the WAV path, or the original
+    path unchanged if conversion is unavailable/fails (never raises).
+    """
+    try:
+        import wave
+        import numpy as np
+        # Lazy import avoids a circular import (module_d imports module_c).
+        from modules.module_d import decode_audio_mono
+
+        samples, rate = decode_audio_mono(audio_path, target_rate=16000)
+        if samples is None or len(samples) == 0:
+            return audio_path
+
+        out_path = os.path.splitext(audio_path)[0] + '_norm.wav'
+        pcm16 = (np.clip(samples, -1.0, 1.0) * 32767.0).astype('<i2')
+        with wave.open(out_path, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(rate)
+            wf.writeframes(pcm16.tobytes())
+        return out_path if os.path.getsize(out_path) > 44 else audio_path
+    except Exception as exc:
+        print(f'[Module C] Audio normalize failed ({exc}) — using original file')
+        return audio_path
+
+
 def _safe_audio_ext(filename: str) -> str:
     """Return a whitelisted audio extension from an untrusted filename."""
     import os as _os
@@ -368,18 +407,21 @@ def transcribe():
     ext = _safe_audio_ext(audio_file.filename)
     temp_path = os.path.join(UPLOAD_FOLDER, f'upload_{uuid.uuid4().hex[:8]}{ext}')
     audio_file.save(temp_path)
+    # Fix the MediaRecorder WebM no-duration truncation before ASR (see
+    # normalize_audio_for_asr) so the FULL recording is transcribed.
+    asr_path = normalize_audio_for_asr(temp_path)
 
     try:
         # Try Groq first (fast), fall back to local Whisper
         from utils.groq_client import get_groq_key
         if get_groq_key():
             try:
-                result = _transcribe_groq(temp_path, language)
+                result = _transcribe_groq(asr_path, language)
             except Exception as groq_err:
                 print(f'[Module C] Groq failed ({groq_err}), falling back to local Whisper')
-                result = _transcribe_local(temp_path, language)
+                result = _transcribe_local(asr_path, language)
         else:
-            result = _transcribe_local(temp_path, language)
+            result = _transcribe_local(asr_path, language)
 
         # For Arabic: add tashkeel reflecting what the student actually said
         if language == 'ar' and result.get('full_text'):
@@ -389,8 +431,9 @@ def transcribe():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        for p in {temp_path, asr_path}:
+            if p and os.path.exists(p):
+                os.remove(p)
 
 
 @module_c_bp.route('/align', methods=['POST'])
