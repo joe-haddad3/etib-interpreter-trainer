@@ -57,8 +57,12 @@ MODE_INSTRUCTIONS = {
 WORD_COUNT_RANGES = {
     'short': {'label': 'Short', 'min': 120, 'max': 180, 'target': 150},
     'medium': {'label': 'Medium', 'min': 220, 'max': 320, 'target': 270},
-    'long': {'label': 'Long', 'min': 400, 'max': 550, 'target': 475},
-    'extended': {'label': 'Extended', 'min': 650, 'max': 800, 'target': 725},
+    'long': {'label': 'Long', 'min': 400, 'max': 550, 'target': 500},
+    'extended': {'label': 'Extended', 'min': 650, 'max': 800, 'target': 750},
+    # Professional-interpreter feedback (18 July): the four options felt too
+    # close together and real assignments are much longer — this range gives
+    # a genuinely long speech (~9-11 min spoken) within one LLM call's budget.
+    'very_long': {'label': 'Very long', 'min': 1100, 'max': 1400, 'target': 1250},
 }
 
 DEFAULT_WORD_COUNT_RANGE = 'medium'
@@ -236,6 +240,67 @@ FACTUAL ACCURACY RULES (no source document available):
             'personal framing of facts and experiences. ABSOLUTELY NOT a structured podium speech — it must '
             'sound like someone talking to a journalist across a table.'
         ),
+        # ── Added per professional-interpreter feedback (18/20 July): more
+        # scenarios and institutional contexts across all interpretation modes.
+        'panel discussion': (
+            'One panelist among several speaking during a moderated panel: reacts to a previous speaker\'s '
+            'point before making their own, references "my fellow panelists", shorter turns than a keynote, '
+            'occasional direct address to the moderator or audience questions.'
+        ),
+        'live TV broadcast': (
+            'Live on-air commentary or statement for television: energetic, quotable, short punchy sentences '
+            'aware of a broad public audience (not specialists), frequent framing like "what this means for '
+            'viewers is..."; no podium formality.'
+        ),
+        'legal/court setting': (
+            'Testimony, examination, or ruling in a legal setting (courtroom, police interview, deposition): '
+            'precise, formal legal register, direct question-and-answer rhythm or formal statement of fact, '
+            'careful qualified language ("to the best of my knowledge", "it is alleged that"), legal terms '
+            'used exactly. Community/legal interpretation, not conference rhetoric.'
+        ),
+        'medical/healthcare': (
+            'Clinical consultation, patient intake, or medical explanation (clinic, hospital, psychotherapy '
+            'session): direct address to a patient or between clinicians, plain but precise clinical '
+            'vocabulary, empathetic but factual tone, short exchanges rather than long rhetorical passages. '
+            'Community/medical interpretation register, not a conference speech.'
+        ),
+        'public service consultation': (
+            'A public-service officer explaining a legal or medical procedure to a member of the public '
+            '(social services, immigration office, public clinic): plain-language explanation of rights, '
+            'steps, or forms, direct second-person address ("you will need to..."), no institutional jargon '
+            'without explanation.'
+        ),
+        'UN Security Council': (
+            'Formal statement to the UN Security Council: solemn register, direct references to resolutions, '
+            'sanctions regimes, peacekeeping mandates, addresses "the Council" and fellow member states, '
+            'high diplomatic stakes language.'
+        ),
+        'ECOSOC': (
+            'Statement to the UN Economic and Social Committee (ECOSOC): technical multilateral register '
+            'focused on development, economic cooperation, and social policy coordination among member states.'
+        ),
+        'WHO': (
+            'Statement at a World Health Organization forum: public-health register, epidemiological and '
+            'health-system vocabulary, references to health emergencies, universal health coverage, and '
+            'WHO guidance.'
+        ),
+        'ILO': (
+            'Statement at an International Labour Organization forum: labour-rights and social-dialogue '
+            'register (tripartite: governments, employers, workers), references to labour standards and '
+            'conventions.'
+        ),
+        'UNESCO': (
+            'Statement at a UNESCO forum: register centered on education, science, and culture, references '
+            'to heritage protection, education access, and international scientific/cultural cooperation.'
+        ),
+        'OIF': (
+            'Statement at an Organisation internationale de la Francophonie forum: register emphasizing '
+            'Francophone solidarity, cultural and linguistic cooperation among French-speaking states.'
+        ),
+        'AUF': (
+            'Statement at an Agence universitaire de la Francophonie forum: academic-institutional register '
+            'focused on higher-education cooperation and research among Francophone universities.'
+        ),
     }
     scenario_style = scenario_styles.get(scenario, f'Style and register appropriate to: {scenario}.')
 
@@ -328,11 +393,19 @@ SPEECH WRITING RULES
    - The 3 wrong options must be plausible but clearly contradicted by the speech.
    - NEVER ask "what is the topic?" or "who gave this speech?".
 
-7. Glossary: 8–12 key terms, each with Arabic, French, English, and a brief definition.
+7. Glossary: 12–18 key terms, each with Arabic, French, English, and a brief definition.
 
+   - PRIORITIZE domain-specific and technical terms from the speech (institutional bodies,
+     treaty names, economic/legal/medical terminology, specialized processes) over general
+     vocabulary. A professional interpreter's glossary is technical, not generic.
+   - OFFICIAL INSTITUTIONAL TERMINOLOGY IS MANDATORY — use the established UN/UNTERM
+     equivalents, never improvised translations. Examples of required official forms:
+     - UNHCR → AR: "مفوضية الأمم المتحدة السامية لشؤون اللاجئين" / FR: "Haut-Commissariat des Nations Unies pour les réfugiés (HCR)"
+     - poverty line → AR: "خط الفقر" (NOT "حد الفقر") / FR: "seuil de pauvreté"
+     - GIEC/IPCC → AR: "الهيئة الحكومية الدولية المعنية بتغير المناخ"
+     - Apply the same standard to every UN body, programme, and convention mentioned.
    - Arabic equivalents must be correct, complete Modern Standard Arabic terms.
    - Do not output malformed Arabic words or split one Arabic term across unrelated lines.
-   - For GIEC/IPCC, use Arabic: "الهيئة الحكومية الدولية المعنية بتغير المناخ".
 
 8. Summary: A polished thematic summary in the speech language:
    - 3 to 5 short bullet points, each a complete sentence.
@@ -417,8 +490,12 @@ def _to_arabic_indic(text: str) -> str:
 
 
 def _clean_arabic_script(text: str) -> str:
-    """Remove stray Latin/CJK characters from an Arabic script field, then convert digits."""
-    import unicodedata
+    """Remove stray Latin/CJK characters from an Arabic script field, then convert digits.
+
+    A stray foreign character is DROPPED, not replaced by a space: replacing it
+    with a space used to split the surrounding Arabic word in half
+    ("وال官ية" → "وال ية", professor's 16 July example). Dropping heals the word.
+    """
     result = []
     for char in text:
         block = ord(char)
@@ -427,8 +504,6 @@ def _clean_arabic_script(text: str) -> str:
         is_digit = char.isdigit()
         if is_arabic or is_space or is_digit:
             result.append(char)
-        else:
-            result.append(' ')
     import re as _re
     cleaned = _re.sub(r' {2,}', ' ', ''.join(result)).strip()
     return _to_arabic_indic(cleaned)
@@ -1108,12 +1183,53 @@ def _trim_script_to_word_count(script: str, target_word_count: int, language: st
     return script
 
 
+def _proofread_arabic_script(script: str) -> str:
+    """
+    Second-pass Arabic proofread (16 July professor feedback). The generation
+    model's recurring Arabic faults — English calques, wrong verb choice,
+    gender agreement, missing prepositions, truncated words — are corrected by
+    a focused review call. Content, rhetoric, numbers, and length must be
+    preserved; the original script is returned on any failure or if the
+    rewrite changed the length materially.
+    """
+    words = len(str(script or '').split())
+    if words < 30:
+        return script
+    try:
+        fixed = generate_text(
+            messages=[
+                {'role': 'system', 'content': (
+                    'You are an expert Modern Standard Arabic proofreader for conference speeches. '
+                    'Correct ONLY genuine language errors: English calques (لا يملكون وصولاً إلى → لا يحصلون على), '
+                    'wrong verb choice (تعنيها البلاد → تعانيها البلاد), gender/number agreement '
+                    '(تتعين على الأمم المتحدة → يتعين على الأمم المتحدة), missing prepositions '
+                    '(فيما يتعلق توفير → فيما يتعلق بتوفير), broken or truncated words, and '
+                    'relative-pronoun agreement. Preserve the content, style, rhetoric, statistics '
+                    '(keep Eastern Arabic-Indic digits), proper nouns, and length EXACTLY. '
+                    'Return ONLY the corrected speech text — no commentary, no JSON.'
+                )},
+                {'role': 'user', 'content': script},
+            ],
+            max_tokens=min(6000, max(1500, words * 3 + 300)),
+            temperature=0.1,
+        )
+        fixed = _clean_arabic_script(str(fixed or '').strip())
+        fixed_words = len(fixed.split())
+        if fixed_words and abs(fixed_words - words) / words <= 0.15:
+            return fixed
+    except Exception:
+        pass
+    return script
+
+
 def build_generation_response(generated: dict, params: dict, mode: str = 'generated', extra: dict | None = None) -> dict:
     script = generated['script']
     word_count_settings = get_word_count_settings(params)
     target_word_count = word_count_settings['target']
     script = _expand_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
     script = _trim_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
+    if params.get('language', 'ar') == 'ar':
+        script = _proofread_arabic_script(script)
     generated['script'] = script
     word_count = len(script.split())
     wpm = params.get('wpm', DEFAULT_WPM)

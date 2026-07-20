@@ -35,21 +35,32 @@ REMOTE_AYA_VERIFY_SSL = os.getenv('REMOTE_AYA_VERIFY_SSL', 'true').strip().lower
 # Person 4 will update these after listening to samples
 TTS_VOICES = {
     'ar': {
-        'LB': 'ar-LB-RamiNeural',     # Lebanese — closest to ETIB students
-        'LB_f': 'ar-LB-LaylaNeural',  # Lebanese female
-        'SA': 'ar-SA-ZariyahNeural',  # Gulf female
-        'EG': 'ar-EG-SalmaNeural',    # Egyptian female
-        'EG_m': 'ar-EG-ShakirNeural', # Egyptian male
+        'LB': 'ar-LB-RamiNeural',       # Lebanese — closest to ETIB students
+        'LB_f': 'ar-LB-LaylaNeural',    # Lebanese female
+        'SA': 'ar-SA-ZariyahNeural',    # Gulf female
+        'SA_m': 'ar-SA-HamedNeural',    # Gulf male (professor feedback: voice diversity)
+        'EG': 'ar-EG-SalmaNeural',      # Egyptian female
+        'EG_m': 'ar-EG-ShakirNeural',   # Egyptian male
+        'MA': 'ar-MA-MounaNeural',      # Maghreb (Morocco) female
+        'MA_m': 'ar-MA-JamalNeural',    # Maghreb (Morocco) male
     },
     'fr': {
         'FR': 'fr-FR-DeniseNeural',
         'FR_m': 'fr-FR-HenriNeural',
         'CA': 'fr-CA-SylvieNeural',
+        'CA_m': 'fr-CA-AntoineNeural',  # Québécois male
     },
     'en': {
         'US': 'en-US-JennyNeural',
         'GB': 'en-GB-SoniaNeural',
+        'GB_m': 'en-GB-RyanNeural',
         'AU': 'en-AU-NatashaNeural',
+        'IE': 'en-IE-EmilyNeural',      # Irish
+        'IE_m': 'en-IE-ConnorNeural',
+        # Non-native-accented English speaker, common in international
+        # institutions — students should be able to train on this too.
+        'IN': 'en-IN-NeerjaNeural',
+        'IN_m': 'en-IN-PrabhatNeural',
     }
 }
 

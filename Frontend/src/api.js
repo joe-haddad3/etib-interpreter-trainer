@@ -44,8 +44,17 @@ async function safeFetch(url, options = {}) {
   try {
     return await fetch(url, options);
   } catch {
-    throw new Error('Cannot reach the server. Check your internet connection and try again.');
+    // Free-tier hosting sleeps after ~15 min idle and takes 2-3 min to wake —
+    // most "cannot reach" failures during testing were exactly this.
+    throw new Error('Cannot reach the server — it may be waking up from sleep (free hosting takes 2–3 minutes). Please wait a moment and try again; also check your internet connection.');
   }
+}
+
+// Wake the backend as soon as the app opens and keep it awake during the
+// session (free hosting sleeps after ~15 min idle; a sleeping server made
+// transcriptions fail for testers). Fire-and-forget — errors ignored.
+export function pingServer() {
+  fetch(SERVER_BASE, { method: 'GET', mode: 'no-cors' }).catch(() => {});
 }
 
 async function parseJsonResponse(res) {
@@ -254,7 +263,7 @@ export async function deleteSavedSpeech(un_id) {
   return parseJsonResponse(res);
 }
 
-export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain, glossary) {
+export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain, glossary, mode) {
   const form = new FormData();
   form.append('audio', audioFile, audioFile.name || 'recording.webm');
   form.append('source_script', sourceScript || '');
@@ -263,6 +272,9 @@ export async function evaluateWithAudio(audioFile, sourceScript, language, sourc
   form.append('auth_token', getAuthToken());
   form.append('groq_api_key', getStoredGroqKey());
   if (domain) form.append('domain', domain);
+  // Interpretation mode — lets the evaluator apply mode-aware pause tolerance
+  // (e.g. Ear-Voice Span lag in simultaneous is not a fluency error).
+  form.append('mode', mode || 'consecutive');
   // Student-reviewed glossary → terminology errors are judged against it
   if (Array.isArray(glossary) && glossary.length > 0) {
     form.append('glossary', JSON.stringify(glossary));
