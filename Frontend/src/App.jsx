@@ -448,6 +448,8 @@ const UI = {
     simulSourceEnded: 'The source speech has ended — finish your interpretation, then press stop. Recording stops automatically after one minute.',
     simulWithText: 'Show source text on screen (SIMUL with text)',
     consecFlowHint: 'Step 1: listen to the speech and take notes. Step 2: record your interpretation from your notes below.',
+    simulUseButton: 'Use "Play source + record me" above to start.',
+    sightUseButton: 'Use the record button next to the scroller above to start.',
     downloadRecording: 'Download recording',
     downloadAudio: 'Download audio',
     llmDownError: 'The AI evaluation service did not respond — try again in a moment.',
@@ -876,6 +878,8 @@ const UI = {
     simulSourceEnded: 'انتهى الخطاب المصدر — أكمل ترجمتك ثم اضغط إيقاف. يتوقف التسجيل تلقائياً بعد دقيقة واحدة.',
     simulWithText: 'إظهار نص المصدر على الشاشة (فورية مع النص)',
     consecFlowHint: 'الخطوة ١: استمع إلى الخطاب ودوّن ملاحظاتك. الخطوة ٢: سجّل ترجمتك اعتماداً على ملاحظاتك أدناه.',
+    simulUseButton: 'استخدم زر «تشغيل المصدر والتسجيل» أعلاه للبدء.',
+    sightUseButton: 'استخدم زر التسجيل بجانب النص المتحرك أعلاه للبدء.',
     downloadRecording: 'تنزيل التسجيل',
     downloadAudio: 'تنزيل الصوت',
     llmDownError: 'لم تستجب خدمة التقييم بالذكاء الاصطناعي — حاول مرة أخرى بعد قليل.',
@@ -1304,6 +1308,8 @@ const UI = {
     simulSourceEnded: "Le discours source est terminé — achevez votre interprétation puis appuyez sur stop. L'enregistrement s'arrête automatiquement après une minute.",
     simulWithText: 'Afficher le texte source à l\'écran (SIMUL avec texte)',
     consecFlowHint: "Étape 1 : écoutez le discours et prenez des notes. Étape 2 : enregistrez votre interprétation à partir de vos notes ci-dessous.",
+    simulUseButton: 'Utilisez « Lire la source + m\'enregistrer » ci-dessus pour démarrer.',
+    sightUseButton: 'Utilisez le bouton d\'enregistrement à côté du défilement ci-dessus.',
     downloadRecording: 'Télécharger l\'enregistrement',
     downloadAudio: 'Télécharger l\'audio',
     llmDownError: "Le service d'évaluation IA n'a pas répondu — réessayez dans un instant.",
@@ -3902,17 +3908,28 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
           <p className="record-section-label">🎙 {labels.yourInterpretation}</p>
 
           <div className="record-controls">
-            {!isRecording ? (
-              <button className="btn-record" onClick={startRecording} disabled={simultaneousActive}>
-                {labels.recordBtn}
-              </button>
-            ) : !simultaneousActive ? (
-              <button className="btn-record recording-active" onClick={stopRecording}>
-                <span className="rec-dot" /> {labels.stopBtn} — {formatTime(recordingTime)}
-              </button>
+            {/* The record button lives here ONLY for consecutive mode.
+                Simultaneous is driven by "Play source + record me" and sight by
+                the scroller's own record button — showing a second "Start
+                recording" here confused testers (professor feedback 20 July). */}
+            {interpMode === 'consecutive' ? (
+              !isRecording ? (
+                <button className="btn-record" onClick={startRecording}>
+                  {labels.recordBtn}
+                </button>
+              ) : (
+                <button className="btn-record recording-active" onClick={stopRecording}>
+                  <span className="rec-dot" /> {labels.stopBtn} — {formatTime(recordingTime)}
+                </button>
+              )
+            ) : isRecording ? (
+              <span style={{ fontSize: '0.85rem', color: 'var(--warm-gray)', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="rec-dot" /> {labels.recordingLive}…
+                {interpMode === 'simultaneous' ? ` (${labels.simulTitle})` : ''}
+              </span>
             ) : (
-              <span style={{ fontSize: '0.85rem', color: 'var(--warm-gray)' }}>
-                {labels.recordingLive}… ({labels.simulTitle})
+              <span style={{ fontSize: '0.82rem', color: 'var(--warm-gray)' }}>
+                {interpMode === 'simultaneous' ? labels.simulUseButton : labels.sightUseButton}
               </span>
             )}
 
