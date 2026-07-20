@@ -189,6 +189,7 @@ const UI = {
     mcqOptionsHeader: 'Options',
     mcqAnswerHeader: 'Answer',
     glossaryTitle: 'Trilingual glossary (AR – FR – EN)',
+    glossaryDuringRecording: 'Glossary (keep terminology visible while interpreting)',
     glossaryTermHeader: 'Term',
     glossaryArabicHeader: 'Arabic',
     glossaryFrenchHeader: 'French',
@@ -263,6 +264,7 @@ const UI = {
     needsArabic: 'Pronunciation check is available for Arabic interpretations only.',
     needsSource: 'Generate a speech in Module A first so the source text is available.',
     sourceAudio: 'Source speech audio',
+    playbackSpeed: 'Playback speed',
     yourInterpretation: 'Your interpretation',
     recordBtn: '🎙 Start recording',
     stopBtn: '⏹ Stop recording',
@@ -454,6 +456,8 @@ const UI = {
     downloadAudio: 'Download audio',
     llmDownError: 'The AI evaluation service did not respond — try again in a moment.',
     addSource: 'Add source',
+    uploadSourceMedia: 'Upload a speech to interpret',
+    sourceMediaEmpty: 'Could not transcribe the uploaded media — try a clearer recording.',
     micDenied: 'Microphone access denied — please allow permission and try again.',
     simultaneousFailed: 'Could not start simultaneous mode — check microphone permission.',
     topErrorSaid: 'said',
@@ -619,6 +623,7 @@ const UI = {
     mcqOptionsHeader: 'الخيارات',
     mcqAnswerHeader: 'الإجابة',
     glossaryTitle: 'المسرد الثلاثي (عربي – فرنسي – إنجليزي)',
+    glossaryDuringRecording: 'المسرد (أبقِ المصطلحات ظاهرة أثناء الترجمة)',
     glossaryTermHeader: 'المصطلح',
     glossaryArabicHeader: 'العربية',
     glossaryFrenchHeader: 'الفرنسية',
@@ -693,6 +698,7 @@ const UI = {
     needsArabic: 'فحص النطق متاح للترجمات العربية فقط.',
     needsSource: 'ولّد خطاباً في الوحدة أ أولاً لتوفير النص المرجعي.',
     sourceAudio: 'الصوت المرجعي للخطاب',
+    playbackSpeed: 'سرعة التشغيل',
     yourInterpretation: 'ترجمتك الفورية',
     recordBtn: '🎙 بدء التسجيل',
     stopBtn: '⏹ إيقاف التسجيل',
@@ -884,6 +890,8 @@ const UI = {
     downloadAudio: 'تنزيل الصوت',
     llmDownError: 'لم تستجب خدمة التقييم بالذكاء الاصطناعي — حاول مرة أخرى بعد قليل.',
     addSource: 'إضافة مصدر',
+    uploadSourceMedia: 'رفع خطاب للترجمة',
+    sourceMediaEmpty: 'تعذّر تفريغ الوسائط المرفوعة — جرّب تسجيلاً أوضح.',
     micDenied: 'تم رفض الوصول إلى الميكروفون — يرجى السماح بالإذن والمحاولة مجدداً.',
     simultaneousFailed: 'تعذّر تشغيل الوضع الفوري — تحقق من إذن الميكروفون.',
     topErrorSaid: 'ما قيل',
@@ -1049,6 +1057,7 @@ const UI = {
     mcqOptionsHeader: 'Options',
     mcqAnswerHeader: 'Réponse',
     glossaryTitle: 'Glossaire trilingue (AR – FR – EN)',
+    glossaryDuringRecording: 'Glossaire (gardez la terminologie visible pendant l’interprétation)',
     glossaryTermHeader: 'Terme',
     glossaryArabicHeader: 'Arabe',
     glossaryFrenchHeader: 'Français',
@@ -1123,6 +1132,7 @@ const UI = {
     needsArabic: 'Le contrôle de prononciation est disponible pour l\'arabe uniquement.',
     needsSource: 'Générez d\'abord un discours dans le Module A.',
     sourceAudio: 'Audio du discours source',
+    playbackSpeed: 'Vitesse de lecture',
     yourInterpretation: 'Votre interprétation',
     recordBtn: '🎙 Démarrer l\'enregistrement',
     stopBtn: '⏹ Arrêter l\'enregistrement',
@@ -1314,6 +1324,8 @@ const UI = {
     downloadAudio: 'Télécharger l\'audio',
     llmDownError: "Le service d'évaluation IA n'a pas répondu — réessayez dans un instant.",
     addSource: 'Ajouter une source',
+    uploadSourceMedia: 'Importer un discours à interpréter',
+    sourceMediaEmpty: 'Impossible de transcrire le média importé — essayez un enregistrement plus clair.',
     micDenied: "Accès au microphone refusé — veuillez autoriser l'accès et réessayer.",
     simultaneousFailed: 'Impossible de démarrer le mode simultané — vérifiez l\'autorisation du microphone.',
     topErrorSaid: 'dit',
@@ -2401,7 +2413,8 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
 
       {/* Keep all panels mounted — state persists when switching tabs */}
       <div style={{ display: activePanel === 'module-a' ? 'block' : 'none' }}>
-        <ModuleA labels={labels} onGenerated={onGenerated} isRtl={isRtl} adaptiveParams={adaptiveParams} />
+        <ModuleA labels={labels} onGenerated={onGenerated} isRtl={isRtl} adaptiveParams={adaptiveParams}
+          onSourceAudio={setSharedAudioUrl} />
       </div>
       <div style={{ display: activePanel === 'module-b' ? 'block' : 'none' }}>
         <ModuleB labels={labels} lastGeneratedScript={lastGeneratedScript}
@@ -2411,6 +2424,7 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
         <ModuleC labels={labels} referenceAudioUrl={sharedAudioUrl}
           sourceScript={lastGeneratedScript?.script || ''}
           targetLanguage={lastGeneratedScript?.target_language || ''}
+          glossary={lastGeneratedScript?.glossary || []}
           onTranscriptComplete={setLastTranscript}
           onRecordingComplete={setLastRecordingBlob} />
       </div>
@@ -2591,8 +2605,10 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
   );
 }
 
-function ModuleA({ labels, onGenerated, isRtl, adaptiveParams }) {
+function ModuleA({ labels, onGenerated, isRtl, adaptiveParams, onSourceAudio }) {
   const [form, setForm] = useState(initialSpeechForm);
+  const sourceMediaRef = useRef(null);
+  const [sourceMediaStatus, setSourceMediaStatus] = useState('idle');
 
   // Adaptive difficulty (cahier D12): merge the recommended parameters from
   // the Progress page into the generation form whenever the student clicks
@@ -2659,6 +2675,39 @@ const [showAdvanced, setShowAdvanced] = useState(true);
       const data = await generateSpeech(params);
       setResult(data); onGenerated(data); setStatus('success');
     } catch (err) { setError(err.message); setStatus('error'); }
+  }
+
+  // Upload a real speech (audio or video) to interpret from (Mariam feedback):
+  // transcribe it → becomes the source script, and its audio plays in Module C.
+  async function handleSourceMediaUpload(file) {
+    if (!file) return;
+    if (!getStoredGroqKey()) {
+      setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
+      setStatus('error');
+      return;
+    }
+    setSourceMediaStatus('loading'); setError(''); setResult(null);
+    try {
+      // Reuse the ASR endpoint (it now normalizes audio so the FULL media is
+      // transcribed, video included — the container is decoded server-side).
+      const data = await transcribeAudio(file, form.language, '');
+      const script = (data.full_text || '').trim();
+      if (!script) throw new Error(labels.sourceMediaEmpty || 'Could not transcribe the uploaded media.');
+      const audioUrl = URL.createObjectURL(file);
+      onSourceAudio?.(audioUrl);   // play the real source in Module C
+      const generated = {
+        script,
+        language: form.language,
+        target_language: form.target_language,
+        domain: form.domain,
+        summary: '', mcqs: [], glossary: [],
+        source_upload: true,
+        mode: 'uploaded_source',
+      };
+      setResult(generated); onGenerated(generated); setSourceMediaStatus('success');
+    } catch (err) {
+      setError(err.message); setSourceMediaStatus('error');
+    }
   }
 
   function buildAllSourceFiles() {
@@ -2869,6 +2918,14 @@ const [showAdvanced, setShowAdvanced] = useState(true);
           <button type="button" className="btn-un-library" onClick={() => setShowLibrary(true)} disabled={isLoading}>
             📚 {labels.addSource || 'Add source'}
           </button>
+          {/* Upload a real speech (audio/video) to interpret from (Mariam
+              feedback) — it is transcribed and used as the source. */}
+          <button type="button" className="btn-secondary" onClick={() => sourceMediaRef.current?.click()}
+            disabled={isLoading || sourceMediaStatus === 'loading'}>
+            🎬 {sourceMediaStatus === 'loading' ? (labels.transcribing || 'Transcribing…') : (labels.uploadSourceMedia || 'Upload a speech to interpret')}
+          </button>
+          <input ref={sourceMediaRef} type="file" accept="audio/*,video/*" style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleSourceMediaUpload(f); e.target.value = ''; }} />
           {hasSources ? (
             <>
               <button type="button" className="btn-primary" onClick={handleDocumentGenerate} disabled={isLoading}>
@@ -3607,7 +3664,7 @@ function NotesPad({ labels, sourceText, sourceIsArabic }) {
 
 // ── Module C — ASR Transcription + Browser Recording ────────────────────────
 
-function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTranscriptComplete, onRecordingComplete }) {
+function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glossary = [], onTranscriptComplete, onRecordingComplete }) {
   const [language, setLanguage] = useState('ar');
 
   // The student interprets INTO the target language chosen in Module A —
@@ -3637,7 +3694,13 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
   const [simultaneousActive, setSimultaneousActive] = useState(false);
   const [simulSourceEnded, setSimulSourceEnded] = useState(false);
   const [simulShowText, setSimulShowText] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const graceTimerRef = useRef(null);
+
+  // Keep the chosen playback speed applied whenever the source audio (re)loads.
+  useEffect(() => {
+    if (referenceAudioRef.current) referenceAudioRef.current.playbackRate = playbackSpeed;
+  }, [referenceAudioUrl, playbackSpeed]);
   // 3 practice modes (professor request): simultaneous | consecutive | sight
   const [interpMode, setInterpMode] = useState('consecutive');
   const sourceIsArabic = /[؀-ۿ]/.test(sourceScript || '');
@@ -3688,6 +3751,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
     if (!player) return;
     try {
       player.currentTime = 0;
+      player.playbackRate = playbackSpeed;
       setSimultaneousActive(true);
       setSimulSourceEnded(false);
       const started = await startRecording({ echoCancellation: true, noiseSuppression: true });
@@ -3834,6 +3898,21 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
           <div className="reference-audio-box">
             <p className="ref-audio-label">🔊 {labels.sourceAudio}</p>
             <audio ref={referenceAudioRef} controls src={referenceAudioUrl} style={{ width: '100%' }} />
+            {/* Playback speed for beginners (Mariam feedback: 0.75 was too big a
+                jump from normal — add 0.9). Applies to this source player. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--warm-gray)' }}>{labels.playbackSpeed}:</span>
+              {[0.5, 0.75, 0.9, 1].map(sp => (
+                <button key={sp} type="button"
+                  className={`lib-tab ${playbackSpeed === sp ? 'lib-tab-active' : ''}`}
+                  onClick={() => {
+                    setPlaybackSpeed(sp);
+                    if (referenceAudioRef.current) referenceAudioRef.current.playbackRate = sp;
+                  }}>
+                  {sp === 1 ? '1×' : `${sp}×`}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -3977,7 +4056,37 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
           )}
         </div>
 
-
+        {/* Glossary visible DURING interpretation (Mariam feedback): terminology
+            should stay available while performing, not only on the prep page. */}
+        {glossary.length > 0 && (
+          <details className="record-section" style={{ marginTop: '0.5rem' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: 'var(--primary)' }}>
+              📖 {labels.glossaryDuringRecording} ({glossary.length})
+            </summary>
+            <div className="table-responsive" style={{ marginTop: '0.6rem', maxHeight: 260, overflowY: 'auto' }}>
+              <table className="glossary-table">
+                <thead>
+                  <tr>
+                    <th>{labels.glossaryTermHeader || 'Term'}</th>
+                    <th>{labels.glossaryArabicHeader || 'Arabic'}</th>
+                    <th>{labels.glossaryFrenchHeader || 'French'}</th>
+                    <th>{labels.glossaryEnglishHeader || 'English'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {glossary.map((item, i) => (
+                    <tr key={i}>
+                      <td><strong>{item.term}</strong></td>
+                      <td className="arabic" dir="rtl">{glossaryArabicValue(item)}</td>
+                      <td>{glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])}</td>
+                      <td>{glossaryValue(item, ['english', 'English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        )}
       </div>
 
       {/* Results card */}
