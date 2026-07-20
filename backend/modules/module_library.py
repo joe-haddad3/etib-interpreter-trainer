@@ -65,6 +65,11 @@ DOMAIN_QUERIES = {
     'disarmament': 'disarmament nuclear weapons arms control non-proliferation',
     'women':       'gender equality women empowerment',
     'food':        'food security hunger malnutrition FAO WFP',
+    # Added per professional-interpreter feedback (18/20 July): legal and
+    # medical are core community/conference interpretation domains missing
+    # from the original 12.
+    'legal':       'international law legal framework treaty convention justice tribunal',
+    'medical':     'health medical care public health WHO patient healthcare system',
 }
 
 FETCH_TIMEOUT = 30   # seconds for API calls

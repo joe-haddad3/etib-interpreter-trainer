@@ -240,6 +240,67 @@ FACTUAL ACCURACY RULES (no source document available):
             'personal framing of facts and experiences. ABSOLUTELY NOT a structured podium speech — it must '
             'sound like someone talking to a journalist across a table.'
         ),
+        # ── Added per professional-interpreter feedback (18/20 July): more
+        # scenarios and institutional contexts across all interpretation modes.
+        'panel discussion': (
+            'One panelist among several speaking during a moderated panel: reacts to a previous speaker\'s '
+            'point before making their own, references "my fellow panelists", shorter turns than a keynote, '
+            'occasional direct address to the moderator or audience questions.'
+        ),
+        'live TV broadcast': (
+            'Live on-air commentary or statement for television: energetic, quotable, short punchy sentences '
+            'aware of a broad public audience (not specialists), frequent framing like "what this means for '
+            'viewers is..."; no podium formality.'
+        ),
+        'legal/court setting': (
+            'Testimony, examination, or ruling in a legal setting (courtroom, police interview, deposition): '
+            'precise, formal legal register, direct question-and-answer rhythm or formal statement of fact, '
+            'careful qualified language ("to the best of my knowledge", "it is alleged that"), legal terms '
+            'used exactly. Community/legal interpretation, not conference rhetoric.'
+        ),
+        'medical/healthcare': (
+            'Clinical consultation, patient intake, or medical explanation (clinic, hospital, psychotherapy '
+            'session): direct address to a patient or between clinicians, plain but precise clinical '
+            'vocabulary, empathetic but factual tone, short exchanges rather than long rhetorical passages. '
+            'Community/medical interpretation register, not a conference speech.'
+        ),
+        'public service consultation': (
+            'A public-service officer explaining a legal or medical procedure to a member of the public '
+            '(social services, immigration office, public clinic): plain-language explanation of rights, '
+            'steps, or forms, direct second-person address ("you will need to..."), no institutional jargon '
+            'without explanation.'
+        ),
+        'UN Security Council': (
+            'Formal statement to the UN Security Council: solemn register, direct references to resolutions, '
+            'sanctions regimes, peacekeeping mandates, addresses "the Council" and fellow member states, '
+            'high diplomatic stakes language.'
+        ),
+        'ECOSOC': (
+            'Statement to the UN Economic and Social Committee (ECOSOC): technical multilateral register '
+            'focused on development, economic cooperation, and social policy coordination among member states.'
+        ),
+        'WHO': (
+            'Statement at a World Health Organization forum: public-health register, epidemiological and '
+            'health-system vocabulary, references to health emergencies, universal health coverage, and '
+            'WHO guidance.'
+        ),
+        'ILO': (
+            'Statement at an International Labour Organization forum: labour-rights and social-dialogue '
+            'register (tripartite: governments, employers, workers), references to labour standards and '
+            'conventions.'
+        ),
+        'UNESCO': (
+            'Statement at a UNESCO forum: register centered on education, science, and culture, references '
+            'to heritage protection, education access, and international scientific/cultural cooperation.'
+        ),
+        'OIF': (
+            'Statement at an Organisation internationale de la Francophonie forum: register emphasizing '
+            'Francophone solidarity, cultural and linguistic cooperation among French-speaking states.'
+        ),
+        'AUF': (
+            'Statement at an Agence universitaire de la Francophonie forum: academic-institutional register '
+            'focused on higher-education cooperation and research among Francophone universities.'
+        ),
     }
     scenario_style = scenario_styles.get(scenario, f'Style and register appropriate to: {scenario}.')
 

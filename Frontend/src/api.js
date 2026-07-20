@@ -263,7 +263,7 @@ export async function deleteSavedSpeech(un_id) {
   return parseJsonResponse(res);
 }
 
-export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain, glossary) {
+export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain, glossary, mode) {
   const form = new FormData();
   form.append('audio', audioFile, audioFile.name || 'recording.webm');
   form.append('source_script', sourceScript || '');
@@ -272,6 +272,9 @@ export async function evaluateWithAudio(audioFile, sourceScript, language, sourc
   form.append('auth_token', getAuthToken());
   form.append('groq_api_key', getStoredGroqKey());
   if (domain) form.append('domain', domain);
+  // Interpretation mode — lets the evaluator apply mode-aware pause tolerance
+  // (e.g. Ear-Voice Span lag in simultaneous is not a fluency error).
+  form.append('mode', mode || 'consecutive');
   // Student-reviewed glossary → terminology errors are judged against it
   if (Array.isArray(glossary) && glossary.length > 0) {
     form.append('glossary', JSON.stringify(glossary));

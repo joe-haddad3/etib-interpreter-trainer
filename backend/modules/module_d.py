@@ -556,11 +556,49 @@ def strip_foreign_script_chars(value):
     return value
 
 
+# Mode-specific evaluation guidance (professor feedback, 20 July): pauses,
+# fidelity expectations, and the criteria that matter most are NOT the same
+# across interpretation modes. Evaluating them identically was penalizing
+# behavior — like Ear-Voice Span lag in simultaneous — that is normal
+# professional practice, not a fluency error.
+MODE_GUIDANCE = {
+    'simultaneous': (
+        'INTERPRETATION MODE: SIMULTANEOUS. The student interpreted WHILE the speaker was talking, '
+        'necessarily lagging behind by a few seconds (Ear-Voice Span, EVS) — this is a REQUIRED, '
+        'professional technique, not a delay to penalize. Pauses under ~3 seconds while the student '
+        'catches up with the speaker are NORMAL décalage management, not disfluencies — do not flag '
+        'them as errors or count them against fluency. Only flag a pause as disruptive if it clearly '
+        'made the interpreter lose the thread (lost content afterward) or exceeds several seconds. '
+        'Judge décalage management explicitly: did the student maintain a consistent, controlled lag '
+        'without falling permanently behind or cutting content to catch up?'
+    ),
+    'consecutive': (
+        'INTERPRETATION MODE: CONSECUTIVE. The student listened to the FULL speech, took notes, then '
+        'restituted it afterward from memory and notes — there is no real-time pressure, so judge fidelity '
+        'and completeness of the restitution against the source, and the logical structure/order of ideas, '
+        'more than moment-to-moment pacing. A pause before starting or between ideas while consulting notes '
+        'is expected and should not be penalized unless clearly excessive.'
+    ),
+    'sight': (
+        'INTERPRETATION MODE: SIGHT TRANSLATION. The student read the source text and translated it aloud '
+        'in real time without preparation time. Judge reading pace, clarity, and how well the student handled '
+        'complex sentence structures on the fly; brief pauses at clause boundaries while parsing dense '
+        'sentences are normal and should not be penalized as harshly as mid-clause hesitations.'
+    ),
+}
+
+
+def build_mode_context(mode: str) -> str:
+    return MODE_GUIDANCE.get(mode, MODE_GUIDANCE['consecutive'])
+
+
 LLM_ANALYSIS_PROMPT = """You are a professional interpreter training evaluator at ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).
 
 THIS IS AN INTERPRETATION TASK — NOT A READING TASK.
 The student heard a speech in {source_language} and interpreted it into {target_language}.
 The two texts are in DIFFERENT languages. Compare MEANING, CONCEPTS, NUMBERS, and TERMINOLOGY.
+
+{mode_context}
 
 YOU ARE A STRICT PROFESSOR. Your job is to FIND and REPORT errors, not to excuse them.
 - If the student's rendering changes the meaning even slightly → flag it as a translation error.
@@ -575,7 +613,8 @@ STUDENT INTERPRETATION TRANSCRIPT (in {target_language}, raw ASR output):
 {transcript}
 {glossary_block}
 AUTOMATICALLY DETECTED ISSUES (algorithmic):
-- Long silences (> 2.0s gaps): {silence_count} detected → details: {silence_examples}
+- Long silences (> {silence_threshold}s gaps — threshold already adjusted for the interpretation mode
+  above, e.g. wider for simultaneous to exclude normal EVS lag): {silence_count} detected → details: {silence_examples}
 - Word repetitions: {repetition_count} detected → examples: {repetition_examples}
 - Hesitation markers: {hesitation_count} detected → examples: {hesitation_examples}
   (A hesitation is ONLY a vocal filler — "euh", "um", "يعني", elongated sounds — or a word the
@@ -706,10 +745,12 @@ TASK 7 — TERMINOLOGY:
 Key domain-specific terms from the source — were they rendered with the correct equivalent in the target language?
 
 TASK 8 — PAUSES & FLOW:
-{silence_count} pause(s) longer than 2 seconds were detected: {silence_examples}
-For each pause, judge whether it disrupted the flow of the interpretation (lost the thread, made the listener wait)
-or was a natural processing pause for a consecutive/simultaneous interpreter.
-For disruptive pauses, note what information was likely delayed or lost because of it.
+{silence_count} pause(s) longer than {silence_threshold} seconds were detected: {silence_examples}
+Apply the mode guidance above: in simultaneous mode, a controlled décalage/EVS lag is NOT a pause
+error — only flag a pause as disruptive if it clearly made the interpreter lose the thread or
+exceeds what normal décalage management would explain. In consecutive mode, a pause before starting
+the restitution or while consulting notes is expected. For genuinely disruptive pauses only, note
+what information was likely delayed or lost because of it.
 
 TASK 9 — REPETITIONS:
 {repetition_count} repeated word(s)/phrase(s) were detected: {repetition_examples}
@@ -2667,16 +2708,29 @@ def detect_cut_words(segments: list, language: str = 'ar') -> list:
     return cut_words
 
 
-def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar') -> dict:
+# Silence threshold by interpretation mode (professor feedback, 20 July):
+# in simultaneous mode, the interpreter necessarily lags behind the speaker
+# (Ear-Voice Span) — a brief pause while catching up is normal delivery, not
+# a disfluency, and was being flatly penalized like any other long pause.
+SILENCE_THRESHOLD_BY_MODE = {
+    'simultaneous': 3.2,
+    'consecutive':  2.0,
+    'sight':        2.0,
+}
+
+
+def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar',
+                       mode: str = 'consecutive') -> dict:
     """
     Run all error detection — combines word-level (when available) and text-based detection.
     Text-based detection works even when Groq transcript has no word timestamps.
     """
     segments  = transcript.get('segments', [])
     full_text = transcript.get('full_text', '')
+    silence_threshold = SILENCE_THRESHOLD_BY_MODE.get(mode, 2.0)
 
     # Word-level detection (works when faster-whisper is used)
-    silences        = detect_long_silences(segments)
+    silences        = detect_long_silences(segments, threshold_seconds=silence_threshold)
     word_reps       = detect_repetitions(segments, language)
     word_hesitations = detect_hesitation_words(segments, language)
     low_conf        = detect_low_confidence_words(segments)
@@ -2716,7 +2770,9 @@ def run_full_analysis(source_script: str, transcript: dict, language: str = 'ar'
             'repetition_count':  len(all_repetitions),
             'hesitation_count':  len(all_hesitations),
             'number_errors':     len(number_errs),
-        }
+            'silence_threshold_seconds': silence_threshold,
+        },
+        'mode': mode,
     }
 
 
@@ -2744,7 +2800,8 @@ def evaluate():
         report = run_full_analysis(
             source_script=data.get('source_script', ''),
             transcript=data['transcript'],
-            language=data.get('language', 'ar')
+            language=data.get('language', 'ar'),
+            mode=data.get('mode', 'consecutive'),
         )
         return jsonify(report)
     except Exception as e:
@@ -2775,6 +2832,7 @@ def generate_feedback():
     transcript_text = data.get('transcript_text', '')
     transcript_obj  = data.get('transcript', {})
     language        = data.get('language', 'ar')
+    mode            = data.get('mode', 'consecutive')
     glossary_block  = build_glossary_block(json.dumps(data.get('glossary'))
                                            if isinstance(data.get('glossary'), list)
                                            else str(data.get('glossary', '') or ''))
@@ -2786,7 +2844,7 @@ def generate_feedback():
     transcript_text, asr_artifacts = remove_asr_artifacts(transcript_text)
 
     # Run algorithmic analysis on segments
-    algo = run_full_analysis(source_script, transcript_obj, language) if transcript_obj else {
+    algo = run_full_analysis(source_script, transcript_obj, language, mode) if transcript_obj else {
         'long_silences': [], 'repetitions': [], 'hesitation_words': [],
         'number_errors': [], 'summary': {}
     }
@@ -2810,6 +2868,8 @@ def generate_feedback():
             target_language=lang_names.get(language, language),
             source=source_script or '(source speech not provided)',
             transcript=transcript_text,
+            mode_context=build_mode_context(mode),
+            silence_threshold=s.get('silence_threshold_seconds', 2.0),
             silence_count=s.get('silence_count', 0),
             silence_examples=sil_examples or 'none found automatically',
             repetition_count=s.get('repetition_count', 0),
@@ -2892,6 +2952,7 @@ def full_evaluation():
     audio_file       = request.files['audio']
     source_script    = request.form.get('source_script', '')
     language         = request.form.get('language', 'ar')
+    mode             = request.form.get('mode', 'consecutive')
     glossary_block   = build_glossary_block(request.form.get('glossary', ''))
     _raw_src_lang    = request.form.get('source_language', '')
     # Avoid telling the LLM source==target (monolingual confusion) when not explicitly set
@@ -3002,8 +3063,12 @@ def full_evaluation():
         }
 
         # Step 2: Full algorithmic analysis (now WITH word timestamps)
-        algo = run_full_analysis(source_script, transcript, language)
-        audio_silences = detect_audio_silences(temp_path)
+        algo = run_full_analysis(source_script, transcript, language, mode)
+        # Audio-energy silence threshold matches the mode-aware word-timestamp
+        # threshold so EVS lag in simultaneous mode isn't re-flagged by this
+        # second, independent silence detector.
+        audio_silence_ms = int(SILENCE_THRESHOLD_BY_MODE.get(mode, 2.0) * 1000)
+        audio_silences = detect_audio_silences(temp_path, threshold_ms=audio_silence_ms)
         if audio_silences:
             algo['long_silences'] = merge_silence_reports(algo.get('long_silences', []), audio_silences)
             algo['audio_silences'] = audio_silences
@@ -3055,6 +3120,8 @@ def full_evaluation():
             target_language=lang_names.get(language, language),
             source=source_script or '(source speech not provided)',
             transcript=full_text,
+            mode_context=build_mode_context(mode),
+            silence_threshold=s.get('silence_threshold_seconds', 2.0),
             silence_count=s.get('silence_count', 0),
             silence_examples=sil_examples or 'none found automatically',
             repetition_count=s.get('repetition_count', 0),

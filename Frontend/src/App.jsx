@@ -304,6 +304,8 @@ const UI = {
     domDisarmament: 'Disarmament',
     domWomen: 'Women & Gender',
     domFood: 'Food & Hunger',
+    domLegal: 'Legal',
+    domMedical: 'Medical',
     diffBeginner: 'Beginner',
     diffIntermediate: 'Intermediate',
     diffAdvanced: 'Advanced',
@@ -325,6 +327,23 @@ const UI = {
     scenDiplomatic: 'Diplomatic meeting',
     scenDebate: 'Political debate',
     scenInterview: 'Interview',
+    scenGroupGeneral: 'General / conference',
+    scenGroupSimul: 'Simultaneous-oriented',
+    scenGroupConsec: 'Consecutive-oriented',
+    scenGroupSight: 'Sight translation-oriented',
+    scenGroupInstitutions: 'International institutions',
+    scenPanel: 'Panel discussion',
+    scenLiveTV: 'Live TV broadcast',
+    scenLegalCourt: 'Legal / Court (tribunal, police, deposition)',
+    scenMedical: 'Medical / Healthcare (clinic, hospital, therapy)',
+    scenPublicService: 'Public service (legal or medical consultation)',
+    scenSecurityCouncil: 'UN Security Council',
+    scenEcosoc: 'ECOSOC (Economic and Social Council)',
+    scenWho: 'WHO (World Health Organization)',
+    scenIlo: 'ILO (International Labour Organization)',
+    scenUnesco: 'UNESCO',
+    scenOif: 'OIF (Francophonie)',
+    scenAuf: 'AUF (Francophone universities)',
     termDensity: 'Terminology density',
     optTermLow: 'Low — everyday vocabulary',
     optTermMedium: 'Medium',
@@ -338,6 +357,7 @@ const UI = {
     mcqShowAnswerLabel: 'ℹ️ Correct answer:',
     mcqYourScore: 'Your score',
     glossaryEdit: '✏️ Edit glossary',
+    glossaryAddTerm: 'Add term',
     glossaryEditDone: '✓ Done editing',
     glossaryEditHint: 'Review and correct the equivalents BEFORE recording your interpretation — the evaluation will then check your terminology against this approved glossary.',
     webPageTab: 'Web page',
@@ -358,8 +378,11 @@ const UI = {
     notesTextTab: 'Text notes',
     notesSketchTab: 'Sketch / mind map',
     notesClear: 'Clear',
+    notesShowSource: 'Show source',
+    notesHideSource: 'Hide source',
+    sourceText: 'Source',
     notesPlaceholder: 'Take your notes here while listening (symbols, arrows, keywords)…',
-    notesHint: 'Your notes stay on this page only — they are not saved or sent anywhere.',
+    notesHint: 'Your notes stay on this page only — they are not saved or sent anywhere. The sketch pad supports a stylus (pressure-sensitive).',
     simulTitle: '🎧 Simultaneous mode',
     simulStart: '▶ Play source + record me',
     simulStop: '⏹ Stop both',
@@ -423,6 +446,7 @@ const UI = {
     llmQuotaError: 'Your Groq API tokens are used up for now — wait for the limit to reset (or add another API key in Settings), then run the evaluation again.',
     keyRequired: 'A personal (free) Groq API key is required — create yours at console.groq.com (2 minutes, no credit card) and add it in Settings.',
     simulSourceEnded: 'The source speech has ended — finish your interpretation, then press stop. Recording stops automatically after one minute.',
+    simulWithText: 'Show source text on screen (SIMUL with text)',
     consecFlowHint: 'Step 1: listen to the speech and take notes. Step 2: record your interpretation from your notes below.',
     downloadRecording: 'Download recording',
     downloadAudio: 'Download audio',
@@ -708,6 +732,8 @@ const UI = {
     domDisarmament: 'نزع السلاح',
     domWomen: 'المرأة والنوع الاجتماعي',
     domFood: 'الغذاء والجوع',
+    domLegal: 'القانون',
+    domMedical: 'الطب',
     diffBeginner: 'مبتدئ',
     diffIntermediate: 'متوسط',
     diffAdvanced: 'متقدم',
@@ -729,6 +755,23 @@ const UI = {
     scenDiplomatic: 'اجتماع دبلوماسي',
     scenDebate: 'مناظرة سياسية',
     scenInterview: 'مقابلة',
+    scenGroupGeneral: 'عام / مؤتمرات',
+    scenGroupSimul: 'مخصص للترجمة الفورية',
+    scenGroupConsec: 'مخصص للترجمة التتبعية',
+    scenGroupSight: 'مخصص للترجمة المنظورة',
+    scenGroupInstitutions: 'المنظمات الدولية',
+    scenPanel: 'حلقة نقاش',
+    scenLiveTV: 'بث تلفزيوني مباشر',
+    scenLegalCourt: 'قضائي / محكمة (تحقيق، شرطة، إفادة)',
+    scenMedical: 'طبي / رعاية صحية (عيادة، مستشفى، علاج نفسي)',
+    scenPublicService: 'خدمة عامة (استشارة قانونية أو طبية)',
+    scenSecurityCouncil: 'مجلس الأمن الدولي',
+    scenEcosoc: 'المجلس الاقتصادي والاجتماعي (ECOSOC)',
+    scenWho: 'منظمة الصحة العالمية',
+    scenIlo: 'منظمة العمل الدولية',
+    scenUnesco: 'اليونسكو',
+    scenOif: 'المنظمة الدولية للفرنكوفونية',
+    scenAuf: 'الوكالة الجامعية للفرنكوفونية',
     termDensity: 'الكثافة المصطلحية',
     optTermLow: 'منخفضة — مفردات يومية',
     optTermMedium: 'متوسطة',
@@ -742,6 +785,7 @@ const UI = {
     mcqShowAnswerLabel: 'ℹ️ الإجابة الصحيحة:',
     mcqYourScore: 'نتيجتك',
     glossaryEdit: '✏️ تعديل المسرد',
+    glossaryAddTerm: 'إضافة مصطلح',
     glossaryEditDone: '✓ إنهاء التعديل',
     glossaryEditHint: 'راجع المقابلات وصحّحها قبل تسجيل ترجمتك — سيتحقق التقييم من مصطلحاتك وفق هذا المسرد المعتمد.',
     webPageTab: 'صفحة ويب',
@@ -762,8 +806,11 @@ const UI = {
     notesTextTab: 'ملاحظات نصية',
     notesSketchTab: 'رسم / خريطة ذهنية',
     notesClear: 'مسح',
+    notesShowSource: 'إظهار المصدر',
+    notesHideSource: 'إخفاء المصدر',
+    sourceText: 'المصدر',
     notesPlaceholder: 'دوّن ملاحظاتك هنا أثناء الاستماع (رموز، أسهم، كلمات مفتاحية)…',
-    notesHint: 'تبقى ملاحظاتك في هذه الصفحة فقط — لا تُحفظ ولا تُرسل إلى أي مكان.',
+    notesHint: 'تبقى ملاحظاتك في هذه الصفحة فقط — لا تُحفظ ولا تُرسل إلى أي مكان. لوحة الرسم تدعم القلم الرقمي (حساس للضغط).',
     simulTitle: '🎧 الوضع الفوري',
     simulStart: '▶ تشغيل المصدر + تسجيلي',
     simulStop: '⏹ إيقاف الاثنين',
@@ -827,6 +874,7 @@ const UI = {
     llmQuotaError: 'انتهت حصة رموز Groq API الخاصة بك حالياً — انتظر إعادة تعيين الحد (أو أضف مفتاح API آخر في الإعدادات)، ثم أعد تشغيل التقييم.',
     keyRequired: 'مفتاح Groq API شخصي (مجاني) مطلوب — أنشئ مفتاحك على console.groq.com (دقيقتان، بدون بطاقة ائتمان) وأضفه في الإعدادات.',
     simulSourceEnded: 'انتهى الخطاب المصدر — أكمل ترجمتك ثم اضغط إيقاف. يتوقف التسجيل تلقائياً بعد دقيقة واحدة.',
+    simulWithText: 'إظهار نص المصدر على الشاشة (فورية مع النص)',
     consecFlowHint: 'الخطوة ١: استمع إلى الخطاب ودوّن ملاحظاتك. الخطوة ٢: سجّل ترجمتك اعتماداً على ملاحظاتك أدناه.',
     downloadRecording: 'تنزيل التسجيل',
     downloadAudio: 'تنزيل الصوت',
@@ -1112,6 +1160,8 @@ const UI = {
     domDisarmament: 'Désarmement',
     domWomen: 'Femmes & Genre',
     domFood: 'Alimentation & Faim',
+    domLegal: 'Juridique',
+    domMedical: 'Médical',
     diffBeginner: 'Débutant',
     diffIntermediate: 'Intermédiaire',
     diffAdvanced: 'Avancé',
@@ -1133,6 +1183,23 @@ const UI = {
     scenDiplomatic: 'Réunion diplomatique',
     scenDebate: 'Débat politique',
     scenInterview: 'Entrevue',
+    scenGroupGeneral: 'Général / conférence',
+    scenGroupSimul: 'Orienté simultanée',
+    scenGroupConsec: 'Orienté consécutive',
+    scenGroupSight: 'Orienté traduction à vue',
+    scenGroupInstitutions: 'Institutions internationales',
+    scenPanel: 'Table ronde',
+    scenLiveTV: 'Diffusion TV en direct',
+    scenLegalCourt: 'Juridique / Tribunal (procès, police, déposition)',
+    scenMedical: 'Médical / Santé (clinique, hôpital, thérapie)',
+    scenPublicService: 'Service public (consultation juridique ou médicale)',
+    scenSecurityCouncil: 'Conseil de sécurité de l\'ONU',
+    scenEcosoc: 'ECOSOC (Conseil économique et social)',
+    scenWho: 'OMS (Organisation mondiale de la Santé)',
+    scenIlo: 'OIT (Organisation internationale du Travail)',
+    scenUnesco: 'UNESCO',
+    scenOif: 'OIF (Francophonie)',
+    scenAuf: 'AUF (universités francophones)',
     termDensity: 'Densité terminologique',
     optTermLow: 'Faible — vocabulaire courant',
     optTermMedium: 'Moyenne',
@@ -1146,6 +1213,7 @@ const UI = {
     mcqShowAnswerLabel: 'ℹ️ Bonne réponse :',
     mcqYourScore: 'Votre score',
     glossaryEdit: '✏️ Modifier le glossaire',
+    glossaryAddTerm: 'Ajouter un terme',
     glossaryEditDone: '✓ Terminer la modification',
     glossaryEditHint: 'Relisez et corrigez les équivalents AVANT d\'enregistrer votre prestation — l\'évaluation vérifiera ensuite votre terminologie par rapport à ce glossaire validé.',
     webPageTab: 'Page web',
@@ -1166,8 +1234,11 @@ const UI = {
     notesTextTab: 'Notes texte',
     notesSketchTab: 'Croquis / carte mentale',
     notesClear: 'Effacer',
+    notesShowSource: 'Afficher la source',
+    notesHideSource: 'Masquer la source',
+    sourceText: 'Source',
     notesPlaceholder: 'Prenez vos notes ici pendant l\'écoute (symboles, flèches, mots-clés)…',
-    notesHint: 'Vos notes restent sur cette page uniquement — elles ne sont ni enregistrées ni envoyées.',
+    notesHint: 'Vos notes restent sur cette page uniquement — elles ne sont ni enregistrées ni envoyées. Le croquis prend en charge un stylet (sensible à la pression).',
     simulTitle: '🎧 Mode simultané',
     simulStart: '▶ Lire la source + m\'enregistrer',
     simulStop: '⏹ Tout arrêter',
@@ -1231,6 +1302,7 @@ const UI = {
     llmQuotaError: "Vos jetons Groq API sont épuisés pour le moment — attendez la réinitialisation de la limite (ou ajoutez une autre clé API dans les Paramètres), puis relancez l'évaluation.",
     keyRequired: "Une clé Groq API personnelle (gratuite) est requise — créez la vôtre sur console.groq.com (2 minutes, sans carte bancaire) et ajoutez-la dans les Paramètres.",
     simulSourceEnded: "Le discours source est terminé — achevez votre interprétation puis appuyez sur stop. L'enregistrement s'arrête automatiquement après une minute.",
+    simulWithText: 'Afficher le texte source à l\'écran (SIMUL avec texte)',
     consecFlowHint: "Étape 1 : écoutez le discours et prenez des notes. Étape 2 : enregistrez votre interprétation à partir de vos notes ci-dessous.",
     downloadRecording: 'Télécharger l\'enregistrement',
     downloadAudio: 'Télécharger l\'audio',
@@ -1288,23 +1360,34 @@ const UN_LANG_LABEL = {
   chi: 'ZH', rus: 'RU', spa: 'ES'
 };
 
+// Voice diversity expanded per professional-interpreter feedback (18/20 July):
+// male voices + more regional accents in every language.
 const VOICE_OPTIONS = {
   ar: [
     { label: 'Lebanese Arabic — Male (ar-LB)', labelAr: 'عربية لبنانية - ذكر', accent: 'LB' },
     { label: 'Lebanese Arabic — Female (ar-LB)', labelAr: 'عربية لبنانية - أنثى', accent: 'LB_f' },
     { label: 'Gulf Arabic — Female (ar-SA)', labelAr: 'عربية خليجية - أنثى', accent: 'SA' },
+    { label: 'Gulf Arabic — Male (ar-SA)', labelAr: 'عربية خليجية - ذكر', accent: 'SA_m' },
     { label: 'Egyptian Arabic — Female (ar-EG)', labelAr: 'عربية مصرية - أنثى', accent: 'EG' },
     { label: 'Egyptian Arabic — Male (ar-EG)', labelAr: 'عربية مصرية - ذكر', accent: 'EG_m' },
+    { label: 'Maghreb Arabic — Female (ar-MA)', labelAr: 'عربية مغاربية - أنثى', accent: 'MA' },
+    { label: 'Maghreb Arabic — Male (ar-MA)', labelAr: 'عربية مغاربية - ذكر', accent: 'MA_m' },
   ],
   fr: [
     { label: 'French (Female)', labelAr: 'فرنسية - أنثى', accent: 'FR' },
     { label: 'French (Male)', labelAr: 'فرنسية - ذكر', accent: 'FR_m' },
-    { label: 'Canadian (Female)', labelAr: 'كندية فرنسية - أنثى', accent: 'CA' },
+    { label: 'Québécois (Female)', labelAr: 'كندية فرنسية - أنثى', accent: 'CA' },
+    { label: 'Québécois (Male)', labelAr: 'كندية فرنسية - ذكر', accent: 'CA_m' },
   ],
   en: [
     { label: 'American (Female)', labelAr: 'أمريكية - أنثى', accent: 'US' },
     { label: 'British (Female)', labelAr: 'بريطانية - أنثى', accent: 'GB' },
+    { label: 'British (Male)', labelAr: 'بريطانية - ذكر', accent: 'GB_m' },
     { label: 'Australian (Female)', labelAr: 'أسترالية - أنثى', accent: 'AU' },
+    { label: 'Irish (Female)', labelAr: 'أيرلندية - أنثى', accent: 'IE' },
+    { label: 'Irish (Male)', labelAr: 'أيرلندية - ذكر', accent: 'IE_m' },
+    { label: 'Non-native accent (Female)', labelAr: 'لهجة غير أصلية - أنثى', accent: 'IN' },
+    { label: 'Non-native accent (Male)', labelAr: 'لهجة غير أصلية - ذكر', accent: 'IN_m' },
   ]
 };
 
@@ -1315,6 +1398,19 @@ function glossaryValue(item, keys) {
     if (value !== undefined && value !== null && String(value).trim()) {
       return String(value).trim();
     }
+  }
+  return '';
+}
+
+// Non-trimming getter for the EDIT inputs. The display getters call .trim(),
+// which strips a trailing space the moment you type it — so the space never
+// appears and the spacebar seems broken (professor feedback 20 July, Arabic
+// glossary). During editing we read the exact key onChange writes to, raw.
+function glossaryEditValue(item, canonicalKey, fallbackKeys) {
+  if (item && typeof item[canonicalKey] === 'string') return item[canonicalKey];
+  for (const key of fallbackKeys) {
+    const v = item?.[key];
+    if (v !== undefined && v !== null && typeof v !== 'object') return String(v);
   }
   return '';
 }
@@ -2686,15 +2782,39 @@ const [showAdvanced, setShowAdvanced] = useState(true);
                 <option value="disarmament">{labels.domDisarmament || 'Disarmament'}</option>
                 <option value="women">{labels.domWomen || 'Women & Gender'}</option>
                 <option value="food">{labels.domFood || 'Food & Hunger'}</option>
+                <option value="legal">{labels.domLegal || 'Legal'}</option>
+                <option value="medical">{labels.domMedical || 'Medical'}</option>
               </SelectField>
               <SelectField label={labels.scenarioLabel || 'Speaker style / setting'} id="f-scenario" name="scenario" value={form.scenario} onChange={updateField}>
-                <option value="UN General Assembly">{labels.scenUNGA || 'UN General Assembly'}</option>
-                <option value="EU Parliament">{labels.scenEUParl || 'EU Parliament'}</option>
-                <option value="Arab League summit">{labels.scenArabLeague || 'Arab League summit'}</option>
-                <option value="press conference">{labels.scenPress || 'Press conference'}</option>
-                <option value="diplomatic meeting">{labels.scenDiplomatic || 'Diplomatic meeting'}</option>
-                <option value="political debate">{labels.scenDebate || 'Political debate'}</option>
-                <option value="interview">{labels.scenInterview || 'Interview'}</option>
+                <optgroup label={labels.scenGroupGeneral || 'General / conference'}>
+                  <option value="UN General Assembly">{labels.scenUNGA || 'UN General Assembly'}</option>
+                  <option value="EU Parliament">{labels.scenEUParl || 'EU Parliament'}</option>
+                  <option value="Arab League summit">{labels.scenArabLeague || 'Arab League summit'}</option>
+                  <option value="press conference">{labels.scenPress || 'Press conference'}</option>
+                  <option value="diplomatic meeting">{labels.scenDiplomatic || 'Diplomatic meeting'}</option>
+                  <option value="political debate">{labels.scenDebate || 'Political debate'}</option>
+                  <option value="interview">{labels.scenInterview || 'Interview'}</option>
+                </optgroup>
+                <optgroup label={labels.scenGroupSimul || 'Simultaneous-oriented'}>
+                  <option value="panel discussion">{labels.scenPanel || 'Panel discussion'}</option>
+                  <option value="live TV broadcast">{labels.scenLiveTV || 'Live TV broadcast'}</option>
+                </optgroup>
+                <optgroup label={labels.scenGroupConsec || 'Consecutive-oriented'}>
+                  <option value="legal/court setting">{labels.scenLegalCourt || 'Legal/Court setting'}</option>
+                  <option value="medical/healthcare">{labels.scenMedical || 'Medical/Healthcare'}</option>
+                </optgroup>
+                <optgroup label={labels.scenGroupSight || 'Sight translation-oriented'}>
+                  <option value="public service consultation">{labels.scenPublicService || 'Public service consultation'}</option>
+                </optgroup>
+                <optgroup label={labels.scenGroupInstitutions || 'International institutions'}>
+                  <option value="UN Security Council">{labels.scenSecurityCouncil || 'UN Security Council'}</option>
+                  <option value="ECOSOC">{labels.scenEcosoc || 'ECOSOC'}</option>
+                  <option value="WHO">{labels.scenWho || 'WHO'}</option>
+                  <option value="ILO">{labels.scenIlo || 'ILO'}</option>
+                  <option value="UNESCO">{labels.scenUnesco || 'UNESCO'}</option>
+                  <option value="OIF">{labels.scenOif || 'OIF (Francophonie)'}</option>
+                  <option value="AUF">{labels.scenAuf || 'AUF (Francophonie)'}</option>
+                </optgroup>
               </SelectField>
               <SelectField label={labels.structure} id="f-structure" name="structure" value={form.structure} onChange={updateField}>
                 <option value="well-organized">{labels.optWellOrganized || 'Well organized'}</option>
@@ -3171,6 +3291,19 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
     onScriptUpdate?.({ ...lastGeneratedScript, glossary: updated });
   }
 
+  // Students build their own terminology base (professor feedback 20 July).
+  function addGlossaryTerm() {
+    const current = lastGeneratedScript?.glossary || [];
+    const updated = [...current, { term: '', arabic: '', french: '', english: '', definition: '' }];
+    onScriptUpdate?.({ ...lastGeneratedScript, glossary: updated });
+    setEditingGlossary(true);
+  }
+
+  function removeGlossaryTerm(index) {
+    const current = lastGeneratedScript?.glossary || [];
+    onScriptUpdate?.({ ...lastGeneratedScript, glossary: current.filter((_, i) => i !== index) });
+  }
+
   useEffect(() => {
     const opts = VOICE_OPTIONS[language] || VOICE_OPTIONS.en;
     setSelectedAccent(opts[0]?.accent || '');
@@ -3273,10 +3406,11 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
         <div className="card">
           <div className="b-section-header">
             <h2 className="b-section-title">📖 {labels.glossaryTitle}</h2>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <button className="btn-secondary btn-sm" onClick={() => setEditingGlossary(v => !v)}>
                 {editingGlossary ? labels.glossaryEditDone : labels.glossaryEdit}
               </button>
+              <button className="btn-secondary btn-sm" onClick={addGlossaryTerm}>➕ {labels.glossaryAddTerm}</button>
               <button className="btn-secondary btn-sm" onClick={handleDownloadGlossary}>{labels.downloadGlossary}</button>
             </div>
           </div>
@@ -3292,6 +3426,7 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
                   <th>{labels.glossaryFrenchHeader || 'French'}</th>
                   <th>{labels.glossaryEnglishHeader || 'English'}</th>
                   <th>{labels.glossaryDefinitionHeader || 'Definition'}</th>
+                  {editingGlossary && <th aria-label="delete"></th>}
                 </tr>
               </thead>
               <tbody>
@@ -3300,10 +3435,11 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
                     {editingGlossary ? (
                       <>
                         <td><input className="glossary-edit-input" value={item.term || ''} onChange={e => updateGlossaryCell(i, 'term', e.target.value)} /></td>
-                        <td><input className="glossary-edit-input arabic" dir="rtl" value={glossaryArabicValue(item)} onChange={e => updateGlossaryCell(i, 'arabic', e.target.value)} /></td>
-                        <td><input className="glossary-edit-input" value={glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])} onChange={e => updateGlossaryCell(i, 'french', e.target.value)} /></td>
-                        <td><input className="glossary-edit-input" value={glossaryValue(item, ['english', 'English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])} onChange={e => updateGlossaryCell(i, 'english', e.target.value)} /></td>
+                        <td><input className="glossary-edit-input arabic" dir="rtl" value={glossaryEditValue(item, 'arabic', ['Arabic', 'ar', 'AR', 'arabic_term', 'term_ar', 'arabic_translation', 'translation_ar', 'العربية', 'عربي'])} onChange={e => updateGlossaryCell(i, 'arabic', e.target.value)} /></td>
+                        <td><input className="glossary-edit-input" value={glossaryEditValue(item, 'french', ['French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])} onChange={e => updateGlossaryCell(i, 'french', e.target.value)} /></td>
+                        <td><input className="glossary-edit-input" value={glossaryEditValue(item, 'english', ['English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])} onChange={e => updateGlossaryCell(i, 'english', e.target.value)} /></td>
                         <td><input className="glossary-edit-input" value={item.definition || ''} onChange={e => updateGlossaryCell(i, 'definition', e.target.value)} /></td>
+                        <td><button type="button" className="file-chip-remove" onClick={() => removeGlossaryTerm(i)} title={labels.removeSource}>×</button></td>
                       </>
                     ) : (
                       <>
@@ -3328,9 +3464,11 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
 
 // ── Note-taking space for consecutive interpretation (text + sketch) ─────────
 
-function NotesPad({ labels }) {
+function NotesPad({ labels, sourceText, sourceIsArabic }) {
   const [tab, setTab] = useState('text');   // 'text' | 'sketch'
   const [notes, setNotes] = useState('');
+  const [showSource, setShowSource] = useState(false);   // hidden until student chooses to reveal
+  const [penColor, setPenColor] = useState('#1a3a5c');
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
   const lastPointRef = useRef(null);
@@ -3338,14 +3476,18 @@ function NotesPad({ labels }) {
   function canvasPos(e) {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const source = e.touches ? e.touches[0] : e;
+    // Pointer events cover mouse, touch, AND stylus natively (professor
+    // feedback: stylus support for handwritten consecutive notes).
     return {
-      x: (source.clientX - rect.left) * (canvas.width / rect.width),
-      y: (source.clientY - rect.top) * (canvas.height / rect.height),
+      x: (e.clientX - rect.left) * (canvas.width / rect.width),
+      y: (e.clientY - rect.top) * (canvas.height / rect.height),
+      pressure: e.pressure && e.pressure > 0 ? e.pressure : 0.5,
     };
   }
 
   function startDraw(e) {
+    e.preventDefault();
+    canvasRef.current?.setPointerCapture?.(e.pointerId);
     drawingRef.current = true;
     lastPointRef.current = canvasPos(e);
   }
@@ -3356,9 +3498,11 @@ function NotesPad({ labels }) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const point = canvasPos(e);
-    ctx.strokeStyle = '#1a3a5c';
-    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = penColor;
+    // Stylus pressure drives line width when available; mouse stays constant.
+    ctx.lineWidth = 1 + point.pressure * 3;
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
     ctx.lineTo(point.x, point.y);
@@ -3379,6 +3523,32 @@ function NotesPad({ labels }) {
     }
   }
 
+  const noteArea = tab === 'text' ? (
+    <textarea
+      value={notes}
+      onChange={e => setNotes(e.target.value)}
+      placeholder={labels.notesPlaceholder}
+      style={{
+        width: '100%', minHeight: 260, padding: '0.75rem 1rem',
+        border: '1px solid var(--border, #ddd)', borderRadius: 10,
+        fontSize: '0.92rem', lineHeight: 1.6, resize: 'vertical',
+        fontFamily: 'inherit', background: 'var(--surface, #fff)',
+      }}
+    />
+  ) : (
+    <canvas
+      ref={canvasRef}
+      width={900}
+      height={520}
+      style={{
+        width: '100%', height: 300, border: '1px solid var(--border, #ddd)',
+        borderRadius: 10, background: 'var(--surface, #fff)', touchAction: 'none', cursor: 'crosshair',
+      }}
+      onPointerDown={startDraw} onPointerMove={draw} onPointerUp={endDraw}
+      onPointerLeave={endDraw} onPointerCancel={endDraw}
+    />
+  );
+
   return (
     <div className="record-section" style={{ marginTop: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
@@ -3391,34 +3561,39 @@ function NotesPad({ labels }) {
             {labels.notesSketchTab}
           </button>
         </div>
+        {tab === 'sketch' && (
+          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+            {['#1a3a5c', '#8B3A2A', '#2D5A4E', '#A67C1B'].map(c => (
+              <button key={c} type="button" onClick={() => setPenColor(c)} aria-label={`pen ${c}`}
+                style={{ width: 20, height: 20, borderRadius: '50%', background: c, cursor: 'pointer',
+                  border: penColor === c ? '2px solid #000' : '1px solid #ccc' }} />
+            ))}
+          </div>
+        )}
+        {sourceText && (
+          <button type="button" className="btn-secondary btn-sm" onClick={() => setShowSource(v => !v)}>
+            {showSource ? labels.notesHideSource : labels.notesShowSource}
+          </button>
+        )}
         <button type="button" className="btn-secondary btn-sm" onClick={clearAll}>{labels.notesClear}</button>
       </div>
 
-      {tab === 'text' ? (
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder={labels.notesPlaceholder}
-          style={{
-            width: '100%', minHeight: 160, padding: '0.75rem 1rem',
-            border: '1px solid var(--border, #ddd)', borderRadius: 10,
-            fontSize: '0.92rem', lineHeight: 1.6, resize: 'vertical',
-            fontFamily: 'inherit', background: 'var(--surface, #fff)',
-          }}
-        />
-      ) : (
-        <canvas
-          ref={canvasRef}
-          width={900}
-          height={360}
-          style={{
-            width: '100%', height: 240, border: '1px solid var(--border, #ddd)',
-            borderRadius: 10, background: 'var(--surface, #fff)', touchAction: 'none', cursor: 'crosshair',
-          }}
-          onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
-          onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
-        />
-      )}
+      {/* Split screen: source text (revealed on demand) beside the note area,
+          matching how interpreters review the source while taking notes. */}
+      {showSource && sourceText ? (
+        <div className="consec-split">
+          <div className="consec-split-source">
+            <p className="consec-split-label">📄 {labels.sourceText || 'Source'}</p>
+            <div className={`consec-source-text ${sourceIsArabic ? 'arabic' : ''}`} dir={sourceIsArabic ? 'rtl' : 'ltr'}>
+              {sourceText}
+            </div>
+          </div>
+          <div className="consec-split-notes">
+            <p className="consec-split-label">✍️ {labels.notesTitle}</p>
+            {noteArea}
+          </div>
+        </div>
+      ) : noteArea}
       <p style={{ fontSize: '0.75rem', color: 'var(--warm-gray)', marginTop: '0.4rem' }}>{labels.notesHint}</p>
     </div>
   );
@@ -3455,6 +3630,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
   useEffect(() => { autoTranscribeRef.current = autoTranscribe; }, [autoTranscribe]);
   const [simultaneousActive, setSimultaneousActive] = useState(false);
   const [simulSourceEnded, setSimulSourceEnded] = useState(false);
+  const [simulShowText, setSimulShowText] = useState(false);
   const graceTimerRef = useRef(null);
   // 3 practice modes (professor request): simultaneous | consecutive | sight
   const [interpMode, setInterpMode] = useState('consecutive');
@@ -3488,7 +3664,10 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
         return;
       }
       setResult(data);
-      onTranscriptComplete?.({ ...data, language, sourceScript: sourceScript || '' });
+      // interpMode travels with the transcript so Module D can evaluate with
+      // mode-aware criteria (décalage tolerance for simultaneous, etc.) —
+      // professor feedback: pauses from normal EVS should not be penalized.
+      onTranscriptComplete?.({ ...data, language, sourceScript: sourceScript || '', mode: interpMode });
       setStatus('success');
     } catch (err) {
       setError(err.message);
@@ -3659,6 +3838,21 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
             <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', margin: '0.3rem 0 0.6rem' }}>
               {referenceAudioUrl ? labels.simulHint : labels.simulNeedsAudio}
             </p>
+            {/* "SIMUL avec texte" (20 July feedback): optionally show the source
+                text on screen during the simultaneous exercise. */}
+            {sourceScript && (
+              <label className="auto-transcribe-toggle" style={{ marginBottom: '0.6rem' }}>
+                <input type="checkbox" checked={simulShowText}
+                  onChange={e => setSimulShowText(e.target.checked)} />
+                {labels.simulWithText}
+              </label>
+            )}
+            {simulShowText && sourceScript && (
+              <div className={`consec-source-text ${sourceIsArabic ? 'arabic' : ''}`} dir={sourceIsArabic ? 'rtl' : 'ltr'}
+                style={{ marginBottom: '0.75rem', maxHeight: 220 }}>
+                {sourceScript}
+              </div>
+            )}
             {referenceAudioUrl && (
               !simultaneousActive ? (
                 <button className="btn-primary" onClick={startSimultaneous} disabled={isRecording}>
@@ -3694,11 +3888,12 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, onTr
 
         {/* Consecutive — pedagogical order (16 July feedback): the student
             FIRST listens and takes notes, THEN interprets from the notes.
-            Notes therefore come before the recording section. */}
+            Split-screen note-taking (20 July feedback): source on one side,
+            note space on the other. */}
         {interpMode === 'consecutive' && (
           <>
             <div className="info-tip" style={{ marginBottom: '0.75rem' }}>📝 {labels.consecFlowHint}</div>
-            <NotesPad labels={labels} />
+            <NotesPad labels={labels} sourceText={sourceScript} sourceIsArabic={sourceIsArabic} />
           </>
         )}
 
@@ -4009,6 +4204,10 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
   const [error, setError] = useState('');
 
   const language = lastTranscript?.language || lastTranscript?.language_detected || 'ar';
+  // Interpretation mode travels with the transcript (professor feedback: pauses
+  // from normal Ear-Voice Span lag in simultaneous mode should not be penalized
+  // as errors — the backend judges pauses against mode-aware criteria).
+  const interpMode = lastTranscript?.mode || 'consecutive';
 
   async function handleEvaluate() {
     if (!getStoredGroqKey()) {
@@ -4031,7 +4230,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           language,
           lastGeneratedScript?.language || language,
           lastGeneratedScript?.domain || '',
-          lastGeneratedScript?.glossary || []   // student-reviewed glossary → terminology check
+          lastGeneratedScript?.glossary || [],   // student-reviewed glossary → terminology check
+          interpMode
         );
       } else {
         // Fallback: use stored Groq transcript (less accurate for hesitations)
@@ -4040,7 +4240,8 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           transcript_text: lastTranscript.full_text,
           transcript:      lastTranscript,
           language,
-          glossary:        lastGeneratedScript?.glossary || []
+          glossary:        lastGeneratedScript?.glossary || [],
+          mode:            interpMode
         });
       }
       // LLM step failed (HTTP 207) — no scores exist, so a partial report with
