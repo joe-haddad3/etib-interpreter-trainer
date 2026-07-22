@@ -667,13 +667,17 @@ def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
         data = {'script': _strip_json_envelope(text)}
 
     def clean(s: str) -> str:
-        return _clean_arabic_script(str(s).strip()) if language == 'ar' else str(s).strip()
+        # Arabic path drops all non-Arabic (incl. CJK); Latin paths keep Latin
+        # but must still drop hallucinated CJK characters.
+        if language == 'ar':
+            return _clean_arabic_script(str(s).strip())
+        return _strip_cjk(str(s).strip())
 
     def clean_mcq_option(s: str) -> str:
         # MCQ options may contain mixed Arabic+Latin (e.g. "GDP نمو 5%").
         # Only strip extra whitespace and convert digits; never strip Latin chars.
         import re as _re
-        cleaned = _re.sub(r'\s{2,}', ' ', str(s).strip())
+        cleaned = _re.sub(r'\s{2,}', ' ', _strip_cjk(str(s).strip()))
         return _to_arabic_indic(cleaned) if language == 'ar' else cleaned
 
     script = clean(data.get('script', ''))
@@ -989,6 +993,23 @@ def first_balanced_json_object(text: str) -> str | None:
     return None
 
 
+# CJK / East-Asian script ranges that the model occasionally hallucinates into
+# glossary and speech fields (e.g. "官" U+5B98). None are ever valid in an
+# Arabic / French / English glossary, so they are stripped in every field and
+# every language — a stray CJK char in the French or English column was the
+# glossary bug faculty reported.
+_CJK_RE = re.compile(
+    r'[　-〿぀-ヿ㄀-ㄯ㆐-㆟㐀-䶿'
+    r'一-鿿ꀀ-꓏가-힯豈-﫿＀-￯ᄀ-ᇿ]'
+)
+
+
+def _strip_cjk(text: str) -> str:
+    """Remove hallucinated CJK/East-Asian characters from any field, keep the rest."""
+    cleaned = _CJK_RE.sub('', str(text or ''))
+    return re.sub(r'\s{2,}', ' ', cleaned).strip()
+
+
 def normalize_glossary(raw_glossary) -> list[dict]:
     """Normalize likely model variants into the frontend's glossary schema."""
     if not isinstance(raw_glossary, list):
@@ -1006,6 +1027,8 @@ def normalize_glossary(raw_glossary) -> list[dict]:
             'english': first_present(item, ['english', 'English', 'en', 'english_translation', 'translation_en']),
             'definition': first_present(item, ['definition', 'meaning', 'explanation']),
         }
+        # Strip hallucinated CJK from EVERY field, EVERY language.
+        row = {k: _strip_cjk(v) for k, v in row.items()}
         row = fix_known_glossary_terms(row)
 
         if any(row.values()):
