@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   generateSpeech,
   generateSpeechFromDocument,
+  generateMaterialsFromScript,
   loginUser,
   logoutUser,
   signupUser,
@@ -2695,12 +2696,22 @@ const [showAdvanced, setShowAdvanced] = useState(true);
       if (!script) throw new Error(labels.sourceMediaEmpty || 'Could not transcribe the uploaded media.');
       const audioUrl = URL.createObjectURL(file);
       onSourceAudio?.(audioUrl);   // play the real source in Module C
+
+      // Generate the full materials from the transcript so the uploaded speech
+      // behaves exactly like a generated one — audio, MCQ, glossary all work.
+      let materials = { summary: '', mcqs: [], glossary: [] };
+      try {
+        materials = await generateMaterialsFromScript({ script, language: form.language, domain: form.domain });
+      } catch { /* keep the transcript usable even if materials fail */ }
+
       const generated = {
         script,
         language: form.language,
         target_language: form.target_language,
         domain: form.domain,
-        summary: '', mcqs: [], glossary: [],
+        summary:  materials.summary || '',
+        mcqs:     materials.mcqs || [],
+        glossary: materials.glossary || [],
         source_upload: true,
         mode: 'uploaded_source',
       };

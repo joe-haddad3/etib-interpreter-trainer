@@ -1647,6 +1647,73 @@ def generate_speech():
         return jsonify({'error': str(exc)}), 500
 
 
+_MATERIALS_ONLY_PROMPT = """You are an expert interpreter-training materials designer for ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).
+
+Given this {lang_name} conference speech (domain: {domain}), produce training materials for interpreter trainees.
+
+SPEECH:
+{script}
+
+Return ONLY valid compact JSON — no markdown, no code fences, no text outside the JSON object:
+{{
+  "summary": "3-5 relevant complete-sentence thematic bullet points in {lang_name}",
+  "mcqs": [
+    {{"question": "Specific comprehension question about the speech content", "options": ["A. option", "B. option", "C. option", "D. option"], "answer": "A"}}
+  ],
+  "glossary": [
+    {{"term": "Key term in the speech language", "arabic": "المصطلح بالعربية", "french": "terme en français", "english": "term in English", "definition": "Brief definition"}}
+  ]
+}}
+
+Rules:
+- mcqs: write 5 questions that test SPECIFIC content from the speech; every question MUST be answerable from the speech alone; the 3 wrong options must be plausible but clearly contradicted by the speech.
+- glossary: 12-18 key domain-specific terms, each with correct Arabic, French, English and a brief definition. Use official UN/UNTERM institutional terminology (e.g. UNHCR → "مفوضية الأمم المتحدة السامية لشؤون اللاجئين" / "Haut-Commissariat des Nations Unies pour les réfugiés (HCR)").
+- summary: 3-5 complete-sentence points capturing the main content."""
+
+
+@module_a_bp.route('/materials-from-script', methods=['POST'])
+def materials_from_script():
+    """
+    Generate pedagogical materials (summary, MCQs, glossary) from an EXISTING
+    script — used when a student uploads a real speech to interpret, so the
+    uploaded transcript behaves exactly like a generated speech (audio, MCQ,
+    glossary all work). Uses the SAME normalization as /generate, so MCQs get
+    answer indices, the glossary gets the full schema, and CJK is stripped.
+    """
+    data = request.get_json() or {}
+    script = str(data.get('script') or '').strip()
+    if not script:
+        return jsonify({'error': 'script is required'}), 400
+    language = data.get('language', 'ar')
+    domain   = data.get('domain', 'general')
+    lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
+
+    try:
+        prompt = _MATERIALS_ONLY_PROMPT.format(
+            lang_name=lang_names.get(language, 'English'),
+            domain=domain,
+            script=script[:9000],   # cap very long uploads to protect the token budget
+        )
+        raw_output = generate_text(
+            messages=[
+                {'role': 'system', 'content': 'You return only valid JSON. Never include markdown, code fences, or any text outside the JSON object.'},
+                {'role': 'user', 'content': prompt},
+            ],
+            max_tokens=_generation_max_tokens(400, language),
+            temperature=0.5,
+        )
+        # parse_generation_output normalizes mcqs (answer_index), glossary
+        # (CJK-stripped, full schema) and summary — identical to /generate.
+        parsed = parse_generation_output(raw_output, language=language)
+        return jsonify({
+            'summary':  parsed.get('summary', ''),
+            'mcqs':     parsed.get('mcqs', []),
+            'glossary': parsed.get('glossary', []),
+        })
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
 @module_a_bp.route('/retrieve-document-context', methods=['POST'])
 def retrieve_document_context():
     uploaded_files = uploaded_document_files(request.files)

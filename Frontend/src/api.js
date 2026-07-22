@@ -114,6 +114,15 @@ export async function generateSpeech(params) {
   return parseJsonResponse(res);
 }
 
+export async function generateMaterialsFromScript({ script, language, domain }) {
+  const res = await safeFetch(`${BASE}/module-a/materials-from-script`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(groqBody({ script, language, domain }))
+  });
+  return parseJsonResponse(res);
+}
+
 export async function generateSpeechFromDocument(files, params) {
   const form = new FormData();
   const fileList = Array.isArray(files) ? files : [files];

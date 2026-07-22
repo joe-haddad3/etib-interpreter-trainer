@@ -25,6 +25,7 @@ def _clean_asr_text(text: str) -> str:
     cleaned = str(text or '').strip()
     cleaned = re.sub(r'\.{2,}', '', cleaned)   # remove all ... regardless of position
     cleaned = re.sub(r'…', '', cleaned)          # remove unicode ellipsis
+    cleaned = re.sub(r'\s*[<>]{2,}\s*', ' ', cleaned)  # ">>" / "<<" speaker-turn artifacts Whisper inserts
     cleaned = re.sub(r'\s{2,}', ' ', cleaned)   # collapse extra spaces left behind
     return cleaned.strip()
 
