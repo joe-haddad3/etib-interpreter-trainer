@@ -183,6 +183,7 @@ const UI = {
     materialsTitle: 'Pedagogical materials',
     generateMaterials: 'Generate materials',
     generatingMaterials: 'Generating materials...',
+    materialsFailed: 'The speech was transcribed, but the materials (summary, MCQ, glossary) could not be generated — the server may be waking up (2–3 min). Click "Upload a speech" again to retry.',
     keyTerms: 'Key terms',
     summaryTitle: 'Thematic summary',
     mcqTitle: 'Comprehension questions (MCQ)',
@@ -617,6 +618,7 @@ const UI = {
     materialsTitle: 'المواد التعليمية',
     generateMaterials: 'توليد المواد',
     generatingMaterials: 'جارٍ توليد المواد...',
+    materialsFailed: 'تم تفريغ الخطاب، لكن تعذّر توليد المواد (الملخص، الأسئلة، المسرد) — قد يكون الخادم قيد التشغيل (٢-٣ دقائق). اضغط «رفع خطاب» مجدداً لإعادة المحاولة.',
     keyTerms: 'المصطلحات الأساسية',
     summaryTitle: 'الملخص الموضوعي',
     mcqTitle: 'أسئلة الفهم (اختيار متعدد)',
@@ -1051,6 +1053,7 @@ const UI = {
     materialsTitle: 'Supports pédagogiques',
     generateMaterials: 'Générer les supports',
     generatingMaterials: 'Génération des supports...',
+    materialsFailed: 'Le discours a été transcrit, mais les supports (résumé, QCM, glossaire) n’ont pas pu être générés — le serveur se réveille peut-être (2–3 min). Cliquez à nouveau sur « Importer un discours » pour réessayer.',
     keyTerms: 'Termes clés',
     summaryTitle: 'Résumé thématique',
     mcqTitle: 'Questions de compréhension (QCM)',
@@ -2699,10 +2702,16 @@ const [showAdvanced, setShowAdvanced] = useState(true);
 
       // Generate the full materials from the transcript so the uploaded speech
       // behaves exactly like a generated one — audio, MCQ, glossary all work.
+      // Not silent: if this fails the student sees why (usually a sleeping
+      // server or an exhausted key) and can retry.
+      setSourceMediaStatus('materials');
       let materials = { summary: '', mcqs: [], glossary: [] };
+      let materialsError = '';
       try {
         materials = await generateMaterialsFromScript({ script, language: form.language, domain: form.domain });
-      } catch { /* keep the transcript usable even if materials fail */ }
+      } catch (mErr) {
+        materialsError = mErr.message;
+      }
 
       const generated = {
         script,
@@ -2715,7 +2724,13 @@ const [showAdvanced, setShowAdvanced] = useState(true);
         source_upload: true,
         mode: 'uploaded_source',
       };
-      setResult(generated); onGenerated(generated); setSourceMediaStatus('success');
+      setResult(generated); onGenerated(generated);
+      if (materialsError || !(materials.mcqs || []).length) {
+        setError(labels.materialsFailed || 'The speech was transcribed, but the materials (summary, MCQ, glossary) could not be generated — the server may be waking up. Click "Upload a speech" again to retry.');
+        setSourceMediaStatus('error');
+      } else {
+        setSourceMediaStatus('success');
+      }
     } catch (err) {
       setError(err.message); setSourceMediaStatus('error');
     }
@@ -2932,8 +2947,10 @@ const [showAdvanced, setShowAdvanced] = useState(true);
           {/* Upload a real speech (audio/video) to interpret from (Mariam
               feedback) — it is transcribed and used as the source. */}
           <button type="button" className="btn-secondary" onClick={() => sourceMediaRef.current?.click()}
-            disabled={isLoading || sourceMediaStatus === 'loading'}>
-            🎬 {sourceMediaStatus === 'loading' ? (labels.transcribing || 'Transcribing…') : (labels.uploadSourceMedia || 'Upload a speech to interpret')}
+            disabled={isLoading || sourceMediaStatus === 'loading' || sourceMediaStatus === 'materials'}>
+            🎬 {sourceMediaStatus === 'loading' ? (labels.transcribing || 'Transcribing…')
+              : sourceMediaStatus === 'materials' ? (labels.generatingMaterials || 'Generating materials…')
+              : (labels.uploadSourceMedia || 'Upload a speech to interpret')}
           </button>
           <input ref={sourceMediaRef} type="file" accept="audio/*,video/*" style={{ display: 'none' }}
             onChange={e => { const f = e.target.files?.[0]; if (f) handleSourceMediaUpload(f); e.target.value = ''; }} />
