@@ -1692,25 +1692,32 @@ def materials_from_script():
         prompt = _MATERIALS_ONLY_PROMPT.format(
             lang_name=lang_names.get(language, 'English'),
             domain=domain,
-            script=script[:9000],   # cap very long uploads to protect the token budget
+            script=script[:8000],   # cap very long uploads to protect the token budget
         )
+        # Generous fixed budget — a 12-18 term glossary with definitions plus
+        # 5 MCQs and a summary needs room and must not truncate.
         raw_output = generate_text(
             messages=[
                 {'role': 'system', 'content': 'You return only valid JSON. Never include markdown, code fences, or any text outside the JSON object.'},
                 {'role': 'user', 'content': prompt},
             ],
-            max_tokens=_generation_max_tokens(400, language),
-            temperature=0.5,
+            max_tokens=5000,
+            temperature=0.4,
         )
         # parse_generation_output normalizes mcqs (answer_index), glossary
         # (CJK-stripped, full schema) and summary — identical to /generate.
         parsed = parse_generation_output(raw_output, language=language)
-        return jsonify({
-            'summary':  parsed.get('summary', ''),
-            'mcqs':     parsed.get('mcqs', []),
-            'glossary': parsed.get('glossary', []),
-        })
+        summary  = parsed.get('summary', '')
+        mcqs     = parsed.get('mcqs', [])
+        glossary = parsed.get('glossary', [])
+        if not mcqs and not glossary and not summary:
+            # Parsing produced nothing — surface a diagnostic head of the model
+            # output so the real cause is visible instead of a silent empty state.
+            head = str(raw_output or '')[:160].replace('\n', ' ')
+            return jsonify({'error': f'Materials could not be parsed from the model response: "{head}"'}), 500
+        return jsonify({'summary': summary, 'mcqs': mcqs, 'glossary': glossary})
     except Exception as exc:
+        import traceback; traceback.print_exc()
         return jsonify({'error': str(exc)}), 500
 
 

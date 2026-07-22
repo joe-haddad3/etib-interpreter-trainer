@@ -2725,8 +2725,12 @@ const [showAdvanced, setShowAdvanced] = useState(true);
         mode: 'uploaded_source',
       };
       setResult(generated); onGenerated(generated);
-      if (materialsError || !(materials.mcqs || []).length) {
-        setError(labels.materialsFailed || 'The speech was transcribed, but the materials (summary, MCQ, glossary) could not be generated — the server may be waking up. Click "Upload a speech" again to retry.');
+      if (materialsError) {
+        // Surface the real backend reason (quota, parse error, etc.).
+        setError(`${labels.errorPrefix}: ${materialsError}`);
+        setSourceMediaStatus('error');
+      } else if (!(materials.mcqs || []).length) {
+        setError(labels.materialsFailed || 'The speech was transcribed, but the materials could not be generated — please retry.');
         setSourceMediaStatus('error');
       } else {
         setSourceMediaStatus('success');
