@@ -577,13 +577,94 @@ def normalize_mcqs(mcqs: list) -> list:
     return normalized
 
 
+def _generation_max_tokens(word_count_val: int, language: str) -> int:
+    """
+    Output-token budget for one generation call. Must fit the SCRIPT plus all
+    materials (summary + 5 MCQs + 12-18 glossary terms) as one JSON object,
+    or the JSON truncates — which dropped the MCQ and leaked raw JSON into the
+    speech on the "Very long" option. Arabic runs ~3 tokens/word and needs
+    ~2500 tokens of material headroom; Latin scripts ~2 tokens/word, ~1800.
+    Cap 8000 (well within llama-3.3-70b-versatile's completion limit).
+    """
+    if language == 'ar':
+        return min(8000, max(3500, int(word_count_val * 3) + 2500))
+    return min(8000, max(2800, int(word_count_val * 2) + 1800))
+
+
+def _strip_json_envelope(text: str) -> str:
+    """
+    Last-resort cleanup when JSON parsing failed and the raw model output is
+    used as the script: remove a leaked opening envelope like
+    {"script": "  so the speech never starts with JSON syntax (the "script at
+    the beginning" bug on very long generations).
+    """
+    t = str(text or '').lstrip()
+    t = re.sub(r'^\{?\s*["\']?(script|summary)["\']?\s*:\s*["\']', '', t, flags=re.IGNORECASE)
+    return t.strip()
+
+
+def repair_truncated_json(text: str):
+    """
+    Best-effort recovery of a JSON object that was cut off mid-way because the
+    model hit its token limit (very long speeches). Closes an open string,
+    drops a dangling trailing key/comma, and balances open brackets/braces,
+    then parses — recovering the script plus whatever materials completed
+    before the cut. Returns a dict or None.
+    """
+    start = text.find('{')
+    if start == -1:
+        return None
+    s = text[start:]
+    in_str = False
+    esc = False
+    stack = []
+    for ch in s:
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == '\\':
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch in '{[':
+            stack.append(ch)
+        elif ch in '}]':
+            if stack:
+                stack.pop()
+    repaired = s
+    if in_str:
+        repaired += '"'
+    # drop a dangling ", "key": partial" or trailing comma left by the cut
+    repaired = re.sub(r',\s*"[^"]*"\s*:\s*$', '', repaired)
+    repaired = re.sub(r',\s*$', '', repaired)
+    for opener in reversed(stack):
+        repaired += ']' if opener == '[' else '}'
+    for candidate in (repaired, escape_newlines_inside_json_strings(repaired)):
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    return None
+
+
 def parse_generation_output(raw_output: str, language: str = 'ar') -> dict:
     """Parse model JSON and fall back to treating the output as script text."""
     text = clean_model_json_text(raw_output)
     data = parse_json_like_object(text)
 
+    # Recover a truncated response (token-limit cut on very long speeches) so
+    # the MCQ/glossary that completed before the cut survive and the raw JSON
+    # envelope never leaks into the displayed speech.
     if not isinstance(data, dict):
-        data = {'script': text}
+        data = repair_truncated_json(text)
+
+    if not isinstance(data, dict):
+        data = {'script': _strip_json_envelope(text)}
 
     def clean(s: str) -> str:
         return _clean_arabic_script(str(s).strip()) if language == 'ar' else str(s).strip()
@@ -1503,13 +1584,7 @@ def generate_speech():
         topic = params.get('topic', '').strip()
         prompt = build_structured_material_prompt(params, topic=topic, excerpts=excerpts)
         word_count_val = get_word_count_settings(params)['max']
-        _lang = params.get('language', 'ar')
-        if _lang == 'ar':
-            # Arabic uses ~3 tokens/word on LLaMA; +1500 for MCQ+glossary+summary JSON
-            max_tok = min(6000, max(3500, int(word_count_val * 3) + 1500))
-        else:
-            # Latin scripts: ~1.5 tokens/word; +1000 for JSON overhead
-            max_tok = min(6000, max(2800, int(word_count_val * 2) + 1000))
+        max_tok = _generation_max_tokens(word_count_val, params.get('language', 'ar'))
         raw_output = generate_text(
             messages=[
                 {
@@ -1685,11 +1760,7 @@ def generate_from_document():
         prompt = build_structured_material_prompt(params, topic=topic, excerpts=selected_chunks)
 
         word_count_val = get_word_count_settings(params)['max']
-        _lang = params.get('language', 'ar')
-        if _lang == 'ar':
-            max_tok = min(6000, max(3500, int(word_count_val * 3) + 1500))
-        else:
-            max_tok = min(6000, max(2800, int(word_count_val * 2) + 1000))
+        max_tok = _generation_max_tokens(word_count_val, params.get('language', 'ar'))
         raw_output = generate_text(
             messages=[
                 {
