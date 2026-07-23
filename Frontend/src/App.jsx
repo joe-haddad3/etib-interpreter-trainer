@@ -32,6 +32,20 @@ import {
   SERVER_BASE,
 } from './api.js';
 
+// Map a raw backend/Groq error to a clear, actionable message. An invalid or
+// expired Groq key surfaces as a 401 "Invalid API Key" — tell the student to
+// fix it in Settings instead of showing raw JSON.
+function friendlyLlmError(message, labels) {
+  const m = String(message || '');
+  if (/invalid[_\s-]?api[_\s-]?key|invalid api key|\b401\b|authentication|unauthorized/i.test(m)) {
+    return labels.keyInvalid || 'Your Groq API key was rejected — check it in Settings.';
+  }
+  if (/rate.?limit|quota|\b429\b|tokens per|tpd|tpm/i.test(m)) {
+    return labels.llmQuotaError || m;
+  }
+  return m;
+}
+
 const UI = {
   en: {
     uiLanguage: 'Interface language',
@@ -449,6 +463,7 @@ const UI = {
     llmFailedWarning: 'AI language analysis could not complete — showing automatic detections only. Scores may be incomplete.',
     llmQuotaError: 'Your Groq API tokens are used up for now — wait for the limit to reset (or add another API key in Settings), then run the evaluation again.',
     keyRequired: 'A personal (free) Groq API key is required — create yours at console.groq.com (2 minutes, no credit card) and add it in Settings.',
+    keyInvalid: 'Your Groq API key was rejected (invalid or expired). Open Settings, delete it, and paste a fresh key from console.groq.com.',
     simulSourceEnded: 'The source speech has ended — finish your interpretation, then press stop. Recording stops automatically after one minute.',
     simulWithText: 'Show source text on screen (SIMUL with text)',
     consecFlowHint: 'Step 1: listen to the speech and take notes. Step 2: record your interpretation from your notes below.',
@@ -884,6 +899,7 @@ const UI = {
     llmFailedWarning: 'لم يتمكن التحليل اللغوي بالذكاء الاصطناعي من الاكتمال — يُعرض الرصد التلقائي فقط. قد تكون الدرجات غير مكتملة.',
     llmQuotaError: 'انتهت حصة رموز Groq API الخاصة بك حالياً — انتظر إعادة تعيين الحد (أو أضف مفتاح API آخر في الإعدادات)، ثم أعد تشغيل التقييم.',
     keyRequired: 'مفتاح Groq API شخصي (مجاني) مطلوب — أنشئ مفتاحك على console.groq.com (دقيقتان، بدون بطاقة ائتمان) وأضفه في الإعدادات.',
+    keyInvalid: 'تم رفض مفتاح Groq API الخاص بك (غير صالح أو منتهي). افتح الإعدادات واحذفه والصق مفتاحاً جديداً من console.groq.com.',
     simulSourceEnded: 'انتهى الخطاب المصدر — أكمل ترجمتك ثم اضغط إيقاف. يتوقف التسجيل تلقائياً بعد دقيقة واحدة.',
     simulWithText: 'إظهار نص المصدر على الشاشة (فورية مع النص)',
     consecFlowHint: 'الخطوة ١: استمع إلى الخطاب ودوّن ملاحظاتك. الخطوة ٢: سجّل ترجمتك اعتماداً على ملاحظاتك أدناه.',
@@ -1319,6 +1335,7 @@ const UI = {
     llmFailedWarning: "L'analyse linguistique IA n'a pas pu se terminer — seules les détections automatiques sont affichées. Les scores peuvent être incomplets.",
     llmQuotaError: "Vos jetons Groq API sont épuisés pour le moment — attendez la réinitialisation de la limite (ou ajoutez une autre clé API dans les Paramètres), puis relancez l'évaluation.",
     keyRequired: "Une clé Groq API personnelle (gratuite) est requise — créez la vôtre sur console.groq.com (2 minutes, sans carte bancaire) et ajoutez-la dans les Paramètres.",
+    keyInvalid: "Votre clé Groq API a été refusée (invalide ou expirée). Ouvrez les Paramètres, supprimez-la et collez une nouvelle clé depuis console.groq.com.",
     simulSourceEnded: "Le discours source est terminé — achevez votre interprétation puis appuyez sur stop. L'enregistrement s'arrête automatiquement après une minute.",
     simulWithText: 'Afficher le texte source à l\'écran (SIMUL avec texte)',
     consecFlowHint: "Étape 1 : écoutez le discours et prenez des notes. Étape 2 : enregistrez votre interprétation à partir de vos notes ci-dessous.",
@@ -2678,7 +2695,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
       }
       const data = await generateSpeech(params);
       setResult(data); onGenerated(data); setStatus('success');
-    } catch (err) { setError(err.message); setStatus('error'); }
+    } catch (err) { setError(friendlyLlmError(err.message, labels)); setStatus('error'); }
   }
 
   // Upload a real speech (audio or video) to interpret from (Mariam feedback):
@@ -2726,8 +2743,8 @@ const [showAdvanced, setShowAdvanced] = useState(true);
       };
       setResult(generated); onGenerated(generated);
       if (materialsError) {
-        // Surface the real backend reason (quota, parse error, etc.).
-        setError(`${labels.errorPrefix}: ${materialsError}`);
+        // Surface a clear reason (invalid key, quota) instead of raw JSON.
+        setError(`${labels.errorPrefix}: ${friendlyLlmError(materialsError, labels)}`);
         setSourceMediaStatus('error');
       } else if (!(materials.mcqs || []).length) {
         setError(labels.materialsFailed || 'The speech was transcribed, but the materials could not be generated — please retry.');
@@ -2763,7 +2780,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
       const topicFallback = form.topic || librarySources[0]?.title || '';
       const data = await generateSpeechFromDocument(allFiles, { ...form, topic: topicFallback });
       setResult(data); onGenerated(data); setStatus('success');
-    } catch (err) { setError(err.message); setStatus('error'); }
+    } catch (err) { setError(friendlyLlmError(err.message, labels)); setStatus('error'); }
   }
 
   const LANG_LABEL = { ar: 'AR', fr: 'FR', en: 'EN' };
@@ -4424,7 +4441,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
       setStatus('success');
       onEvaluationSaved?.();
     } catch (err) {
-      setError(err.message);
+      setError(friendlyLlmError(err.message, labels));
       setStatus('error');
     }
   }
