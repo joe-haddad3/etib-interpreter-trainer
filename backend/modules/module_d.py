@@ -33,7 +33,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
-from config import PRIMARY_LLM_MODEL, UPLOAD_FOLDER
+from config import PRIMARY_LLM_MODEL, UPLOAD_FOLDER, EVALUATION_SCORE_ON_MEANING
 
 def _current_user_id() -> str:
     """Extract user id from auth token in request args, form, or JSON body."""
@@ -592,19 +592,79 @@ def build_mode_context(mode: str) -> str:
     return MODE_GUIDANCE.get(mode, MODE_GUIDANCE['consecutive'])
 
 
+# Professor bilan (23 July): the automatic meaning/sense judgement was the
+# least reliable part (false errors, inexact corrections). Until it is
+# trustworthy, the score must focus on terminology conformity, linguistic
+# correctness, pronunciation, and delivery (pauses/décalage/fluency) — NOT on
+# "la restitution du sens du discours". These blocks are injected into the
+# evaluation prompt and switch with config.EVALUATION_SCORE_ON_MEANING.
+
+_EVAL_SCOPE_FORM_FOCUS = (
+    'EVALUATION SCOPE — READ FIRST, THIS OVERRIDES ANY CONFLICTING INSTRUCTION BELOW:\n'
+    'At this stage the automatic evaluation grades ONLY these dimensions:\n'
+    '  1. TERMINOLOGY CONFORMITY — did the student use the correct/approved target-language\n'
+    '     equivalents (checked against the approved glossary when provided)?\n'
+    '  2. LINGUISTIC CORRECTNESS — grammar, morphology, and pronunciation IN THE TARGET LANGUAGE.\n'
+    '  3. DELIVERY — management of pauses, décalage/Ear-Voice Span, hesitations, repetitions, fluency.\n'
+    '  4. NUMBERS, DATES & PROPER NAMES — factual reproduction of figures and names.\n'
+    'It DOES NOT grade the restitution of the MEANING/SENSE of the discourse. You may still LIST\n'
+    'meaning observations (translation_errors, missing_content, coverage) so the student sees them,\n'
+    'but they are INFORMATIONAL ONLY and must NEVER lower overall_score. Do not invent meaning\n'
+    'errors, and when unsure whether something is a meaning error, leave it out — a wrong automatic\n'
+    'correction is worse than a missed one.'
+)
+
+_EVAL_SCOPE_FULL = (
+    'EVALUATION SCOPE: grade the full interpretation, including terminology, linguistic\n'
+    'correctness, delivery, numbers/names, AND the fidelity of meaning/sense restitution.'
+)
+
+_TRANSLATION_TASK_NOTE_FORM = (
+    '(FOR THE STUDENT\'S INFORMATION ONLY — list observations but do NOT let them affect '
+    'overall_score, per the EVALUATION SCOPE above)'
+)
+_TRANSLATION_TASK_NOTE_FULL = '(most important task — be thorough and strict)'
+
+_SCORING_POLICY_FORM = (
+    'SCORING POLICY (authoritative — overrides the scoring philosophy text that follows):\n'
+    'Compute overall_score ONLY from: terminology conformity, target-language linguistic correctness,\n'
+    'pronunciation, delivery (pauses/décalage/hesitations/repetitions/fluency), and the accuracy of\n'
+    'numbers, dates, and proper names. Do NOT lower overall_score for meaning/sense divergences,\n'
+    'missing content, weakened wording, or coverage — those are informational this round. A student\n'
+    'who used correct terminology, correct target-language grammar, good delivery, and correct\n'
+    'numbers/names must score high EVEN IF you believe the meaning drifted. Ignore the "3+ HIGH-\n'
+    'importance omissions" cap below; base the score on the dimensions listed here.\n'
+)
+_SCORING_POLICY_FULL = ''
+
+
+def build_evaluation_scope() -> str:
+    return _EVAL_SCOPE_FULL if EVALUATION_SCORE_ON_MEANING else _EVAL_SCOPE_FORM_FOCUS
+
+
+def build_translation_task_note() -> str:
+    return _TRANSLATION_TASK_NOTE_FULL if EVALUATION_SCORE_ON_MEANING else _TRANSLATION_TASK_NOTE_FORM
+
+
+def build_scoring_policy() -> str:
+    return _SCORING_POLICY_FULL if EVALUATION_SCORE_ON_MEANING else _SCORING_POLICY_FORM
+
+
 LLM_ANALYSIS_PROMPT = """You are a professional interpreter training evaluator at ETIB (École de Traducteurs et d'Interprètes de Beyrouth, USJ Beirut).
 
 THIS IS AN INTERPRETATION TASK — NOT A READING TASK.
 The student heard a speech in {source_language} and interpreted it into {target_language}.
-The two texts are in DIFFERENT languages. Compare MEANING, CONCEPTS, NUMBERS, and TERMINOLOGY.
+The two texts are in DIFFERENT languages. Compare CONCEPTS, NUMBERS, and TERMINOLOGY.
+
+{evaluation_scope}
 
 {mode_context}
 
 YOU ARE A STRICT PROFESSOR. Your job is to FIND and REPORT errors, not to excuse them.
-- If the student's rendering changes the meaning even slightly → flag it as a translation error.
-- If a term is imprecise, vague, or weakened → flag it.
-- If you find fewer than 3 translation errors in a student transcript that has obvious mistakes, you are being too lenient. Re-read and look harder.
-- Do NOT give the student the benefit of the doubt. If something is wrong, say so clearly.
+- If a term is imprecise, vague, or weakened, or the wrong target-language equivalent → flag it.
+- If the target-language grammar, morphology, or pronunciation is wrong → flag it.
+- Do NOT give the student the benefit of the doubt on TERMINOLOGY, LANGUAGE, NUMBERS, or NAMES.
+- But follow the EVALUATION SCOPE above on what actually affects the score.
 
 SOURCE SPEECH (in {source_language}):
 {source}
@@ -642,7 +702,7 @@ Important reliability rule:
 
 EVALUATION TASKS — check every category thoroughly:
 
-TASK 1 — TRANSLATION ACCURACY (most important task — be thorough and strict):
+TASK 1 — TRANSLATION ACCURACY {translation_task_note}:
 Go through the source speech sentence by sentence. For each sentence ask:
 "Did the student convey the EXACT meaning in {target_language}?"
 
@@ -823,7 +883,7 @@ Names are identity-critical in interpretation — a distorted head-of-state or o
 can be a diplomatic incident. Flag every genuine mispronunciation and omission.
 
 Give overall_score 0-10 and coverage_score 0-10.
-STRICTNESS APPLIES TO overall_score ONLY. coverage_score follows the MANDATORY rubric in TASK 2:
+{scoring_policy}STRICTNESS APPLIES TO overall_score ONLY. coverage_score follows the MANDATORY rubric in TASK 2:
 empty missing_content = coverage 9-10, no exceptions. A complete interpretation gets full coverage
 credit even when other error types (grammar, pronunciation, hesitations) lower the overall_score.
 Be strict on overall_score — most student interpretations score 4–7:
@@ -2016,26 +2076,37 @@ def reconcile_overall_with_evidence(result: dict) -> dict:
     if not isinstance(result, dict):
         return result
 
-    # Floors only apply when coverage says the content actually arrived —
-    # a partial interpretation with few "errors" is still a partial one.
-    try:
-        coverage = float(result.get('coverage_score'))
-    except (TypeError, ValueError):
-        coverage = None
-    if coverage is None or coverage < 7.0:
-        return result
+    # Professor bilan (23 July): when meaning is NOT scored, coverage must not
+    # gate the floor and missing_content must not count as a penalty — the score
+    # rests on terminology, numbers, and names only.
+    score_meaning = EVALUATION_SCORE_ON_MEANING
+
+    if score_meaning:
+        # Floors only apply when coverage says the content actually arrived —
+        # a partial interpretation with few "errors" is still a partial one.
+        try:
+            coverage = float(result.get('coverage_score'))
+        except (TypeError, ValueError):
+            coverage = None
+        if coverage is None or coverage < 7.0:
+            return result
 
     # translation_errors deliberately NOT counted (16 July professor feedback):
     # word-level source-vs-target comparison is machine-translation logic —
     # an interpreter transmits meaning; meaning loss shows up in
-    # missing_content / information_loss, which ARE counted.
+    # missing_content / information_loss, which ARE counted (only when meaning
+    # is scored — form-focus excludes them entirely).
     missing = result.get('missing_content')
     missing = missing if isinstance(missing, list) else []
-    high_missing = sum(
-        1 for m in missing
-        if isinstance(m, dict) and str(m.get('importance', '')).lower() == 'high'
-    )
-    minor_missing = len(missing) - high_missing
+    if score_meaning:
+        high_missing = sum(
+            1 for m in missing
+            if isinstance(m, dict) and str(m.get('importance', '')).lower() == 'high'
+        )
+        minor_missing = len(missing) - high_missing
+    else:
+        high_missing = 0
+        minor_missing = 0
 
     numbers = result.get('number_accuracy')
     wrong_numbers = sum(
@@ -2708,14 +2779,21 @@ def detect_cut_words(segments: list, language: str = 'ar') -> list:
     return cut_words
 
 
-# Silence threshold by interpretation mode (professor feedback, 20 July):
-# in simultaneous mode, the interpreter necessarily lags behind the speaker
-# (Ear-Voice Span) — a brief pause while catching up is normal delivery, not
-# a disfluency, and was being flatly penalized like any other long pause.
+# Silence threshold by interpretation mode (professor feedback, 20 July;
+# extended per bilan 23 July):
+# - Simultaneous: the interpreter necessarily lags behind the speaker
+#   (Ear-Voice Span) — a brief pause while catching up is normal delivery.
+# - Consecutive: the student restitutes from memory + written notes AFTER the
+#   speech; pausing to read/decode notes and structure the next idea is expected
+#   professional behaviour, not a disfluency. The bilan flagged that normal
+#   note-consultation pauses were being penalized, so consecutive gets the most
+#   tolerant threshold of all three modes.
+# - Sight: reading dense source text on the fly; brief clause-boundary pauses
+#   are normal but shorter than consecutive note-reading gaps.
 SILENCE_THRESHOLD_BY_MODE = {
     'simultaneous': 3.2,
-    'consecutive':  2.0,
-    'sight':        2.0,
+    'consecutive':  4.0,
+    'sight':        2.5,
 }
 
 
@@ -2869,6 +2947,9 @@ def generate_feedback():
             source=source_script or '(source speech not provided)',
             transcript=transcript_text,
             mode_context=build_mode_context(mode),
+            evaluation_scope=build_evaluation_scope(),
+            translation_task_note=build_translation_task_note(),
+            scoring_policy=build_scoring_policy(),
             silence_threshold=s.get('silence_threshold_seconds', 2.0),
             silence_count=s.get('silence_count', 0),
             silence_examples=sil_examples or 'none found automatically',
@@ -2911,6 +2992,7 @@ def generate_feedback():
         llm_result = reconcile_coverage_with_missing_content(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, transcript_text)
         llm_result = reconcile_overall_with_evidence(llm_result)
+        llm_result['score_on_meaning'] = EVALUATION_SCORE_ON_MEANING
         if asr_artifacts:
             llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = {
@@ -3125,6 +3207,9 @@ def full_evaluation():
             source=source_script or '(source speech not provided)',
             transcript=full_text,
             mode_context=build_mode_context(mode),
+            evaluation_scope=build_evaluation_scope(),
+            translation_task_note=build_translation_task_note(),
+            scoring_policy=build_scoring_policy(),
             silence_threshold=s.get('silence_threshold_seconds', 2.0),
             silence_count=s.get('silence_count', 0),
             silence_examples=sil_examples or 'none found automatically',
@@ -3183,6 +3268,7 @@ def full_evaluation():
         llm_result = reconcile_coverage_with_missing_content(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, full_text)
         llm_result = reconcile_overall_with_evidence(llm_result)
+        llm_result['score_on_meaning'] = EVALUATION_SCORE_ON_MEANING
         if asr_artifacts:
             llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = _algo_payload

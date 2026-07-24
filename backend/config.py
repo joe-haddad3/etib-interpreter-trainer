@@ -91,3 +91,15 @@ DEFAULT_WORD_COUNT = 250
 DEFAULT_WPM = 120           # words per minute delivery rate
 DEFAULT_LANGUAGE = 'ar'     # Arabic is the primary language per cahier des charges
 DEFAULT_DIFFICULTY = 'intermediate'
+
+# ── Evaluation scope ─────────────────────────────────────────────────────────
+# Professor bilan (23 July 2026): "Se contenter à ce stade de nous concentrer
+# sur la conformité à la terminologie, la gestion du décalage, des pauses, la
+# correction linguistique — ET NON celle de la restitution du sens du discours."
+# The automatic meaning/sense judgement was unreliable (false errors, inexact
+# corrections), so it must NOT drive the score. When False, the evaluation
+# grades ONLY terminology conformity, linguistic correctness, pronunciation, and
+# delivery (pauses / décalage / fluency); meaning & coverage stay in the report
+# as informational feedback but never lower overall_score. Set the env var
+# EVALUATION_SCORE_ON_MEANING=true to restore full meaning-based scoring.
+EVALUATION_SCORE_ON_MEANING = os.getenv('EVALUATION_SCORE_ON_MEANING', 'false').lower() == 'true'

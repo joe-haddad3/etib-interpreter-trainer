@@ -8,6 +8,7 @@ import {
   signupUser,
   textToSpeech,
   downloadGlossary,
+  uploadGlossary,
   transcribeAudio,
   generateFeedback,
   evaluateWithAudio,
@@ -43,6 +44,9 @@ function friendlyLlmError(message, labels) {
   if (/rate.?limit|quota|\b429\b|tokens per|tpd|tpm/i.test(m)) {
     return labels.llmQuotaError || m;
   }
+  if (/source_and_target_must_differ/i.test(m)) {
+    return labels.sameLangError;
+  }
   return m;
 }
 
@@ -67,6 +71,7 @@ const UI = {
     switchToSignup: 'Create an account',
     switchToLogin: 'Already have an account? Sign in',
     student: 'Student',
+    guestName: 'Guest',
     instructor: 'Instructor',
     coordinator: 'Coordinator',
     signOut: 'Sign out',
@@ -212,6 +217,9 @@ const UI = {
     glossaryEnglishHeader: 'English',
     glossaryDefinitionHeader: 'Definition',
     downloadGlossary: 'Download glossary (DOCX)',
+    uploadGlossary: 'Import glossary',
+    glossaryUploading: 'Importing…',
+    glossaryUploadEmpty: 'No terms could be read from that file. Use columns like Term / Arabic / French / English (CSV, TSV, TXT, DOCX, or JSON).',
     uploadAudio: 'Upload your interpretation (MP3, WAV, M4A)',
     transcribeBtn: 'Transcribe',
     transcribing: 'Transcribing — may take 1–2 min...',
@@ -251,6 +259,7 @@ const UI = {
     studentSaid: 'Student said',
     correctTranslation: 'Correct',
     missingContent: 'Missing content',
+    scoreScopeNote: 'This score reflects terminology, target-language accuracy, numbers/names, and delivery (pauses, décalage, fluency). Meaning/coverage below is shown for your information and does not affect the score at this stage.',
     fluencyScore: 'Fluency score',
     pauseAnalysisTitle: 'Pauses & flow',
     repetitionAnalysisTitle: 'Repetitions — analysis',
@@ -328,13 +337,15 @@ const UI = {
     diffIntermediate: 'Intermediate',
     diffAdvanced: 'Advanced',
     diffHint: 'Beginner: simple vocabulary, short sentences, 1–2 numbers, slow pace. Intermediate: moderate terminology, several statistics, mixed sentences. Advanced: dense terminology, frequent numbers and names, complex syntax, fast pace.',
-    demoKeyBanner: 'This platform uses a free AI service (Groq) to generate and evaluate speeches. Right now you are using the platform\'s shared demonstration key, which works but is slower and has shared daily limits. Creating your own free key (2 minutes, no credit card) gives you faster responses and your own quota.',
+    demoKeyBanner: 'To generate speeches and evaluate your interpretations, you need your own free Groq API key (2 minutes, no credit card). Add it in Settings and it gives you your own quota. The assistant chatbot works without a key.',
     demoKeyBtn: 'Add my free key in Settings',
     wordRangeShortFull: 'Short — 120–180 words (≈ 1 min)',
     wordRangeMediumFull: 'Medium — 220–320 words (≈ 1.5–2.5 min)',
     wordRangeLongFull: 'Long — 400–550 words (≈ 3–4 min)',
     wordRangeExtendedFull: 'Extended — 650–800 words (≈ 4.5–6 min)',
     wordRangeVeryLongFull: 'Very long — 1100–1400 words (≈ 8–11 min)',
+    wordRangeExtraLongFull: 'Extra long — 1500–2200 words (≈ 12–18 min)',
+    wordRangeMarathonFull: 'Marathon — 2900–3600 words (≈ 24–30 min)',
     optSemiStructured: 'Semi-structured',
     optDisorganizedFull: 'Deliberately disorganized',
     scenarioLabel: 'Speaker style / setting',
@@ -382,6 +393,9 @@ const UI = {
     webPageUrlPlaceholder: 'https://… paste the address of an article or report',
     webPageFetch: 'Fetch page',
     webPageFetching: 'Fetching page…',
+    webPageAttached: 'Source attached',
+    webPageDone: 'Done',
+    fileTypeError: 'Unsupported file type. Upload a PDF, Word (.docx), or plain-text (.txt) file.',
     webPageHint: 'The readable text of the page will be extracted and used as the source for the speech.',
     scrollerTitle: 'Sight translation — scrolling text',
     scrollerPlay: '▶ Start scrolling',
@@ -398,6 +412,11 @@ const UI = {
     notesClear: 'Clear',
     notesShowSource: 'Show source',
     notesHideSource: 'Hide source',
+    liveTranscriptOn: 'Live transcript',
+    liveTranscriptOff: 'Hide live transcript',
+    liveTranscriptTitle: 'Live transcription',
+    liveTranscriptWaiting: 'Press play on the source audio — the transcription will appear here as it plays.',
+    liveTranscriptHint: 'Split screen: the source speech is transcribed on one side as it plays; take your notes on the other. Play, pause, and rewind the source audio above to control it.',
     sourceText: 'Source',
     notesPlaceholder: 'Take your notes here while listening (symbols, arrows, keywords)…',
     notesHint: 'Your notes stay on this page only — they are not saved or sent anywhere. The sketch pad supports a stylus (pressure-sensitive).',
@@ -464,6 +483,7 @@ const UI = {
     llmQuotaError: 'Your Groq API tokens are used up for now — wait for the limit to reset (or add another API key in Settings), then run the evaluation again.',
     keyRequired: 'A personal (free) Groq API key is required — create yours at console.groq.com (2 minutes, no credit card) and add it in Settings.',
     keyInvalid: 'Your Groq API key was rejected (invalid or expired). Open Settings, delete it, and paste a fresh key from console.groq.com.',
+    sameLangError: 'The source and interpretation languages must be different — interpretation is always between two languages.',
     simulSourceEnded: 'The source speech has ended — finish your interpretation, then press stop. Recording stops automatically after one minute.',
     simulWithText: 'Show source text on screen (SIMUL with text)',
     consecFlowHint: 'Step 1: listen to the speech and take notes. Step 2: record your interpretation from your notes below.',
@@ -503,6 +523,7 @@ const UI = {
     switchToSignup: 'إنشاء حساب جديد',
     switchToLogin: 'لديك حساب؟ سجّل الدخول',
     student: 'طالب',
+    guestName: 'ضيف',
     instructor: 'مدرب',
     coordinator: 'منسق',
     signOut: 'تسجيل الخروج',
@@ -648,6 +669,9 @@ const UI = {
     glossaryEnglishHeader: 'الإنجليزية',
     glossaryDefinitionHeader: 'التعريف',
     downloadGlossary: 'تنزيل المسرد (DOCX)',
+    uploadGlossary: 'استيراد مسرد',
+    glossaryUploading: 'جارٍ الاستيراد…',
+    glossaryUploadEmpty: 'تعذّرت قراءة أي مصطلحات من الملف. استخدم أعمدة مثل: المصطلح / العربية / الفرنسية / الإنجليزية (بصيغة CSV أو TSV أو TXT أو DOCX أو JSON).',
     uploadAudio: 'ارفع تسجيل ترجمتك (MP3, WAV, M4A)',
     transcribeBtn: 'فرّغ الصوت',
     transcribing: 'جارٍ التفريغ — قد يستغرق دقيقة أو دقيقتين...',
@@ -687,6 +711,7 @@ const UI = {
     studentSaid: 'ما قاله الطالب',
     correctTranslation: 'الترجمة الصحيحة',
     missingContent: 'محتوى مفقود',
+    scoreScopeNote: 'تعكس هذه الدرجة الالتزام بالمصطلحات، وصحّة اللغة الهدف، والأرقام والأسماء، والأداء (التوقّفات، إدارة الفارق الزمني، السلاسة). أمّا المعنى/التغطية المعروضان أدناه فهما للاطّلاع فقط ولا يؤثّران في الدرجة في هذه المرحلة.',
     fluencyScore: 'درجة السلاسة',
     pauseAnalysisTitle: 'التوقفات والانسيابية',
     repetitionAnalysisTitle: 'تحليل التكرارات',
@@ -764,13 +789,15 @@ const UI = {
     diffIntermediate: 'متوسط',
     diffAdvanced: 'متقدم',
     diffHint: 'مبتدئ: مفردات بسيطة، جمل قصيرة، رقم أو رقمان، إيقاع بطيء. متوسط: مصطلحات معتدلة، عدة إحصاءات، جمل متنوعة. متقدم: مصطلحات كثيفة، أرقام وأسماء متكررة، تراكيب معقدة، إيقاع سريع.',
-    demoKeyBanner: 'تعتمد المنصة على خدمة ذكاء اصطناعي مجانية (Groq) لتوليد الخطابات وتقييمها. أنت تستخدم حالياً المفتاح التجريبي المشترك للمنصة، وهو يعمل لكنه أبطأ وله حدود استخدام مشتركة. إنشاء مفتاحك المجاني الخاص (دقيقتان، دون بطاقة ائتمان) يمنحك استجابات أسرع وحصة خاصة بك.',
+    demoKeyBanner: 'لتوليد الخطابات وتقييم ترجمتك الشفوية، تحتاج إلى مفتاح Groq المجاني الخاص بك (دقيقتان، دون بطاقة ائتمان). أضِفه في الإعدادات ليمنحك حصة خاصة بك. أمّا المساعد الآلي (الدردشة) فيعمل دون مفتاح.',
     demoKeyBtn: 'أضف مفتاحي المجاني في الإعدادات',
     wordRangeShortFull: 'قصير — 120–180 كلمة (≈ دقيقة واحدة)',
     wordRangeMediumFull: 'متوسط — 220–320 كلمة (≈ 1.5–2.5 دقيقة)',
     wordRangeLongFull: 'طويل — 400–550 كلمة (≈ 3–4 دقائق)',
     wordRangeExtendedFull: 'ممتد — 650–800 كلمة (≈ 4.5–6 دقائق)',
     wordRangeVeryLongFull: 'طويل جداً — 1100–1400 كلمة (≈ 8–11 دقيقة)',
+    wordRangeExtraLongFull: 'طويل إضافي — 1500–2200 كلمة (≈ 12–18 دقيقة)',
+    wordRangeMarathonFull: 'ماراثوني — 2900–3600 كلمة (≈ 24–30 دقيقة)',
     optSemiStructured: 'شبه منظَّم',
     optDisorganizedFull: 'غير منظَّم عمداً',
     scenarioLabel: 'أسلوب المتحدث / السياق',
@@ -818,6 +845,9 @@ const UI = {
     webPageUrlPlaceholder: '…https:// الصق رابط مقال أو تقرير',
     webPageFetch: 'جلب الصفحة',
     webPageFetching: 'جارٍ جلب الصفحة…',
+    webPageAttached: 'تم إرفاق المصدر',
+    webPageDone: 'تم',
+    fileTypeError: 'نوع الملف غير مدعوم. ارفع ملف PDF أو Word‏ (.docx) أو نصاً عادياً‏ (.txt).',
     webPageHint: 'سيُستخرج النص المقروء من الصفحة ويُستخدم كمصدر للخطاب.',
     scrollerTitle: 'الترجمة البصرية — نص متحرك',
     scrollerPlay: '▶ بدء التمرير',
@@ -834,6 +864,11 @@ const UI = {
     notesClear: 'مسح',
     notesShowSource: 'إظهار المصدر',
     notesHideSource: 'إخفاء المصدر',
+    liveTranscriptOn: 'التفريغ المباشر',
+    liveTranscriptOff: 'إخفاء التفريغ المباشر',
+    liveTranscriptTitle: 'التفريغ المباشر',
+    liveTranscriptWaiting: 'شغّل الصوت المصدر — سيظهر التفريغ هنا أثناء التشغيل.',
+    liveTranscriptHint: 'شاشة مقسّمة: يُفرَّغ الخطاب المصدر على جهة أثناء تشغيله، ودوّن ملاحظاتك على الجهة الأخرى. تحكّم بذلك عبر تشغيل الصوت المصدر أعلاه وإيقافه وإرجاعه.',
     sourceText: 'المصدر',
     notesPlaceholder: 'دوّن ملاحظاتك هنا أثناء الاستماع (رموز، أسهم، كلمات مفتاحية)…',
     notesHint: 'تبقى ملاحظاتك في هذه الصفحة فقط — لا تُحفظ ولا تُرسل إلى أي مكان. لوحة الرسم تدعم القلم الرقمي (حساس للضغط).',
@@ -900,6 +935,7 @@ const UI = {
     llmQuotaError: 'انتهت حصة رموز Groq API الخاصة بك حالياً — انتظر إعادة تعيين الحد (أو أضف مفتاح API آخر في الإعدادات)، ثم أعد تشغيل التقييم.',
     keyRequired: 'مفتاح Groq API شخصي (مجاني) مطلوب — أنشئ مفتاحك على console.groq.com (دقيقتان، بدون بطاقة ائتمان) وأضفه في الإعدادات.',
     keyInvalid: 'تم رفض مفتاح Groq API الخاص بك (غير صالح أو منتهي). افتح الإعدادات واحذفه والصق مفتاحاً جديداً من console.groq.com.',
+    sameLangError: 'يجب أن تختلف لغة المصدر عن لغة الترجمة الشفوية — فالترجمة الفورية تكون دائماً بين لغتين مختلفتين.',
     simulSourceEnded: 'انتهى الخطاب المصدر — أكمل ترجمتك ثم اضغط إيقاف. يتوقف التسجيل تلقائياً بعد دقيقة واحدة.',
     simulWithText: 'إظهار نص المصدر على الشاشة (فورية مع النص)',
     consecFlowHint: 'الخطوة ١: استمع إلى الخطاب ودوّن ملاحظاتك. الخطوة ٢: سجّل ترجمتك اعتماداً على ملاحظاتك أدناه.',
@@ -939,6 +975,7 @@ const UI = {
     switchToSignup: 'Créer un compte',
     switchToLogin: 'Vous avez déjà un compte ? Se connecter',
     student: 'Étudiant',
+    guestName: 'Invité',
     instructor: 'Formateur',
     coordinator: 'Coordinateur',
     signOut: 'Se déconnecter',
@@ -1084,6 +1121,9 @@ const UI = {
     glossaryEnglishHeader: 'Anglais',
     glossaryDefinitionHeader: 'Définition',
     downloadGlossary: 'Télécharger le glossaire (DOCX)',
+    uploadGlossary: 'Importer un glossaire',
+    glossaryUploading: 'Importation…',
+    glossaryUploadEmpty: 'Aucun terme n\'a pu être lu dans ce fichier. Utilisez des colonnes comme Terme / Arabe / Français / Anglais (CSV, TSV, TXT, DOCX ou JSON).',
     uploadAudio: 'Déposez votre interprétation (MP3, WAV, M4A)',
     transcribeBtn: 'Transcrire',
     transcribing: 'Transcription en cours — peut prendre 1–2 min...',
@@ -1123,6 +1163,7 @@ const UI = {
     studentSaid: "L'étudiant a dit",
     correctTranslation: 'Traduction correcte',
     missingContent: 'Contenu manquant',
+    scoreScopeNote: 'Ce score reflète la conformité terminologique, la correction de la langue cible, les chiffres/noms et la restitution technique (pauses, gestion du décalage, fluidité). Le sens/la couverture ci-dessous sont affichés à titre informatif et n\'influencent pas le score à ce stade.',
     fluencyScore: 'Score de fluidité',
     pauseAnalysisTitle: 'Pauses et rythme',
     repetitionAnalysisTitle: 'Répétitions — analyse',
@@ -1200,13 +1241,15 @@ const UI = {
     diffIntermediate: 'Intermédiaire',
     diffAdvanced: 'Avancé',
     diffHint: 'Débutant : vocabulaire simple, phrases courtes, 1–2 chiffres, débit lent. Intermédiaire : terminologie modérée, plusieurs statistiques, phrases variées. Avancé : terminologie dense, chiffres et noms fréquents, syntaxe complexe, débit rapide.',
-    demoKeyBanner: 'La plateforme utilise un service d\'IA gratuit (Groq) pour générer et évaluer les discours. Vous utilisez actuellement la clé de démonstration partagée de la plateforme : elle fonctionne, mais elle est plus lente et soumise à des limites d\'usage partagées. Créer votre propre clé gratuite (2 minutes, sans carte bancaire) vous donne des réponses plus rapides et un quota personnel.',
+    demoKeyBanner: 'Pour générer des discours et évaluer vos interprétations, vous avez besoin de votre propre clé Groq gratuite (2 minutes, sans carte bancaire). Ajoutez-la dans Paramètres : elle vous donne votre propre quota. L\'assistant conversationnel fonctionne sans clé.',
     demoKeyBtn: 'Ajouter ma clé gratuite dans Paramètres',
     wordRangeShortFull: 'Court — 120–180 mots (≈ 1 min)',
     wordRangeMediumFull: 'Moyen — 220–320 mots (≈ 1,5–2,5 min)',
     wordRangeLongFull: 'Long — 400–550 mots (≈ 3–4 min)',
     wordRangeExtendedFull: 'Étendu — 650–800 mots (≈ 4,5–6 min)',
     wordRangeVeryLongFull: 'Très long — 1100–1400 mots (≈ 8–11 min)',
+    wordRangeExtraLongFull: 'Très très long — 1500–2200 mots (≈ 12–18 min)',
+    wordRangeMarathonFull: 'Marathon — 2900–3600 mots (≈ 24–30 min)',
     optSemiStructured: 'Semi-structuré',
     optDisorganizedFull: 'Volontairement désorganisé',
     scenarioLabel: 'Style d\'orateur / contexte',
@@ -1254,6 +1297,9 @@ const UI = {
     webPageUrlPlaceholder: 'https://… collez l\'adresse d\'un article ou d\'un rapport',
     webPageFetch: 'Récupérer la page',
     webPageFetching: 'Récupération…',
+    webPageAttached: 'Source ajoutée',
+    webPageDone: 'Terminé',
+    fileTypeError: 'Type de fichier non pris en charge. Importez un PDF, un Word (.docx) ou un fichier texte (.txt).',
     webPageHint: 'Le texte lisible de la page sera extrait et utilisé comme source du discours.',
     scrollerTitle: 'Traduction à vue — texte défilant',
     scrollerPlay: '▶ Lancer le défilement',
@@ -1270,6 +1316,11 @@ const UI = {
     notesClear: 'Effacer',
     notesShowSource: 'Afficher la source',
     notesHideSource: 'Masquer la source',
+    liveTranscriptOn: 'Transcription en direct',
+    liveTranscriptOff: 'Masquer la transcription',
+    liveTranscriptTitle: 'Transcription en direct',
+    liveTranscriptWaiting: 'Lancez l\'audio source — la transcription apparaîtra ici au fil de la lecture.',
+    liveTranscriptHint: 'Écran partagé : le discours source est transcrit d\'un côté pendant sa lecture ; prenez vos notes de l\'autre. Contrôlez le tout avec la lecture/pause/retour de l\'audio source ci-dessus.',
     sourceText: 'Source',
     notesPlaceholder: 'Prenez vos notes ici pendant l\'écoute (symboles, flèches, mots-clés)…',
     notesHint: 'Vos notes restent sur cette page uniquement — elles ne sont ni enregistrées ni envoyées. Le croquis prend en charge un stylet (sensible à la pression).',
@@ -1336,6 +1387,7 @@ const UI = {
     llmQuotaError: "Vos jetons Groq API sont épuisés pour le moment — attendez la réinitialisation de la limite (ou ajoutez une autre clé API dans les Paramètres), puis relancez l'évaluation.",
     keyRequired: "Une clé Groq API personnelle (gratuite) est requise — créez la vôtre sur console.groq.com (2 minutes, sans carte bancaire) et ajoutez-la dans les Paramètres.",
     keyInvalid: "Votre clé Groq API a été refusée (invalide ou expirée). Ouvrez les Paramètres, supprimez-la et collez une nouvelle clé depuis console.groq.com.",
+    sameLangError: "La langue source et la langue d'interprétation doivent être différentes — l'interprétation se fait toujours entre deux langues.",
     simulSourceEnded: "Le discours source est terminé — achevez votre interprétation puis appuyez sur stop. L'enregistrement s'arrête automatiquement après une minute.",
     simulWithText: 'Afficher le texte source à l\'écran (SIMUL avec texte)',
     consecFlowHint: "Étape 1 : écoutez le discours et prenez des notes. Étape 2 : enregistrez votre interprétation à partir de vos notes ci-dessous.",
@@ -2406,7 +2458,7 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
     <section>
       <div className="workspace-header fade-up">
         <span className="workspace-user">
-          {currentUser && <><strong>{currentUser.name}</strong> · {currentUser.role}</>}
+          {currentUser && <><strong>{currentUser.id === 'guest' ? labels.guestName : currentUser.name}</strong> · {labels.student}</>}
         </span>
         <button type="button" className="sign-out-btn" onClick={onLogout}>{labels.signOut}</button>
       </div>
@@ -2484,20 +2536,39 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
   const [pageUrl, setPageUrl] = useState('');
   const [urlStatus, setUrlStatus] = useState('idle');
   const [urlError, setUrlError] = useState('');
+  const [urlSuccessTitle, setUrlSuccessTitle] = useState('');
+  const [fileError, setFileError] = useState('');
+
+  // Only these document types are supported by the backend
+  // (utils/document_grounding.SUPPORTED_DOCUMENT_EXTENSIONS).
+  const ALLOWED_DOC_EXT = ['.pdf', '.docx', '.txt'];
 
   function handleFileChosen(file) {
     if (!file) return;
+    const name = (file.name || '').toLowerCase();
+    if (!ALLOWED_DOC_EXT.some(ext => name.endsWith(ext))) {
+      // Client-side type check: the accept="" attribute is only a picker hint
+      // and does not block drag-drop or every browser, so validate explicitly.
+      setFileError(labels.fileTypeError || 'Unsupported file type. Upload a PDF, Word (.docx), or plain-text file.');
+      return;
+    }
+    setFileError('');
     onSelectFile(file);
     onClose();
   }
 
   async function handleFetchUrl() {
     if (!pageUrl.trim()) return;
-    setUrlStatus('loading'); setUrlError('');
+    setUrlStatus('loading'); setUrlError(''); setUrlSuccessTitle('');
     try {
       const data = await fetchWebPage(pageUrl.trim());
-      onSelectLibrary({ text: data.text, title: data.title || pageUrl, un_id: '', web_url: data.url });
-      onClose();
+      const title = data.title || pageUrl;
+      onSelectLibrary({ text: data.text, title, un_id: '', web_url: data.url });
+      // Explicit success feedback: the tester reported the modal closing with no
+      // visible confirmation. Keep it open and confirm what was attached.
+      setUrlSuccessTitle(title);
+      setUrlStatus('success');
+      setPageUrl('');
     } catch (err) {
       setUrlError(err.message);
       setUrlStatus('error');
@@ -2547,6 +2618,14 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
               </button>
             </div>
             {urlError && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{urlError}</div>}
+            {urlStatus === 'success' && (
+              <div className="info-tip" style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <span style={{ flex: 1 }}>✅ {labels.webPageAttached}: <strong>{urlSuccessTitle}</strong></span>
+                <button type="button" className="btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={onClose}>
+                  {labels.webPageDone || 'Done'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -2596,6 +2675,7 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
                 <div className="upload-zone-label">{labels?.srcDropPdf} <span className="upload-zone-browse">{labels?.srcBrowse}</span></div>
                 <div className="upload-zone-hint">{labels?.srcFileTypes}</div>
               </label>
+              {fileError && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{fileError}</div>}
             </div>
           </div>
         )}
@@ -2619,6 +2699,7 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
               <div className="upload-zone-label">{labels?.srcDropFile} <span className="upload-zone-browse">{labels?.srcBrowse}</span></div>
               <div className="upload-zone-hint">{labels?.srcFileTypes}</div>
             </label>
+            {fileError && <div className="error-msg" style={{ marginTop: '0.75rem' }}>{fileError}</div>}
           </div>
         )}
       </div>
@@ -2678,6 +2759,10 @@ const [showAdvanced, setShowAdvanced] = useState(true);
       setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
       setStatus('error');
       return;
+    }
+    // Interpretation is cross-language: source and target must differ.
+    if (form.language === form.target_language) {
+      setError(labels.sameLangError); setStatus('error'); return;
     }
     setStatus('loading'); setError(''); setResult(null);
     try {
@@ -2773,6 +2858,9 @@ const [showAdvanced, setShowAdvanced] = useState(true);
       setStatus('error');
       return;
     }
+    if (form.language === form.target_language) {
+      setError(labels.sameLangError); setStatus('error'); return;
+    }
     setStatus('loading'); setError(''); setResult(null);
     try {
       const allFiles = buildAllSourceFiles();
@@ -2860,6 +2948,11 @@ const [showAdvanced, setShowAdvanced] = useState(true);
           </button>
         </div>
 
+        {/* Interpretation is cross-language — warn on an identical pair. */}
+        {form.language === form.target_language && (
+          <div className="error-msg" style={{ marginTop: '0.5rem' }}>⚠️ {labels.sameLangError}</div>
+        )}
+
         {/* ── Advanced options (collapsible) ── */}
         {showAdvanced && (
           <div className="advanced-panel">
@@ -2870,6 +2963,8 @@ const [showAdvanced, setShowAdvanced] = useState(true);
                 <option value="long">{labels.wordRangeLongFull || 'Long — 400–550 words (≈3.5–4.5 min)'}</option>
                 <option value="extended">{labels.wordRangeExtendedFull || 'Extended — 650–800 words (≈4.5–6 min)'}</option>
                 <option value="very_long">{labels.wordRangeVeryLongFull || 'Very long — 1100–1400 words (≈8–11 min)'}</option>
+                <option value="extra_long">{labels.wordRangeExtraLongFull || 'Extra long — 1500–2200 words (≈12–18 min)'}</option>
+                <option value="marathon">{labels.wordRangeMarathonFull || 'Marathon — 2900–3600 words (≈24–30 min)'}</option>
               </SelectField>
               <SelectField label={labels.domain} id="f-domain" name="domain" value={form.domain} onChange={updateField}>
                 <option value="politics">{labels.domPolitics || 'Politics'}</option>
@@ -3394,6 +3489,38 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
   const [audioStatus, setAudioStatus] = useState('idle');
   const [audioError, setAudioError] = useState('');
   const [editingGlossary, setEditingGlossary] = useState(false);
+  const [glossaryUploading, setGlossaryUploading] = useState(false);
+  const glossaryFileRef = useRef(null);
+
+  // Professor bilan (23 July): let the student upload their OWN glossary file so
+  // it is taken into account in the evaluation phase. Imported terms are merged
+  // onto the current glossary, which already flows into Module D.
+  async function handleUploadGlossary(e) {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = '';   // allow re-uploading the same file
+    if (!file) return;
+    setGlossaryUploading(true);
+    try {
+      const { glossary: imported } = await uploadGlossary(file);
+      if (!imported?.length) { alert(labels.glossaryUploadEmpty); return; }
+      const current = lastGeneratedScript?.glossary || [];
+      // Merge: skip an imported row whose term already exists (case-insensitive).
+      const seen = new Set(current.map(g => String(g.term || '').trim().toLowerCase()).filter(Boolean));
+      const merged = [...current];
+      for (const row of imported) {
+        const key = String(row.term || '').trim().toLowerCase();
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        merged.push(row);
+      }
+      onScriptUpdate?.({ ...lastGeneratedScript, glossary: merged });
+      setEditingGlossary(true);
+    } catch (err) {
+      alert(`${labels.errorPrefix}: ${err.message}`);
+    } finally {
+      setGlossaryUploading(false);
+    }
+  }
 
   function updateGlossaryCell(index, key, value) {
     const current = lastGeneratedScript?.glossary || [];
@@ -3523,6 +3650,16 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
                 {editingGlossary ? labels.glossaryEditDone : labels.glossaryEdit}
               </button>
               <button className="btn-secondary btn-sm" onClick={addGlossaryTerm}>➕ {labels.glossaryAddTerm}</button>
+              <button className="btn-secondary btn-sm" onClick={() => glossaryFileRef.current?.click()} disabled={glossaryUploading}>
+                {glossaryUploading ? `⏳ ${labels.glossaryUploading}` : `⬆ ${labels.uploadGlossary}`}
+              </button>
+              <input
+                ref={glossaryFileRef}
+                type="file"
+                accept=".csv,.tsv,.txt,.md,.docx,.json"
+                onChange={handleUploadGlossary}
+                style={{ display: 'none' }}
+              />
               <button className="btn-secondary btn-sm" onClick={handleDownloadGlossary}>{labels.downloadGlossary}</button>
             </div>
           </div>
@@ -3576,10 +3713,13 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
 
 // ── Note-taking space for consecutive interpretation (text + sketch) ─────────
 
-function NotesPad({ labels, sourceText, sourceIsArabic }) {
+function NotesPad({ labels, sourceText, sourceIsArabic, hasReferenceAudio = false, sourceProgress = 0 }) {
   const [tab, setTab] = useState('text');   // 'text' | 'sketch'
   const [notes, setNotes] = useState('');
   const [showSource, setShowSource] = useState(false);   // hidden until student chooses to reveal
+  // Live transcript: the source speech transcription fills in progressively,
+  // synced to the audio, beside a blank notes space (professor bilan 23 July).
+  const [liveTranscript, setLiveTranscript] = useState(false);
   const [penColor, setPenColor] = useState('#1a3a5c');
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
@@ -3635,6 +3775,23 @@ function NotesPad({ labels, sourceText, sourceIsArabic }) {
     }
   }
 
+  // Progressive source transcript, revealed sentence by sentence in sync with
+  // the source audio, so the student sees the speech "being transcribed" as it
+  // plays while they take notes beside it (professor bilan 23 July).
+  const sourceSentences = useMemo(() => {
+    if (!sourceText) return [];
+    return sourceText.match(/[^.!?؟\n]+[.!?؟]*\s*/g) || [sourceText];
+  }, [sourceText]);
+  const revealCount = sourceProgress <= 0
+    ? 0
+    : Math.min(sourceSentences.length, Math.ceil(sourceProgress * sourceSentences.length));
+  const revealedSource = sourceSentences.slice(0, revealCount).join('');
+
+  const liveRef = useRef(null);
+  useEffect(() => {
+    if (liveTranscript && liveRef.current) liveRef.current.scrollTop = liveRef.current.scrollHeight;
+  }, [revealedSource, liveTranscript]);
+
   const noteArea = tab === 'text' ? (
     <textarea
       value={notes}
@@ -3682,7 +3839,13 @@ function NotesPad({ labels, sourceText, sourceIsArabic }) {
             ))}
           </div>
         )}
-        {sourceText && (
+        {hasReferenceAudio && sourceText && (
+          <button type="button" className={`btn-secondary btn-sm ${liveTranscript ? 'lib-tab-active' : ''}`}
+            onClick={() => { setLiveTranscript(v => !v); if (!liveTranscript) setShowSource(false); }}>
+            {liveTranscript ? labels.liveTranscriptOff : `🎙 ${labels.liveTranscriptOn}`}
+          </button>
+        )}
+        {sourceText && !liveTranscript && (
           <button type="button" className="btn-secondary btn-sm" onClick={() => setShowSource(v => !v)}>
             {showSource ? labels.notesHideSource : labels.notesShowSource}
           </button>
@@ -3690,9 +3853,32 @@ function NotesPad({ labels, sourceText, sourceIsArabic }) {
         <button type="button" className="btn-secondary btn-sm" onClick={clearAll}>{labels.notesClear}</button>
       </div>
 
-      {/* Split screen: source text (revealed on demand) beside the note area,
-          matching how interpreters review the source while taking notes. */}
-      {showSource && sourceText ? (
+      {/* Live transcription split screen: the source speech transcription fills
+          in progressively as the audio plays (left), beside a blank notes space
+          (right) — professor bilan 23 July. */}
+      {liveTranscript && sourceText ? (
+        <div className="consec-split">
+          <div className="consec-split-source">
+            <p className="consec-split-label">
+              🎙 {labels.liveTranscriptTitle} · {Math.round(sourceProgress * 100)}%
+            </p>
+            <div ref={liveRef} className={`consec-source-text ${sourceIsArabic ? 'arabic' : ''}`}
+              dir={sourceIsArabic ? 'rtl' : 'ltr'} style={{ maxHeight: 300, overflowY: 'auto' }}>
+              {revealedSource}
+              {sourceProgress > 0 && sourceProgress < 1 && <span className="live-caret">▍</span>}
+              {sourceProgress === 0 && (
+                <span style={{ color: 'var(--warm-gray)' }}>{labels.liveTranscriptWaiting}</span>
+              )}
+            </div>
+          </div>
+          <div className="consec-split-notes">
+            <p className="consec-split-label">✍️ {labels.notesTitle}</p>
+            {noteArea}
+          </div>
+        </div>
+      ) : showSource && sourceText ? (
+        /* Static reveal: full source text beside the note area, for reviewing
+           the source while taking notes without waiting for playback. */
         <div className="consec-split">
           <div className="consec-split-source">
             <p className="consec-split-label">📄 {labels.sourceText || 'Source'}</p>
@@ -3706,7 +3892,9 @@ function NotesPad({ labels, sourceText, sourceIsArabic }) {
           </div>
         </div>
       ) : noteArea}
-      <p style={{ fontSize: '0.75rem', color: 'var(--warm-gray)', marginTop: '0.4rem' }}>{labels.notesHint}</p>
+      <p style={{ fontSize: '0.75rem', color: 'var(--warm-gray)', marginTop: '0.4rem' }}>
+        {liveTranscript ? labels.liveTranscriptHint : labels.notesHint}
+      </p>
     </div>
   );
 }
@@ -3745,11 +3933,23 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
   const [simulShowText, setSimulShowText] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const graceTimerRef = useRef(null);
+  // Playback progress (0..1) of the source audio — drives the live source
+  // transcript that fills in beside the notes area in consecutive mode
+  // (professor bilan 23 July: split screen with the speech transcription on
+  // one side and a blank notes space on the other).
+  const [sourceProgress, setSourceProgress] = useState(0);
 
   // Keep the chosen playback speed applied whenever the source audio (re)loads.
   useEffect(() => {
     if (referenceAudioRef.current) referenceAudioRef.current.playbackRate = playbackSpeed;
   }, [referenceAudioUrl, playbackSpeed]);
+  // Reset the live-transcript progress whenever the source audio changes.
+  useEffect(() => { setSourceProgress(0); }, [referenceAudioUrl]);
+
+  function handleSourceTimeUpdate(e) {
+    const el = e.currentTarget;
+    if (el?.duration > 0) setSourceProgress(Math.min(1, el.currentTime / el.duration));
+  }
   // 3 practice modes (professor request): simultaneous | consecutive | sight
   const [interpMode, setInterpMode] = useState('consecutive');
   const sourceIsArabic = /[؀-ۿ]/.test(sourceScript || '');
@@ -3946,7 +4146,8 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
         {interpMode !== 'sight' && referenceAudioUrl && (
           <div className="reference-audio-box">
             <p className="ref-audio-label">🔊 {labels.sourceAudio}</p>
-            <audio ref={referenceAudioRef} controls src={referenceAudioUrl} style={{ width: '100%' }} />
+            <audio ref={referenceAudioRef} controls src={referenceAudioUrl} style={{ width: '100%' }}
+              onTimeUpdate={handleSourceTimeUpdate} />
             {/* Playback speed for beginners (Mariam feedback: 0.75 was too big a
                 jump from normal — add 0.9). Applies to this source player. */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
@@ -4027,7 +4228,8 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
         {interpMode === 'consecutive' && (
           <>
             <div className="info-tip" style={{ marginBottom: '0.75rem' }}>📝 {labels.consecFlowHint}</div>
-            <NotesPad labels={labels} sourceText={sourceScript} sourceIsArabic={sourceIsArabic} />
+            <NotesPad labels={labels} sourceText={sourceScript} sourceIsArabic={sourceIsArabic}
+              hasReferenceAudio={!!referenceAudioUrl} sourceProgress={sourceProgress} />
           </>
         )}
 
@@ -4516,6 +4718,11 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               <div className="report-summary">
                 <p className="report-label">📋 {labels.evalSummary}</p>
                 <p dir="auto" style={{ textAlign: 'start' }}>{report.summary}</p>
+              </div>
+            )}
+            {report.score_on_meaning === false && (
+              <div className="info-tip" style={{ marginTop: '0.75rem', fontSize: '0.8rem' }}>
+                ℹ️ {labels.scoreScopeNote}
               </div>
             )}
           </div>

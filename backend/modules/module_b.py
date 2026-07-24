@@ -317,3 +317,174 @@ def download_glossary():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ── Glossary upload / import ─────────────────────────────────────────────────
+# Professor bilan (23 July): "Glossaire à éditer avec possibilité de le
+# téléverser dans la plateforme pour qu'il soit pris en compte dans la phase
+# d'évaluation." The student uploads their own trilingual glossary; it is parsed
+# into the standard {term, arabic, french, english, definition} shape and merged
+# into the in-app glossary, which already flows into Module D as approved
+# terminology.
+
+_GLOSSARY_COLUMN_ALIASES = {
+    'term':       ('term', 'terme', 'مصطلح', 'key term', 'source term', 'concept'),
+    'arabic':     ('arabic', 'arabe', 'العربية', 'عربي', 'ar', 'arabic term', 'المقابل العربي'),
+    'french':     ('french', 'français', 'francais', 'fr', 'الفرنسية', 'terme français'),
+    'english':    ('english', 'anglais', 'en', 'الإنجليزية', 'english term'),
+    'definition': ('definition', 'définition', 'definitions', 'meaning', 'تعريف', 'def'),
+}
+
+
+def _glossary_field_for_header(header: str) -> str | None:
+    """Map an arbitrary column header to a canonical glossary field name."""
+    key = str(header or '').strip().casefold()
+    for field, aliases in _GLOSSARY_COLUMN_ALIASES.items():
+        if key in aliases:
+            return field
+    return None
+
+
+def _normalize_uploaded_glossary_rows(rows: list[dict]) -> list[dict]:
+    """Keep only real glossary fields; drop rows that carry no content."""
+    cleaned = []
+    for row in rows:
+        entry = {k: str(row.get(k, '') or '').strip() for k in
+                 ('term', 'arabic', 'french', 'english', 'definition')}
+        # A row needs at least one language equivalent or a term to be useful.
+        if entry['term'] or entry['arabic'] or entry['french'] or entry['english']:
+            cleaned.append(entry)
+    return cleaned
+
+
+def _parse_glossary_json(data: bytes) -> list[dict]:
+    parsed = json.loads(data.decode('utf-8-sig'))
+    if isinstance(parsed, dict):
+        parsed = parsed.get('glossary', [])
+    if not isinstance(parsed, list):
+        return []
+    rows = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        row = {}
+        for header, value in item.items():
+            field = _glossary_field_for_header(header)
+            if field:
+                row[field] = value
+        rows.append(row)
+    return _normalize_uploaded_glossary_rows(rows)
+
+
+def _parse_glossary_csv(data: bytes) -> list[dict]:
+    import csv
+    text = data.decode('utf-8-sig', errors='replace')
+    # Sniff the delimiter (comma / semicolon / tab) from the first line.
+    first_line = text.splitlines()[0] if text.strip() else ''
+    delimiter = ';' if first_line.count(';') > first_line.count(',') else ','
+    if '\t' in first_line and first_line.count('\t') >= first_line.count(delimiter):
+        delimiter = '\t'
+    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+    table = [r for r in reader if any(cell.strip() for cell in r)]
+    if not table:
+        return []
+    header_map = {i: _glossary_field_for_header(h) for i, h in enumerate(table[0])}
+    has_header = any(field for field in header_map.values())
+    rows = []
+    if has_header:
+        for raw in table[1:]:
+            row = {}
+            for i, cell in enumerate(raw):
+                field = header_map.get(i)
+                if field:
+                    row[field] = cell
+            rows.append(row)
+    else:
+        # No recognizable header — assume columns: term, arabic, french, english, definition
+        order = ('term', 'arabic', 'french', 'english', 'definition')
+        for raw in table:
+            rows.append({order[i]: cell for i, cell in enumerate(raw) if i < len(order)})
+    return _normalize_uploaded_glossary_rows(rows)
+
+
+def _parse_glossary_docx(data: bytes) -> list[dict]:
+    from docx import Document
+    doc = Document(io.BytesIO(data))
+    rows = []
+    for table in doc.tables:
+        if not table.rows:
+            continue
+        header_cells = [c.text for c in table.rows[0].cells]
+        header_map = {i: _glossary_field_for_header(h) for i, h in enumerate(header_cells)}
+        has_header = any(field for field in header_map.values())
+        body_rows = table.rows[1:] if has_header else table.rows
+        order = ('arabic', 'french', 'english')   # matches the DOCX export column order
+        for trow in body_rows:
+            cells = [c.text for c in trow.cells]
+            row = {}
+            if has_header:
+                for i, cell in enumerate(cells):
+                    field = header_map.get(i)
+                    if field:
+                        row[field] = cell
+            else:
+                for i, cell in enumerate(cells):
+                    if i < len(order):
+                        row[order[i]] = cell
+            rows.append(row)
+    return _normalize_uploaded_glossary_rows(rows)
+
+
+def _parse_glossary_txt(data: bytes) -> list[dict]:
+    text = data.decode('utf-8-sig', errors='replace')
+    rows = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        # Accept "term | arabic | french | english | definition" or tab-separated.
+        parts = re.split(r'\s*\|\s*|\t', line.strip())
+        parts = [p.strip() for p in parts if p.strip()]
+        if not parts:
+            continue
+        order = ('term', 'arabic', 'french', 'english', 'definition')
+        rows.append({order[i]: parts[i] for i in range(min(len(parts), len(order)))})
+    return _normalize_uploaded_glossary_rows(rows)
+
+
+@module_b_bp.route('/glossary/upload', methods=['POST'])
+def upload_glossary():
+    """
+    Parse an uploaded glossary file (CSV, TSV, TXT, DOCX, or JSON) into the
+    standard trilingual glossary shape so it can be merged into the in-app
+    glossary and used by the evaluation phase. Returns {'glossary': [...]}.
+    """
+    file = request.files.get('glossary') or request.files.get('file')
+    if not file or not file.filename:
+        return jsonify({'error': 'No glossary file provided'}), 400
+
+    filename = file.filename.lower()
+    raw = file.read()
+    if not raw:
+        return jsonify({'error': 'The uploaded file is empty'}), 400
+    if len(raw) > 2 * 1024 * 1024:
+        return jsonify({'error': 'Glossary file too large (max 2 MB)'}), 400
+
+    try:
+        if filename.endswith('.json'):
+            entries = _parse_glossary_json(raw)
+        elif filename.endswith(('.csv', '.tsv')):
+            entries = _parse_glossary_csv(raw)
+        elif filename.endswith('.docx'):
+            entries = _parse_glossary_docx(raw)
+        elif filename.endswith(('.txt', '.md')):
+            entries = _parse_glossary_txt(raw)
+        else:
+            return jsonify({'error': 'Unsupported file type. Use CSV, TSV, TXT, DOCX, or JSON.'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Could not read the glossary file: {e}'}), 400
+
+    if not entries:
+        return jsonify({'error': 'No glossary terms could be read from the file. '
+                                 'Expected columns like Term / Arabic / French / English.'}), 400
+
+    return jsonify({'glossary': entries[:200]})

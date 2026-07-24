@@ -661,6 +661,12 @@ audio { width: 100%; accent-color: var(--primary); }
 .consec-source-text.arabic {
   font-family: 'Noto Naskh Arabic', serif; font-size: 1.02rem; line-height: 2;
 }
+/* Blinking caret for the live source transcription (consecutive mode). */
+.live-caret {
+  display: inline-block; margin-inline-start: 1px; color: var(--primary, #1a3a5c);
+  font-weight: 700; animation: live-caret-blink 1s step-start infinite;
+}
+@keyframes live-caret-blink { 50% { opacity: 0; } }
 .record-section-label {
   font-size: 0.82rem;
   font-weight: 600;

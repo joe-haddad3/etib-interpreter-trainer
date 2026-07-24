@@ -187,6 +187,14 @@ export async function downloadGlossary(params) {
   return res.blob();
 }
 
+export async function uploadGlossary(file) {
+  const form = new FormData();
+  form.append('glossary', file, file.name || 'glossary');
+  form.append('auth_token', getAuthToken());
+  const res = await safeFetch(`${BASE}/module-b/glossary/upload`, { method: 'POST', body: form });
+  return parseJsonResponse(res);
+}
+
 export async function evaluatePerformance(sourceScript, transcript, language) {
   const res = await safeFetch(`${BASE}/module-d/evaluate`, {
     method: 'POST',
