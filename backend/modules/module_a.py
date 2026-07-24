@@ -1533,6 +1533,43 @@ def _proofread_arabic_script(script: str) -> str:
     return script
 
 
+def _ensure_materials(generated: dict, params: dict) -> None:
+    """
+    Guarantee a generated speech carries its MCQ + glossary + summary.
+
+    Two situations leave them empty:
+    1. Single-call generation of a long speech (e.g. "very long", 1400 words):
+       the script eats the JSON token budget and the trailing mcqs/glossary get
+       truncated away.
+    2. Long-form (extra_long/marathon) generation where the separate materials
+       call failed (rate limit, timeout, parse error).
+
+    In both cases the SCRIPT is fine but the materials are missing. Regenerate
+    them from the finished script in a dedicated, right-sized call — this only
+    runs when something is actually missing, so normal short speeches are
+    unaffected. Mutates `generated` in place.
+    """
+    script = str(generated.get('script') or '').strip()
+    if not script:
+        return
+    if generated.get('mcqs') and generated.get('glossary') and generated.get('summary'):
+        return   # everything present — nothing to do
+
+    language = params.get('language', 'ar')
+    domain = params.get('domain', 'politics')
+    try:
+        mats = _generate_materials_for_script(script, language, domain)
+    except Exception:
+        return   # leave what we have; never fail the whole generation over materials
+
+    if not generated.get('summary'):
+        generated['summary'] = mats.get('summary', '')
+    if not generated.get('mcqs'):
+        generated['mcqs'] = mats.get('mcqs', [])
+    if not generated.get('glossary'):
+        generated['glossary'] = mats.get('glossary', [])
+
+
 def build_generation_response(generated: dict, params: dict, mode: str = 'generated',
                               extra: dict | None = None, reflow: bool = True) -> dict:
     script = generated['script']
@@ -1548,6 +1585,9 @@ def build_generation_response(generated: dict, params: dict, mode: str = 'genera
         if params.get('language', 'ar') == 'ar':
             script = _proofread_arabic_script(script)
     generated['script'] = script
+    # Safety net: fill MCQ/glossary/summary if they came back empty (long
+    # single-call truncation, or a failed long-form materials call).
+    _ensure_materials(generated, params)
     word_count = len(script.split())
     wpm = params.get('wpm', DEFAULT_WPM)
     word_count_range = {

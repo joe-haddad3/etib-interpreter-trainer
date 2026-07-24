@@ -195,6 +195,8 @@ const UI = {
     comingSoon: 'Coming soon',
     errorPrefix: 'Error',
     noSpeechYet: 'Generate a speech in Module A first, then come back here.',
+    materialsMissing: 'The comprehension questions and glossary for this speech are missing (they can drop out on very long speeches). Generate them now:',
+    materialsGenerating: 'Generating…',
     voiceAccent: 'Voice accent',
     speechRate: 'Speech rate',
     generateAudio: 'Generate audio',
@@ -647,6 +649,8 @@ const UI = {
     comingSoon: 'قريباً',
     errorPrefix: 'خطأ',
     noSpeechYet: 'ولّد خطاباً في الوحدة أ أولاً، ثم عد إلى هنا.',
+    materialsMissing: 'أسئلة الفهم والمسرد لهذا الخطاب غير موجودة (قد تختفي في الخطابات الطويلة جداً). ولّدها الآن:',
+    materialsGenerating: 'جارٍ التوليد…',
     voiceAccent: 'نبرة الصوت',
     speechRate: 'سرعة الإلقاء',
     generateAudio: 'توليد الصوت',
@@ -1099,6 +1103,8 @@ const UI = {
     comingSoon: 'Bientôt disponible',
     errorPrefix: 'Erreur',
     noSpeechYet: 'Générez d\'abord un discours dans le Module A, puis revenez ici.',
+    materialsMissing: 'Les questions de compréhension et le glossaire de ce discours sont absents (ils peuvent disparaître sur les discours très longs). Générez-les maintenant :',
+    materialsGenerating: 'Génération…',
     voiceAccent: 'Accent vocal',
     speechRate: 'Débit de parole',
     generateAudio: 'Générer l\'audio',
@@ -3490,7 +3496,33 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
   const [audioError, setAudioError] = useState('');
   const [editingGlossary, setEditingGlossary] = useState(false);
   const [glossaryUploading, setGlossaryUploading] = useState(false);
+  const [materialsStatus, setMaterialsStatus] = useState('idle');
   const glossaryFileRef = useRef(null);
+
+  // Recovery path: if a speech came back with its script but no MCQ/glossary
+  // (rare — a long generation whose materials call was rate-limited even after
+  // the backend safety net), regenerate the materials on demand.
+  async function handleRegenerateMaterials() {
+    if (!lastGeneratedScript?.script) return;
+    setMaterialsStatus('loading');
+    try {
+      const mats = await generateMaterialsFromScript({
+        script: lastGeneratedScript.script,
+        language,
+        domain: lastGeneratedScript.domain || 'general',
+      });
+      onScriptUpdate?.({
+        ...lastGeneratedScript,
+        summary:  lastGeneratedScript.summary || mats.summary || '',
+        mcqs:     (lastGeneratedScript.mcqs?.length ? lastGeneratedScript.mcqs : mats.mcqs) || [],
+        glossary: (lastGeneratedScript.glossary?.length ? lastGeneratedScript.glossary : mats.glossary) || [],
+      });
+      setMaterialsStatus('idle');
+    } catch (err) {
+      setMaterialsStatus('error');
+      alert(`${labels.errorPrefix}: ${err.message}`);
+    }
+  }
 
   // Professor bilan (23 July): let the student upload their OWN glossary file so
   // it is taken into account in the evaluation phase. Imported terms are merged
@@ -3590,6 +3622,16 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
 
   return (
     <div className="module-b-layout">
+
+      {/* Materials recovery: script present but MCQ/glossary missing. */}
+      {lastGeneratedScript.script && (mcqs.length === 0 || glossary.length === 0) && (
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', background: '#fff7e6', border: '1px solid #f0d9a8' }}>
+          <span style={{ flex: 1, fontSize: '0.9rem' }}>⚠️ {labels.materialsMissing}</span>
+          <button className="btn-primary" onClick={handleRegenerateMaterials} disabled={materialsStatus === 'loading'} style={{ whiteSpace: 'nowrap' }}>
+            {materialsStatus === 'loading' ? labels.materialsGenerating : labels.generateMaterials}
+          </button>
+        </div>
+      )}
 
       {/* ── Audio ── */}
       <div className="card">
