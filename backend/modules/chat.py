@@ -3,6 +3,7 @@ Chat endpoint — AI assistant for interpretation training.
 """
 from flask import Blueprint, jsonify, request
 from services.llm_service import generate_text
+from utils.rate_limit import rate_limit
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -43,6 +44,7 @@ If someone asks something unrelated to interpretation or this platform, answer b
 
 
 @chat_bp.route('/message', methods=['POST'])
+@rate_limit(max_requests=20, window_seconds=60, scope='chat')
 def chat_message():
     payload = request.get_json(silent=True) or {}
     messages = payload.get('messages', [])

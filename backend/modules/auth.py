@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from utils.rate_limit import rate_limit
+
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -225,6 +227,7 @@ def signup():
 
 
 @auth_bp.route('/login', methods=['POST'])
+@rate_limit(max_requests=10, window_seconds=60, scope='login')
 def login():
     payload = request.get_json(silent=True) or {}
     email = (payload.get('email') or '').strip().lower()
@@ -267,6 +270,7 @@ def logout():
 
 
 @auth_bp.route('/validate-groq-key', methods=['POST'])
+@rate_limit(max_requests=12, window_seconds=60, scope='validate-key')
 def validate_groq_key():
     """Test a Groq API key by making a minimal chat completion call."""
     payload = request.get_json(silent=True) or {}
