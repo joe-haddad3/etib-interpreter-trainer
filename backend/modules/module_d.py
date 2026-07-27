@@ -2786,13 +2786,13 @@ def detect_cut_words(segments: list, language: str = 'ar') -> list:
 # - Consecutive: the student restitutes from memory + written notes AFTER the
 #   speech; pausing to read/decode notes and structure the next idea is expected
 #   professional behaviour, not a disfluency. The bilan flagged that normal
-#   note-consultation pauses were being penalized, so consecutive gets the most
-#   tolerant threshold of all three modes.
+#   note-consultation pauses were being penalized, so consecutive gets a wider
+#   tolerance than sight.
 # - Sight: reading dense source text on the fly; brief clause-boundary pauses
 #   are normal but shorter than consecutive note-reading gaps.
 SILENCE_THRESHOLD_BY_MODE = {
     'simultaneous': 3.2,
-    'consecutive':  4.0,
+    'consecutive':  3.0,
     'sight':        2.5,
 }
 
