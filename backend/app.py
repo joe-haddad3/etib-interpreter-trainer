@@ -19,7 +19,10 @@ app = Flask(__name__)
 # Random fallback instead of a fixed public string — sessions are not used
 # (token-in-body auth), but a predictable secret key is never acceptable.
 app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.urandom(32)
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB — audio files can be large
+# 120 MB — tester feedback (Aug 2026): a 30-min source VIDEO easily exceeds the
+# old 50 MB cap. Audio-only stays small (30 min MP3 ≈ 28 MB); the error message
+# advises converting video to audio when even 120 MB is not enough.
+app.config['MAX_CONTENT_LENGTH'] = 120 * 1024 * 1024
 
 _ALLOWED_ORIGINS = {
     'https://etib-interpreter-trainer.vercel.app',
@@ -130,7 +133,9 @@ def get_config():
 
 @app.errorhandler(413)
 def too_large(_):
-    return jsonify({'error': 'File too large. Maximum upload size is 50 MB.'}), 413
+    return jsonify({'error': 'File too large. Maximum upload size is 120 MB. '
+                             'Tip: for long speeches, upload the AUDIO only (MP3/M4A) — '
+                             '30 minutes of MP3 is under 30 MB.'}), 413
 
 @app.errorhandler(Exception)
 def handle_exception(_):

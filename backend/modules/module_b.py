@@ -90,6 +90,21 @@ def run_tts(text: str, language: str, accent: str = None,
     return output_path, filename
 
 
+def _audio_duration_seconds(path: str) -> float | None:
+    """Duration of a generated audio file via PyAV (already a dependency)."""
+    try:
+        import av
+        with av.open(path) as container:
+            if container.duration:
+                return float(container.duration) / av.time_base
+            for stream in container.streams:
+                if stream.duration and stream.time_base:
+                    return float(stream.duration * stream.time_base)
+    except Exception:
+        pass
+    return None
+
+
 @module_b_bp.route('/tts', methods=['POST'])
 def text_to_speech():
     """
@@ -102,9 +117,13 @@ def text_to_speech():
       rate_adjustment  int   -50 (slower) to +50 (faster)    default 0
 
     Response (JSON):
-      audio_url   str   URL to retrieve the audio file
-      filename    str   filename for reference
-      voice_used  str   the edge-tts voice name
+      audio_url         str    URL to retrieve the audio file
+      filename          str    filename for reference
+      voice_used        str    the edge-tts voice name
+      duration_seconds  float  measured audio duration (when measurable)
+      words_per_minute  int    measured speaking rate — professors asked for
+                               an explicit wpm because simultaneous training
+                               requires sources at ~100-120 wpm (Prof. LSF)
     """
     params = request.get_json()
     if not params or not params.get('text'):
@@ -117,10 +136,15 @@ def text_to_speech():
             accent=params.get('accent'),
             rate_adjustment=params.get('rate_adjustment', 0)
         )
+        duration = _audio_duration_seconds(path)
+        word_count = len(str(params['text']).split())
+        wpm = round(word_count / (duration / 60.0)) if duration and duration > 1 else None
         return jsonify({
             'audio_url': f'/api/module-b/audio/{filename}',
             'filename': filename,
-            'voice_used': get_voice(params.get('language', 'ar'), params.get('accent'))
+            'voice_used': get_voice(params.get('language', 'ar'), params.get('accent')),
+            'duration_seconds': round(duration, 1) if duration else None,
+            'words_per_minute': wpm,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -337,11 +361,34 @@ _GLOSSARY_COLUMN_ALIASES = {
 
 
 def _glossary_field_for_header(header: str) -> str | None:
-    """Map an arbitrary column header to a canonical glossary field name."""
+    """
+    Map an arbitrary column header to a canonical glossary field name.
+
+    Must handle BILINGUAL headers — our own DOCX export writes
+    "العربية / Arabic", "Français / French", "English" (tester bug Aug 2026:
+    re-importing a platform-exported glossary only filled the English column
+    because exact matching failed on the combined headers).
+    """
     key = str(header or '').strip().casefold()
+    if not key:
+        return None
+    # 1. Exact match on the whole header
     for field, aliases in _GLOSSARY_COLUMN_ALIASES.items():
         if key in aliases:
             return field
+    # 2. Token match — split compound headers ("العربية / Arabic") and try
+    #    each part. First matching token wins.
+    tokens = [t for t in re.split(r'[/|,;()\[\]–—-]+|\s+', key) if t]
+    for tok in tokens:
+        for field, aliases in _GLOSSARY_COLUMN_ALIASES.items():
+            if tok in aliases:
+                return field
+    # 3. Substring match for long aliases only (≥4 chars — keeps 'ar'/'fr'/'en'
+    #    from false-matching inside unrelated words).
+    for field, aliases in _GLOSSARY_COLUMN_ALIASES.items():
+        for alias in aliases:
+            if len(alias) >= 4 and alias in key:
+                return field
     return None
 
 

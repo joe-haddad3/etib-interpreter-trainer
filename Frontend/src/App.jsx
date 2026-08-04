@@ -47,6 +47,9 @@ function friendlyLlmError(message, labels) {
   if (/source_and_target_must_differ/i.test(m)) {
     return labels.sameLangError;
   }
+  if (/unreadable_media|invalid data found/i.test(m)) {
+    return labels.mediaUnreadable || m;
+  }
   return m;
 }
 
@@ -199,6 +202,13 @@ const UI = {
     materialsGenerating: 'Generating…',
     voiceAccent: 'Voice accent',
     speechRate: 'Speech rate',
+    sessionRestored: 'Your previous session was restored (speech, materials, and glossary edits). You can continue where you left off.',
+    sessionKeep: 'Continue',
+    sessionDiscard: 'Start fresh',
+    measuredRate: 'Measured pace',
+    wordsPerMinute: 'words/min',
+    rateTooFastHint: 'above the 100–120 wpm range recommended for simultaneous — lower the speech rate slider and regenerate',
+    mediaUnreadable: 'This file could not be read. Supported formats: MP3, WAV, M4A, OGG, WebM, MP4. If it plays on your device, convert it to MP3 or WAV and retry.',
     generateAudio: 'Generate audio',
     generatingAudio: 'Generating audio...',
     materialsTitle: 'Pedagogical materials',
@@ -482,7 +492,7 @@ const UI = {
     pnDistorted: 'Distorted — likely mispronounced',
     pnMissing: 'Omitted',
     llmFailedWarning: 'AI language analysis could not complete — showing automatic detections only. Scores may be incomplete.',
-    llmQuotaError: 'Your Groq API tokens are used up for now — wait for the limit to reset (or add another API key in Settings), then run the evaluation again.',
+    llmQuotaError: 'The Groq per-minute limit was reached (it happens with long speeches). The platform already retried once — wait about 1 minute and run the evaluation again. Adding another key only helps if your DAILY quota is exhausted.',
     keyRequired: 'A personal (free) Groq API key is required — create yours at console.groq.com (2 minutes, no credit card) and add it in Settings.',
     keyInvalid: 'Your Groq API key was rejected (invalid or expired). Open Settings, delete it, and paste a fresh key from console.groq.com.',
     sameLangError: 'The source and interpretation languages must be different — interpretation is always between two languages.',
@@ -504,6 +514,14 @@ const UI = {
     topErrorMissing: 'Missing',
     uploadAudioBtn: 'Upload audio file',
     correctTashkeel: 'Correct tashkeel',
+    iraabTitle: 'Arabic case endings (i\'rab)',
+    iraabAcousticNote: 'Detected acoustically from your recording — the transcript is kept verbatim and wrong endings are not corrected.',
+    iraabDetected: 'Heard',
+    iraabCorrect: 'Correct',
+    iraabIncorrect: 'Incorrect',
+    iraabUncertain: 'Uncertain',
+    iraabAccuracy: 'Ending accuracy',
+    iraabDiacritized: 'Vocalized hypothesis',
   },
   ar: {
     uiLanguage: 'لغة الواجهة',
@@ -653,6 +671,13 @@ const UI = {
     materialsGenerating: 'جارٍ التوليد…',
     voiceAccent: 'نبرة الصوت',
     speechRate: 'سرعة الإلقاء',
+    sessionRestored: 'استُعيدت جلستك السابقة (الخطاب والمواد وتعديلات المسرد). يمكنك المتابعة من حيث توقفت.',
+    sessionKeep: 'متابعة',
+    sessionDiscard: 'البدء من جديد',
+    measuredRate: 'السرعة المقاسة',
+    wordsPerMinute: 'كلمة/دقيقة',
+    rateTooFastHint: 'أعلى من النطاق 100–120 كلمة/دقيقة الموصى به للترجمة الفورية — خفّض سرعة الإلقاء وأعد التوليد',
+    mediaUnreadable: 'تعذّرت قراءة هذا الملف. الصيغ المدعومة: MP3 وWAV وM4A وOGG وWebM وMP4. إذا كان الملف يعمل على جهازك فحوّله إلى MP3 أو WAV وأعد المحاولة.',
     generateAudio: 'توليد الصوت',
     generatingAudio: 'جارٍ توليد الصوت...',
     materialsTitle: 'المواد التعليمية',
@@ -936,7 +961,7 @@ const UI = {
     pnDistorted: 'محرَّف — نطق خاطئ على الأرجح',
     pnMissing: 'محذوف',
     llmFailedWarning: 'لم يتمكن التحليل اللغوي بالذكاء الاصطناعي من الاكتمال — يُعرض الرصد التلقائي فقط. قد تكون الدرجات غير مكتملة.',
-    llmQuotaError: 'انتهت حصة رموز Groq API الخاصة بك حالياً — انتظر إعادة تعيين الحد (أو أضف مفتاح API آخر في الإعدادات)، ثم أعد تشغيل التقييم.',
+    llmQuotaError: 'تم بلوغ حد Groq في الدقيقة (يحدث مع الخطابات الطويلة). أعادت المنصة المحاولة تلقائياً — انتظر نحو دقيقة ثم أعد تشغيل التقييم. إضافة مفتاح آخر لا تفيد إلا إذا نفدت حصتك اليومية.',
     keyRequired: 'مفتاح Groq API شخصي (مجاني) مطلوب — أنشئ مفتاحك على console.groq.com (دقيقتان، بدون بطاقة ائتمان) وأضفه في الإعدادات.',
     keyInvalid: 'تم رفض مفتاح Groq API الخاص بك (غير صالح أو منتهي). افتح الإعدادات واحذفه والصق مفتاحاً جديداً من console.groq.com.',
     sameLangError: 'يجب أن تختلف لغة المصدر عن لغة الترجمة الشفوية — فالترجمة الفورية تكون دائماً بين لغتين مختلفتين.',
@@ -958,6 +983,14 @@ const UI = {
     topErrorMissing: 'مفقود',
     uploadAudioBtn: 'رفع ملف صوتي',
     correctTashkeel: 'تشكيل صحيح',
+    iraabTitle: 'أواخر الكلمات (الإعراب)',
+    iraabAcousticNote: 'مكتشفة صوتيًّا من تسجيلك — يُترك النص حرفيًّا ولا تُصحَّح الأخطاء.',
+    iraabDetected: 'المسموع',
+    iraabCorrect: 'صحيح',
+    iraabIncorrect: 'خطأ',
+    iraabUncertain: 'غير مؤكَّد',
+    iraabAccuracy: 'دقة الأواخر',
+    iraabDiacritized: 'الفرضية المشكَّلة',
   },
   fr: {
     uiLanguage: 'Langue de l’interface',
@@ -1107,6 +1140,13 @@ const UI = {
     materialsGenerating: 'Génération…',
     voiceAccent: 'Accent vocal',
     speechRate: 'Débit de parole',
+    sessionRestored: 'Votre session précédente a été restaurée (discours, supports et modifications du glossaire). Vous pouvez reprendre là où vous étiez.',
+    sessionKeep: 'Continuer',
+    sessionDiscard: 'Recommencer à zéro',
+    measuredRate: 'Débit mesuré',
+    wordsPerMinute: 'mots/min',
+    rateTooFastHint: 'au-dessus de la plage 100–120 mots/min recommandée pour la simultanée — réduisez le débit avec le curseur puis régénérez',
+    mediaUnreadable: 'Ce fichier n\'a pas pu être lu. Formats pris en charge : MP3, WAV, M4A, OGG, WebM, MP4. S\'il fonctionne sur votre appareil, convertissez-le en MP3 ou WAV puis réessayez.',
     generateAudio: 'Générer l\'audio',
     generatingAudio: 'Génération audio...',
     materialsTitle: 'Supports pédagogiques',
@@ -1390,7 +1430,7 @@ const UI = {
     pnDistorted: 'Déformé — probablement mal prononcé',
     pnMissing: 'Omis',
     llmFailedWarning: "L'analyse linguistique IA n'a pas pu se terminer — seules les détections automatiques sont affichées. Les scores peuvent être incomplets.",
-    llmQuotaError: "Vos jetons Groq API sont épuisés pour le moment — attendez la réinitialisation de la limite (ou ajoutez une autre clé API dans les Paramètres), puis relancez l'évaluation.",
+    llmQuotaError: "La limite Groq par minute a été atteinte (fréquent avec les longs discours). La plateforme a déjà réessayé automatiquement — attendez environ 1 minute puis relancez l'évaluation. Ajouter une autre clé n'aide que si votre quota QUOTIDIEN est épuisé.",
     keyRequired: "Une clé Groq API personnelle (gratuite) est requise — créez la vôtre sur console.groq.com (2 minutes, sans carte bancaire) et ajoutez-la dans les Paramètres.",
     keyInvalid: "Votre clé Groq API a été refusée (invalide ou expirée). Ouvrez les Paramètres, supprimez-la et collez une nouvelle clé depuis console.groq.com.",
     sameLangError: "La langue source et la langue d'interprétation doivent être différentes — l'interprétation se fait toujours entre deux langues.",
@@ -1412,6 +1452,14 @@ const UI = {
     topErrorMissing: 'Manquant',
     uploadAudioBtn: 'Déposer un fichier audio',
     correctTashkeel: 'Tachkîl correct',
+    iraabTitle: 'Désinences casuelles (i\'râb)',
+    iraabAcousticNote: 'Détecté acoustiquement à partir de votre enregistrement — la transcription reste verbatim et les erreurs ne sont pas corrigées.',
+    iraabDetected: 'Entendu',
+    iraabCorrect: 'Correct',
+    iraabIncorrect: 'Incorrect',
+    iraabUncertain: 'Incertain',
+    iraabAccuracy: 'Précision des désinences',
+    iraabDiacritized: 'Hypothèse vocalisée',
   }
 };
 
@@ -1513,11 +1561,16 @@ function glossaryEditValue(item, canonicalKey, fallbackKeys) {
 }
 
 function glossaryArabicValue(item) {
+  // Student edits write the canonical 'arabic' key — they ALWAYS win.
+  // (Tester bug Aug 2026: the IPCC hardcode below used to run first and
+  // silently overwrite manual corrections.)
+  if (typeof item?.arabic === 'string' && item.arabic.trim()) return item.arabic.trim();
+
   const combined = Object.values(item || {})
     .filter(value => value !== undefined && value !== null && typeof value !== 'object')
     .map(value => String(value).toLowerCase())
     .join(' ');
-  if (combined.includes('giec') || combined.includes('ipcc') || combined.includes('groupe d')) {
+  if (combined.includes('giec') || combined.includes('ipcc')) {
     return 'الهيئة الحكومية الدولية المعنية بتغير المناخ';
   }
 
@@ -1992,7 +2045,31 @@ export default function App() {
   const [activePanel, setActivePanel] = useState('module-a');
   const [lastGeneratedScript, setLastGeneratedScript] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [sessionRestored, setSessionRestored] = useState(false);
   const L = UI[uiLang];
+
+  // ── Session resume (tester request, Aug 2026) ─────────────────────────────
+  // If the page reloads mid-session (HF cold start, crash, accidental refresh)
+  // the generated speech + materials + edited glossary survive in localStorage
+  // and are restored on the next load — the student does not start over.
+  // A live RECORDING cannot survive a reload (browser memory only).
+  const SESSION_KEY = 'etib_session_snapshot_v1';
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved?.script) { setLastGeneratedScript(saved); setSessionRestored(true); }
+      }
+    } catch { /* corrupt snapshot — ignore */ }
+  }, []);
+  useEffect(() => {
+    try {
+      if (lastGeneratedScript?.script) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(lastGeneratedScript));
+      }
+    } catch { /* quota exceeded — not fatal */ }
+  }, [lastGeneratedScript]);
 
   // Wake the free-tier backend immediately and keep it awake during the
   // session — a sleeping server (2-3 min cold start) caused testers'
@@ -2064,6 +2141,8 @@ export default function App() {
     setCurrentUser(null);
     setActivePanel('module-a');
     setLastGeneratedScript(null);
+    setSessionRestored(false);
+    try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
   }
 
   return (
@@ -2079,6 +2158,19 @@ export default function App() {
         onOpenSettings={() => setShowSettings(true)}
       />
       <main>
+        {isAuthenticated && sessionRestored && lastGeneratedScript?.script && (
+          <div style={{ margin: '0.75rem auto', maxWidth: '1100px', padding: '0.6rem 1rem',
+                        background: '#e8f2ec', border: '1px solid #b9d8c4', borderRadius: '8px',
+                        display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
+                        fontSize: '0.9rem' }}>
+          <span style={{ flex: 1 }}>🔄 {L.sessionRestored}</span>
+            <button className="btn-secondary btn-sm" onClick={() => {
+              setLastGeneratedScript(null); setSessionRestored(false);
+              try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+            }}>{L.sessionDiscard}</button>
+            <button className="btn-secondary btn-sm" onClick={() => setSessionRestored(false)}>✓ {L.sessionKeep}</button>
+          </div>
+        )}
         {!isAuthenticated ? (
           <LoginScreen labels={L} onLogin={handleLogin} onSignup={handleSignup} onGuest={handleGuest} />
         ) : (
@@ -2844,7 +2936,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
         setSourceMediaStatus('success');
       }
     } catch (err) {
-      setError(err.message); setSourceMediaStatus('error');
+      setError(friendlyLlmError(err.message, labels)); setSourceMediaStatus('error');
     }
   }
 
@@ -3494,6 +3586,9 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
   const [audioUrl, setAudioUrl] = useState(null);
   const [audioStatus, setAudioStatus] = useState('idle');
   const [audioError, setAudioError] = useState('');
+  // Measured speaking rate of the generated audio (Prof. LSF: simultaneous
+  // sources must stay around 100-120 wpm — show the real number, not a guess).
+  const [audioWpm, setAudioWpm] = useState(null);
   const [editingGlossary, setEditingGlossary] = useState(false);
   const [glossaryUploading, setGlossaryUploading] = useState(false);
   const [materialsStatus, setMaterialsStatus] = useState('idle');
@@ -3556,7 +3651,22 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
 
   function updateGlossaryCell(index, key, value) {
     const current = lastGeneratedScript?.glossary || [];
-    const updated = current.map((row, i) => (i === index ? { ...row, [key]: value } : row));
+    // Alias keys the LLM may have used for the same field. They must be
+    // dropped on edit: the display/download getters fall back through them,
+    // so a stale 'ar'/'fr'/'en' value would resurface whenever the student
+    // cleared or rewrote a cell (tester bug Aug 2026 — "my modifications
+    // were not taken into account").
+    const aliasKeys = {
+      arabic:  ['Arabic', 'ar', 'AR', 'arabic_term', 'term_ar', 'arabic_translation', 'translation_ar', 'العربية', 'عربي'],
+      french:  ['French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'],
+      english: ['English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'],
+    }[key] || [];
+    const updated = current.map((row, i) => {
+      if (i !== index) return row;
+      const next = { ...row, [key]: value };
+      for (const alias of aliasKeys) delete next[alias];
+      return next;
+    });
     // Propagate upward so Module D evaluates terminology against the
     // student-corrected glossary (cahier des charges request).
     onScriptUpdate?.({ ...lastGeneratedScript, glossary: updated });
@@ -3581,6 +3691,7 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
     setAudioUrl(null);
     setAudioStatus('idle');
     setAudioError('');
+    setAudioWpm(null);
   }, [speechId]);
 
   if (!lastGeneratedScript) {
@@ -3601,6 +3712,7 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
     try {
       const data = await textToSpeech({ text: lastGeneratedScript.script, language, accent: selectedAccent, rate_adjustment: speechRate });
       const url = `${SERVER_BASE}${data.audio_url}`;
+      setAudioWpm(data.words_per_minute || null);
       setAudioUrl(url); onAudioGenerated?.(url); setAudioStatus('success');
     } catch (err) { setAudioError(err.message); setAudioStatus('error'); }
   }
@@ -3656,6 +3768,13 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
         {audioUrl && (
           <div style={{ marginTop: '1rem' }}>
             <audio key={audioUrl} controls src={audioUrl} style={{ width: '100%' }} />
+            {audioWpm && (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.85rem',
+                            color: audioWpm > 120 ? '#a15c00' : '#2f6b3a' }}>
+                🕐 {labels.measuredRate}: ~{audioWpm} {labels.wordsPerMinute}
+                {audioWpm > 120 ? ` — ${labels.rateTooFastHint}` : ''}
+              </div>
+            )}
             <a className="btn-secondary btn-sm" href={audioUrl} download={`speech_${language}.mp3`}
               style={{ display: 'inline-block', marginTop: '0.5rem' }}>
               ⬇ {labels.downloadAudio}
@@ -4423,6 +4542,26 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
 
 // ── Module D — Full Evaluation Report ────────────────────────────────────────
 
+// Arabic final case-ending (i'rab) labels — Arabic term + a short romanised hint.
+// The acoustic module reports raw keys (none/fatha/damma/kasra/tanwin_*).
+const IRAAB_ENDINGS = {
+  none:        ['بدون حركة', '∅'],
+  fatha:       ['فتحة', 'a'],
+  damma:       ['ضمة', 'u'],
+  kasra:       ['كسرة', 'i'],
+  tanwin_fath: ['تنوين فتح', 'an'],
+  tanwin_damm: ['تنوين ضمّ', 'un'],
+  tanwin_kasr: ['تنوين كسر', 'in'],
+};
+function IraabEnding({ code }) {
+  const [ar, roman] = IRAAB_ENDINGS[code] || [code || '—', ''];
+  return (
+    <span className="arabic" dir="rtl">
+      {ar}{roman ? <small style={{ opacity: 0.7 }}> ({roman})</small> : null}
+    </span>
+  );
+}
+
 function ScoreBar({ score, labels }) {
   const safeScore = Number.isFinite(Number(score)) ? Number(score) : 0;
   const pct = Math.round((safeScore / 10) * 100);
@@ -4911,6 +5050,81 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               ))}
             </div>
           )}
+
+          {/* Arabic case endings (إعراب) — acoustic detection from the
+              new_arabic_solution module. Reports what the student ACTUALLY
+              pronounced from the audio; the transcript is left verbatim and
+              wrong endings are never "corrected". */}
+          {report.arabic_module?.pronunciation?.available && (() => {
+            const pron = report.arabic_module.pronunciation;
+            const sum = pron.summary || {};
+            const acc = sum.accuracy != null ? Math.round(sum.accuracy * 100) : null;
+            const findings = pron.findings || [];
+            return (
+              <div className="card">
+                <h3 className="report-section-title">📐 {labels.iraabTitle}</h3>
+                <p className="info-tip" style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                  ℹ️ {labels.iraabAcousticNote}
+                </p>
+                {/* Ali's vowelized (tashkeel/tanween) hypothesis — shown only when
+                    it actually carries harakat (i.e. once his diacritizer is on). */}
+                {/[ً-ْ]/.test(report.arabic_module.transcript?.diacritized || '') && (
+                  <div className="eval-item" style={{ marginBottom: '0.75rem', paddingInlineStart: '0.75rem', borderInlineStart: '3px solid var(--gold)' }}>
+                    <span style={{ color: 'var(--warm-gray)', fontSize: '0.78rem' }}>{labels.iraabDiacritized}: </span>
+                    <span className="arabic" dir="rtl" style={{ fontSize: '1rem' }}>{report.arabic_module.transcript.diacritized}</span>
+                  </div>
+                )}
+                <div className="algo-grid" style={{ marginBottom: '0.75rem' }}>
+                  <div className="algo-card">
+                    <span className="algo-count" style={{ color: 'var(--sage)' }}>{sum.correct ?? 0}</span>
+                    <span className="algo-label">{labels.iraabCorrect}</span>
+                  </div>
+                  <div className={`algo-card ${(sum.incorrect ?? 0) > 0 ? 'algo-card-warn' : ''}`}>
+                    <span className="algo-count" style={{ color: 'var(--sienna)' }}>{sum.incorrect ?? 0}</span>
+                    <span className="algo-label">{labels.iraabIncorrect}</span>
+                  </div>
+                  <div className="algo-card">
+                    <span className="algo-count" style={{ color: 'var(--gold)' }}>{sum.uncertain ?? 0}</span>
+                    <span className="algo-label">{labels.iraabUncertain}</span>
+                  </div>
+                  {acc != null && (
+                    <div className="algo-card">
+                      <span className="algo-count">{acc}%</span>
+                      <span className="algo-label">{labels.iraabAccuracy}</span>
+                    </div>
+                  )}
+                </div>
+                {findings.map((f, i) => {
+                  const color = f.status === 'correct' ? 'var(--sage)'
+                    : f.status === 'incorrect' ? 'var(--sienna)' : 'var(--gold)';
+                  const badge = f.status === 'correct' ? labels.iraabCorrect
+                    : f.status === 'incorrect' ? labels.iraabIncorrect : labels.iraabUncertain;
+                  const importance = f.status === 'incorrect' ? 'high' : 'low';
+                  return (
+                    <div key={i} className="eval-item" style={{ borderInlineStart: `3px solid ${color}`, paddingInlineStart: '0.75rem', marginBottom: '0.6rem' }}>
+                      <div style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <strong className="arabic" dir="rtl" style={{ fontSize: '1.05rem' }}>{f.word}</strong>
+                        <span className={`importance-badge importance-${importance}`}>{badge}</span>
+                        {f.detection_confidence != null && (
+                          <small style={{ color: 'var(--warm-gray)' }}>
+                            {labels.pronunciationScore}: {Math.round(f.detection_confidence * 100)}%
+                          </small>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.84rem', marginTop: '0.3rem' }}>
+                        <span style={{ color: 'var(--warm-gray)' }}>{labels.expectedLabel}: </span>
+                        <IraabEnding code={f.expected_ending} />
+                        <span style={{ color: 'var(--warm-gray)', margin: '0 0.4rem' }}>→</span>
+                        <span style={{ color: 'var(--warm-gray)' }}>{labels.iraabDetected}: </span>
+                        <span style={{ color }}><IraabEnding code={f.detected_ending} /></span>
+                      </div>
+                      {f.explanation && <div className="eval-explanation" dir="auto">{f.explanation}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Pronunciation assessment (LLM commentary, all languages) */}
           {false && report.pronunciation_assessment?.comment && (

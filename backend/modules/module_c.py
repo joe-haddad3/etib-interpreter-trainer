@@ -424,13 +424,45 @@ def transcribe():
         else:
             result = _transcribe_local(asr_path, language)
 
-        # For Arabic: add tashkeel reflecting what the student actually said
+        # For Arabic: reflect what the student actually said — including errors.
+        # Architecture (Ali, 28 July): OUR system stays authoritative for the main
+        # verbatim transcript (`full_text`, word-timestamped for the Module D
+        # detectors). Ali's module is authoritative for tashkeel/tanween/i'rab.
+        # The VOCALISED (tashkeel'd) transcript now comes from Ali's diacritizer
+        # (`transcript.diacritized`) instead of the old LLM `_add_tashkeel` guess.
+        # No LLM fallback when the wrapper is on: a guessed vocalisation could
+        # "correct" a wrong ending and contradict Ali's acoustic i'rab findings.
         if language == 'ar' and result.get('full_text'):
-            result['vocalized_text'] = _add_tashkeel(result['full_text'], source_text)
+            from config import ARABIC_WRAPPER_URL
+            if ARABIC_WRAPPER_URL:
+                result['tashkeel_source'] = 'acoustic'
+                try:
+                    import re as _re
+                    from services.arabic_wrapper_client import evaluate_arabic
+                    ar = evaluate_arabic(asr_path, reference_text=source_text, mode='light')
+                    tr = (ar or {}).get('transcript') or {}
+                    diac = (tr.get('diacritized') or '').strip()
+                    # Only use it once it actually carries harakat (i.e. Ali's
+                    # diacritizer is on); otherwise show verbatim, no fake tashkeel.
+                    if diac and _re.search(r'[ً-ْ]', diac):
+                        result['vocalized_text'] = diac
+                        result['vocalized_source'] = 'arabic_module'
+                except Exception:
+                    import traceback; traceback.print_exc()
+            else:
+                result['vocalized_text'] = _add_tashkeel(result['full_text'], source_text)
 
         return jsonify(result)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        msg = str(e)
+        # FFmpeg/PyAV decode failures come back as cryptic AVERROR codes
+        # ("[Errno 1094995529] Invalid data found when processing input").
+        # Translate them for the student: the file itself is unreadable.
+        if re.search(r'invalid data found|moov atom|could not find codec|invalid argument.*decod|end of file', msg, re.I):
+            return jsonify({'error': 'unreadable_media: This file could not be decoded. '
+                                     'Supported formats: MP3, WAV, M4A, OGG, Opus, FLAC, WebM, MP4. '
+                                     'If the file plays on your device, convert it to MP3 or WAV and retry.'}), 415
+        return jsonify({'error': msg}), 500
     finally:
         for p in {temp_path, asr_path}:
             if p and os.path.exists(p):

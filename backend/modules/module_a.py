@@ -2294,13 +2294,38 @@ def fetch_web_page():
 
     try:
         import requests as _requests
+        try:
+            from curl_cffi import requests as _cffi_requests
+        except ImportError:
+            _cffi_requests = None
+        # Realistic browser headers — many institutional sites (mayoclinic, undp,
+        # cdc…) return 403 to anything that does not look like a real browser.
+        headers = {
+            'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                           '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8,ar;q=0.7',
+        }
+
+        def _get_once(target):
+            """One HTTP GET without redirects. curl_cffi first (browser TLS
+            fingerprint beats most WAFs), plain requests as fallback."""
+            if _cffi_requests is not None:
+                try:
+                    r = _cffi_requests.get(target, timeout=20, headers=headers,
+                                           impersonate='chrome120', allow_redirects=False)
+                    if r.status_code not in (403, 429):
+                        return r
+                except Exception:
+                    pass
+            return _requests.get(target, timeout=20, headers=headers, allow_redirects=False)
+
         # Follow redirects manually so every hop is re-validated against the
         # SSRF guard (a public URL may redirect to an internal address).
-        headers = {'User-Agent': 'Mozilla/5.0 (compatible; ETIB-Interpreter-Trainer/1.0; academic use)'}
         current_url = url
         resp = None
         for _hop in range(4):
-            resp = _requests.get(current_url, timeout=20, headers=headers, allow_redirects=False)
+            resp = _get_once(current_url)
             if resp.status_code in (301, 302, 303, 307, 308):
                 next_url = resp.headers.get('Location', '')
                 if next_url.startswith('/'):
@@ -2311,6 +2336,10 @@ def fetch_web_page():
                 current_url = next_url
                 continue
             break
+        if resp.status_code in (401, 403):
+            return jsonify({'error': 'This site blocks automated access (HTTP %d). '
+                                     'Save the page as PDF and use "Upload file" instead.'
+                                     % resp.status_code}), 502
         resp.raise_for_status()
         url = current_url
 
@@ -2320,7 +2349,10 @@ def fetch_web_page():
             text = _clean_extracted_text(_download_and_extract(url, timeout=30))
             title = url.rsplit('/', 1)[-1]
         else:
-            resp.encoding = resp.apparent_encoding or resp.encoding
+            try:  # curl_cffi responses have no apparent_encoding
+                resp.encoding = getattr(resp, 'apparent_encoding', None) or resp.encoding
+            except (AttributeError, TypeError):
+                pass
             text, title = _WebPageTextExtractor().extract(resp.text)
 
         text = text.strip()

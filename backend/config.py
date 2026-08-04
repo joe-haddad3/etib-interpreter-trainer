@@ -14,6 +14,14 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GOOGLE_AI_KEY = os.getenv('GOOGLE_AI_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # paid fallback only
 
+# ── Arabic evaluation micro-service (Ali's FastAPI wrapper) ─────────────────
+# Independent Arabic i'rab/tanween/pronunciation service. We only talk to it
+# over HTTP, so this Flask app never imports FastAPI code or loads the heavy
+# wav2vec2 models. Empty URL = feature off (existing evaluation unchanged).
+ARABIC_WRAPPER_URL = os.getenv('ARABIC_WRAPPER_URL', '').strip()
+ARABIC_WRAPPER_API_KEY = os.getenv('ARABIC_WRAPPER_API_KEY', '').strip()
+ARABIC_WRAPPER_TIMEOUT = int(os.getenv('ARABIC_WRAPPER_TIMEOUT', '180'))
+
 LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'groq')  # groq | local_aya | remote_aya
 PRIMARY_LLM_MODEL = 'llama-3.3-70b-versatile'   # via Groq (free)
 FALLBACK_LLM_MODEL = 'gemini-1.5-flash'          # via Google AI Studio (free)

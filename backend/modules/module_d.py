@@ -300,6 +300,35 @@ def _compute_adaptive_params(sessions: list) -> dict:
     }
 
 
+def _eval_llm_call(client, messages, max_tokens=6000, temperature=0.2):
+    """
+    One evaluation LLM call with a rate-limit-aware retry.
+
+    Tester feedback (Aug 2026): "Groq tokens used up" even with a FRESH key.
+    Cause: Groq admits a request against the per-minute token budget using
+    prompt + max_tokens, so a long transcript + max_tokens=6000 can exceed a
+    free-tier TPM limit in a SINGLE request — switching keys never helps.
+    Strategy: on a 429, wait the short suggested delay and retry once with a
+    smaller completion budget (the report JSON almost always fits in 3000).
+    """
+    import time as _time
+    try:
+        return client.chat.completions.create(
+            model=PRIMARY_LLM_MODEL, messages=messages,
+            max_tokens=max_tokens, temperature=temperature)
+    except Exception as exc:
+        msg = str(exc)
+        if '429' not in msg and not re.search(r'rate.?limit|too large|tokens per minute|tpm', msg, re.I):
+            raise
+        # Honour Groq's "Please try again in 7.66s" hint when it is short.
+        m = re.search(r'try again in ([0-9.]+)s', msg)
+        wait = min(float(m.group(1)) if m else 5.0, 20.0)
+        _time.sleep(wait)
+        return client.chat.completions.create(
+            model=PRIMARY_LLM_MODEL, messages=messages,
+            max_tokens=min(max_tokens, 3000), temperature=temperature)
+
+
 def _extract_json(text: str) -> dict:
     text = text.strip()
     fence = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
@@ -2966,21 +2995,16 @@ def generate_feedback():
             proper_nouns_block=build_proper_nouns_block(source_script),
         )
 
-        response = client.chat.completions.create(
-            model=PRIMARY_LLM_MODEL,
-            messages=[
-                {
-                    'role': 'system',
-                    'content': (
-                        'You are an expert interpreter training evaluator at ETIB Beirut. '
-                        'You return only valid JSON for pedagogical evaluation reports.'
-                    )
-                },
-                {'role': 'user', 'content': prompt}
-            ],
-            max_tokens=6000,
-            temperature=0.2
-        )
+        response = _eval_llm_call(client, [
+            {
+                'role': 'system',
+                'content': (
+                    'You are an expert interpreter training evaluator at ETIB Beirut. '
+                    'You return only valid JSON for pedagogical evaluation reports.'
+                )
+            },
+            {'role': 'user', 'content': prompt}
+        ])
 
         llm_result = _extract_json(response.choices[0].message.content)
         llm_result = strip_foreign_script_chars(llm_result)
@@ -3236,17 +3260,12 @@ def full_evaluation():
         }
 
         try:
-            response = client.chat.completions.create(
-                model=PRIMARY_LLM_MODEL,
-                messages=[
-                    {'role': 'system', 'content':
-                     'You are an expert interpreter training evaluator at ETIB Beirut. '
-                     'Return only valid JSON. Be thorough — detect ALL error types listed.'},
-                    {'role': 'user', 'content': prompt}
-                ],
-                max_tokens=6000,
-                temperature=0.2
-            )
+            response = _eval_llm_call(client, [
+                {'role': 'system', 'content':
+                 'You are an expert interpreter training evaluator at ETIB Beirut. '
+                 'Return only valid JSON. Be thorough — detect ALL error types listed.'},
+                {'role': 'user', 'content': prompt}
+            ])
             llm_result = _extract_json(response.choices[0].message.content)
         except Exception as llm_err:
             import traceback; traceback.print_exc()
@@ -3279,6 +3298,42 @@ def full_evaluation():
         pronun_report = build_pronunciation_report(all_word_scores, language=language)
         llm_result['pronunciation'] = pronun_report
         llm_result['transcript'] = transcript
+
+        # Arabic i'rab / tanween pronunciation via Ali's dedicated micro-service
+        # (new_arabic_solution branch). Independent FastAPI backend, called over
+        # HTTP — this AUGMENTS the evaluation with specialised final-haraka /
+        # tanween findings; it never replaces the analysis above. Dormant unless
+        # ARABIC_WRAPPER_URL is set, and fail-open so a slow/down service or a
+        # bad response can never break the report.
+        if language == 'ar':
+            try:
+                from services.arabic_wrapper_client import evaluate_arabic, is_configured
+                if is_configured():
+                    # Ali's spec (28 July): send the SAME audio + the vowelized
+                    # Arabic reference sentence, mode='full'. His module is
+                    # authoritative for tashkeel/tanween/i'rab; our own evaluation
+                    # (meaning/terminology/fluency/pauses/repetitions/numbers/
+                    # overall score) is unchanged and runs above.
+                    arabic_module = evaluate_arabic(
+                        asr_path,
+                        reference_text=source_script,
+                        mode='full',
+                    )
+                    if arabic_module:
+                        pron = arabic_module.get('pronunciation') or {}
+                        # Drop the heavy per-word _debug blobs (probabilities,
+                        # raw frames) before returning / persisting the session.
+                        for finding in pron.get('findings', []):
+                            finding.pop('_debug', None)
+                        llm_result['arabic_module'] = arabic_module
+                        # Acoustic detection is the authoritative source for Arabic
+                        # case endings: it reports what the student ACTUALLY
+                        # pronounced (errors included), so we never let the LLM
+                        # "correct" the tashkeel.
+                        if pron.get('available'):
+                            llm_result['tashkeel_source'] = 'acoustic'
+            except Exception:
+                import traceback; traceback.print_exc()
 
         # Step 5: Persist session for history / adaptive difficulty (D11-D12).
         # Guests have no account: their sessions are NOT saved, otherwise all
