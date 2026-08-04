@@ -184,6 +184,7 @@ const UI = {
     topicOnlyHint: 'Generate from the topic and selected settings.',
     documentGenerationHint: 'Upload a source file and generate a speech grounded in its content.',
     generateFromDocument: 'Generate from document',
+    generationEmpty: 'No speech text was generated (the server may be waking up, or the request was rate-limited). Nothing was kept — please try again.',
     retrieveContext: 'Preview retrieved context',
     retrievedContext: 'Retrieved context',
     submit: 'Generate speech',
@@ -653,6 +654,7 @@ const UI = {
     topicOnlyHint: 'توليد الخطاب من الموضوع والإعدادات المحددة.',
     documentGenerationHint: 'ارفع وثيقة لتوليد خطاب مستند إلى محتواها.',
     generateFromDocument: '▷ توليد من وثيقة',
+    generationEmpty: 'لم يُولَّد أي نص للخطاب (قد يكون الخادم في طور الاستيقاظ أو جرى تقييد الطلب). لم يُحفظ شيء — يُرجى المحاولة مرة أخرى.',
     retrieveContext: 'معاينة السياق المستخرج',
     retrievedContext: 'السياق المستخرج',
     submit: 'توليد الخطاب',
@@ -1113,6 +1115,7 @@ const UI = {
     topicOnlyHint: 'Générer à partir du sujet et des paramètres choisis.',
     documentGenerationHint: 'Déposez un document source pour générer un discours ancré dans son contenu.',
     generateFromDocument: 'Générer depuis le document',
+    generationEmpty: 'Aucun texte de discours n\'a été généré (le serveur se réveille peut-être, ou la requête a été limitée). Rien n\'a été conservé — veuillez réessayer.',
     retrieveContext: 'Prévisualiser le contexte extrait',
     retrievedContext: 'Contexte extrait',
     wordCount: 'Longueur du discours',
@@ -2067,6 +2070,10 @@ export default function App() {
     try {
       if (lastGeneratedScript?.script) {
         localStorage.setItem(SESSION_KEY, JSON.stringify(lastGeneratedScript));
+      } else {
+        // Cleared to null (e.g. a failed/empty generation) — wipe the snapshot
+        // too, otherwise stale materials would come back on the next reload.
+        localStorage.removeItem(SESSION_KEY);
       }
     } catch { /* quota exceeded — not fatal */ }
   }, [lastGeneratedScript]);
@@ -2862,7 +2869,9 @@ const [showAdvanced, setShowAdvanced] = useState(true);
     if (form.language === form.target_language) {
       setError(labels.sameLangError); setStatus('error'); return;
     }
-    setStatus('loading'); setError(''); setResult(null);
+    // Reset any previous/restored session up front so a new generation can
+    // never leave stale summary/MCQ from an earlier speech on screen.
+    setStatus('loading'); setError(''); setResult(null); onGenerated(null);
     try {
       let params = form;
       if (topicIsLongText) {
@@ -2877,8 +2886,13 @@ const [showAdvanced, setShowAdvanced] = useState(true);
         };
       }
       const data = await generateSpeech(params);
+      if (!(data?.script || '').trim()) {
+        setResult(null); onGenerated(null);
+        setError(labels.generationEmpty || 'No speech text was generated — please try again.');
+        setStatus('error'); return;
+      }
       setResult(data); onGenerated(data); setStatus('success');
-    } catch (err) { setError(friendlyLlmError(err.message, labels)); setStatus('error'); }
+    } catch (err) { setResult(null); onGenerated(null); setError(friendlyLlmError(err.message, labels)); setStatus('error'); }
   }
 
   // Upload a real speech (audio or video) to interpret from (Mariam feedback):
@@ -2890,7 +2904,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
       setStatus('error');
       return;
     }
-    setSourceMediaStatus('loading'); setError(''); setResult(null);
+    setSourceMediaStatus('loading'); setError(''); setResult(null); onGenerated(null);
     try {
       // Reuse the ASR endpoint (it now normalizes audio so the FULL media is
       // transcribed, video included — the container is decoded server-side).
@@ -2959,14 +2973,19 @@ const [showAdvanced, setShowAdvanced] = useState(true);
     if (form.language === form.target_language) {
       setError(labels.sameLangError); setStatus('error'); return;
     }
-    setStatus('loading'); setError(''); setResult(null);
+    setStatus('loading'); setError(''); setResult(null); onGenerated(null);
     try {
       const allFiles = buildAllSourceFiles();
       if (!allFiles.length) throw new Error(labels.addSourceFirst || 'Add at least one source document first.');
       const topicFallback = form.topic || librarySources[0]?.title || '';
       const data = await generateSpeechFromDocument(allFiles, { ...form, topic: topicFallback });
+      if (!(data?.script || '').trim()) {
+        setResult(null); onGenerated(null);
+        setError(labels.generationEmpty || 'No speech text was generated — please try again.');
+        setStatus('error'); return;
+      }
       setResult(data); onGenerated(data); setStatus('success');
-    } catch (err) { setError(friendlyLlmError(err.message, labels)); setStatus('error'); }
+    } catch (err) { setResult(null); onGenerated(null); setError(friendlyLlmError(err.message, labels)); setStatus('error'); }
   }
 
   const LANG_LABEL = { ar: 'AR', fr: 'FR', en: 'EN' };
