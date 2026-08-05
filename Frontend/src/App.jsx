@@ -2051,32 +2051,48 @@ export default function App() {
   const [sessionRestored, setSessionRestored] = useState(false);
   const L = UI[uiLang];
 
-  // ── Session resume (tester request, Aug 2026) ─────────────────────────────
-  // If the page reloads mid-session (HF cold start, crash, accidental refresh)
-  // the generated speech + materials + edited glossary survive in localStorage
-  // and are restored on the next load — the student does not start over.
-  // A live RECORDING cannot survive a reload (browser memory only).
-  const SESSION_KEY = 'etib_session_snapshot_v1';
+  // ── Session resume — ACCOUNTS ONLY (tester request, 5 Aug 2026) ───────────
+  // A logged-in user's generated speech + materials + glossary edits survive a
+  // reload / cold start and are restored on their NEXT login, keyed to their
+  // account id. GUESTS are deliberately NOT persisted: nothing saved, nothing
+  // restored, no banner. A live RECORDING never survives a reload (browser only).
+  const SESSION_KEY_PREFIX = 'etib_session_snapshot_v1_';
+  const isGuest = currentUser?.id === 'guest';
+  const sessionKey = (isAuthenticated && !isGuest)
+    ? SESSION_KEY_PREFIX + (currentUser?.id || 'anon')
+    : null;
+
+  // One-time cleanup of the legacy non-namespaced snapshot (may hold a guest's
+  // speech from before this change).
+  useEffect(() => { try { localStorage.removeItem('etib_session_snapshot_v1'); } catch { /* ignore */ } }, []);
+
+  // Restore this account's last snapshot when they log in (never for guests).
   useEffect(() => {
+    if (!sessionKey) return;
     try {
-      const raw = localStorage.getItem(SESSION_KEY);
+      const raw = localStorage.getItem(sessionKey);
       if (raw) {
         const saved = JSON.parse(raw);
         if (saved?.script) { setLastGeneratedScript(saved); setSessionRestored(true); }
       }
     } catch { /* corrupt snapshot — ignore */ }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey]);
+
+  // Persist on change — only for a real account (sessionKey null => guest or
+  // logged out => never write, and logout keeps the snapshot for next login).
   useEffect(() => {
+    if (!sessionKey) return;
     try {
       if (lastGeneratedScript?.script) {
-        localStorage.setItem(SESSION_KEY, JSON.stringify(lastGeneratedScript));
+        localStorage.setItem(sessionKey, JSON.stringify(lastGeneratedScript));
       } else {
-        // Cleared to null (e.g. a failed/empty generation) — wipe the snapshot
-        // too, otherwise stale materials would come back on the next reload.
-        localStorage.removeItem(SESSION_KEY);
+        // Cleared to null while logged in (e.g. a failed/empty generation) —
+        // wipe the snapshot so stale materials don't return on the next reload.
+        localStorage.removeItem(sessionKey);
       }
     } catch { /* quota exceeded — not fatal */ }
-  }, [lastGeneratedScript]);
+  }, [lastGeneratedScript, sessionKey]);
 
   // Wake the free-tier backend immediately and keep it awake during the
   // session — a sleeping server (2-3 min cold start) caused testers'
@@ -2149,7 +2165,8 @@ export default function App() {
     setActivePanel('module-a');
     setLastGeneratedScript(null);
     setSessionRestored(false);
-    try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+    // Keep the account's snapshot on disk so it can be restored on next login;
+    // it is namespaced per user, so it never leaks to a guest or another account.
   }
 
   return (
@@ -2165,7 +2182,7 @@ export default function App() {
         onOpenSettings={() => setShowSettings(true)}
       />
       <main>
-        {isAuthenticated && sessionRestored && lastGeneratedScript?.script && (
+        {isAuthenticated && !isGuest && sessionRestored && lastGeneratedScript?.script && (
           <div style={{ margin: '0.75rem auto', maxWidth: '1100px', padding: '0.6rem 1rem',
                         background: '#e8f2ec', border: '1px solid #b9d8c4', borderRadius: '8px',
                         display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
@@ -2173,7 +2190,7 @@ export default function App() {
           <span style={{ flex: 1 }}>🔄 {L.sessionRestored}</span>
             <button className="btn-secondary btn-sm" onClick={() => {
               setLastGeneratedScript(null); setSessionRestored(false);
-              try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+              try { if (sessionKey) localStorage.removeItem(sessionKey); } catch { /* ignore */ }
             }}>{L.sessionDiscard}</button>
             <button className="btn-secondary btn-sm" onClick={() => setSessionRestored(false)}>✓ {L.sessionKeep}</button>
           </div>
