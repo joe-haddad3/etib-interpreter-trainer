@@ -41,6 +41,10 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 2rem;
+  /* Sticky-footer layout: main grows to fill, the credits footer sits at the
+     bottom of the viewport instead of below the fold (login page). */
+  display: flex;
+  flex-direction: column;
 }
 
 /* ══════════════════════════════════
@@ -122,7 +126,7 @@ nav { display: flex; gap: 0.4rem; align-items: center; }
 /* ══════════════════════════════════
    MAIN
    ══════════════════════════════════ */
-main { padding: 2.5rem 0 4rem; display: flex; flex-direction: column; gap: 2rem; }
+main { padding: 2.5rem 0 4rem; display: flex; flex-direction: column; gap: 2rem; flex: 1 0 auto; }
 
 /* ══════════════════════════════════
    HERO (login screen left panel)
@@ -132,7 +136,12 @@ main { padding: 2.5rem 0 4rem; display: flex; flex-direction: column; gap: 2rem;
   grid-template-columns: 1fr 400px;
   gap: 2rem;
   align-items: center;
-  min-height: calc(100vh - 120px);
+  align-content: center;
+  /* Fill the space main gives us (between header and footer) instead of
+     forcing ~full-viewport height, which used to push the footer off-screen.
+     Content stays vertically centered via align-content. */
+  flex: 1;
+  min-height: 0;
 }
 .hero-text {
   position: relative;
