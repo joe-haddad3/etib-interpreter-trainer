@@ -1476,7 +1476,7 @@ const UI = {
 
 // ── Credits (professor request: ESIB + CINIA logos and developer names) ─────
 const CREDITS = {
-  developers: ['Joe Haddad', 'Kevin Khoury', 'Ali Ali', 'Chris Wehbe', 'Marc Khatar'],
+  developers: ['Joe Haddad', 'Kevin Khoury', 'Ali Ali', 'Chris Wehbe', 'Marc Khattar'],
   logos: [
     { src: '/usj-etib-logo.png',  alt: 'USJ — ETIB' },
     { src: '/usj-esib-logo.png',  alt: 'ESIB' },
