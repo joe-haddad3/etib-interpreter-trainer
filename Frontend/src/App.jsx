@@ -371,7 +371,7 @@ const UI = {
     scenInterview: 'Interview',
     scenGroupGeneral: 'General / conference',
     scenGroupSimul: 'Simultaneous-oriented',
-    scenGroupConsec: 'Consecutive-oriented',
+    scenGroupConsec: 'Community interpreting',
     scenGroupSight: 'Sight translation-oriented',
     scenGroupInstitutions: 'International institutions',
     scenPanel: 'Panel discussion',
@@ -843,7 +843,7 @@ const UI = {
     scenInterview: 'مقابلة',
     scenGroupGeneral: 'عام / مؤتمرات',
     scenGroupSimul: 'مخصص للترجمة الفورية',
-    scenGroupConsec: 'مخصص للترجمة التتبعية',
+    scenGroupConsec: 'الترجمة المجتمعية',
     scenGroupSight: 'مخصص للترجمة المنظورة',
     scenGroupInstitutions: 'المنظمات الدولية',
     scenPanel: 'حلقة نقاش',
@@ -1315,7 +1315,7 @@ const UI = {
     scenInterview: 'Entrevue',
     scenGroupGeneral: 'Général / conférence',
     scenGroupSimul: 'Orienté simultanée',
-    scenGroupConsec: 'Orienté consécutive',
+    scenGroupConsec: 'Interprétation de service public',
     scenGroupSight: 'Orienté traduction à vue',
     scenGroupInstitutions: 'Institutions internationales',
     scenPanel: 'Table ronde',
@@ -3186,35 +3186,32 @@ const [showAdvanced, setShowAdvanced] = useState(true);
                 <option value="legal">{labels.domLegal || 'Legal'}</option>
                 <option value="medical">{labels.domMedical || 'Medical'}</option>
               </SelectField>
+              {/* Scenario list trimmed from 19 to 7 curated, verified styles
+                  (10 Aug 2026 — most were redundant institutional podium variants
+                  that differ only in vocabulary, already controlled by Domain/Topic).
+                  Backend SCENARIO_STYLES/SCENARIO_FORMATS keep ALL definitions, so any
+                  archived scenario is restored by pasting its <option> back here.
+
+                  ARCHIVED (removed from the dropdown, still defined in the backend):
+                    General:       "EU Parliament", "Arab League summit", "diplomatic meeting"
+                    Simultaneous:  "live TV broadcast"
+                    Sight transl.: "public service consultation"
+                    Institutions:  "UN Security Council", "ECOSOC", "WHO", "ILO",
+                                   "UNESCO", "OIF", "AUF"
+                  Their EN/AR/FR labels (scenEUParl, scenArabLeague, scenDiplomatic,
+                  scenLiveTV, scenPublicService, scenSecurityCouncil, scenEcosoc,
+                  scenWho, scenIlo, scenUnesco, scenOif, scenAuf) are also kept. */}
               <SelectField label={labels.scenarioLabel || 'Speaker style / setting'} id="f-scenario" name="scenario" value={form.scenario} onChange={updateField}>
                 <optgroup label={labels.scenGroupGeneral || 'General / conference'}>
-                  <option value="UN General Assembly">{labels.scenUNGA || 'UN General Assembly'}</option>
-                  <option value="EU Parliament">{labels.scenEUParl || 'EU Parliament'}</option>
-                  <option value="Arab League summit">{labels.scenArabLeague || 'Arab League summit'}</option>
+                  <option value="UN General Assembly">{labels.scenUNGA || 'Conference / institutional speech'}</option>
                   <option value="press conference">{labels.scenPress || 'Press conference'}</option>
-                  <option value="diplomatic meeting">{labels.scenDiplomatic || 'Diplomatic meeting'}</option>
                   <option value="political debate">{labels.scenDebate || 'Political debate'}</option>
                   <option value="interview">{labels.scenInterview || 'Interview'}</option>
-                </optgroup>
-                <optgroup label={labels.scenGroupSimul || 'Simultaneous-oriented'}>
                   <option value="panel discussion">{labels.scenPanel || 'Panel discussion'}</option>
-                  <option value="live TV broadcast">{labels.scenLiveTV || 'Live TV broadcast'}</option>
                 </optgroup>
-                <optgroup label={labels.scenGroupConsec || 'Consecutive-oriented'}>
+                <optgroup label={labels.scenGroupConsec || 'Community interpreting'}>
                   <option value="legal/court setting">{labels.scenLegalCourt || 'Legal/Court setting'}</option>
                   <option value="medical/healthcare">{labels.scenMedical || 'Medical/Healthcare'}</option>
-                </optgroup>
-                <optgroup label={labels.scenGroupSight || 'Sight translation-oriented'}>
-                  <option value="public service consultation">{labels.scenPublicService || 'Public service consultation'}</option>
-                </optgroup>
-                <optgroup label={labels.scenGroupInstitutions || 'International institutions'}>
-                  <option value="UN Security Council">{labels.scenSecurityCouncil || 'UN Security Council'}</option>
-                  <option value="ECOSOC">{labels.scenEcosoc || 'ECOSOC'}</option>
-                  <option value="WHO">{labels.scenWho || 'WHO'}</option>
-                  <option value="ILO">{labels.scenIlo || 'ILO'}</option>
-                  <option value="UNESCO">{labels.scenUnesco || 'UNESCO'}</option>
-                  <option value="OIF">{labels.scenOif || 'OIF (Francophonie)'}</option>
-                  <option value="AUF">{labels.scenAuf || 'AUF (Francophonie)'}</option>
                 </optgroup>
               </SelectField>
               <SelectField label={labels.structure} id="f-structure" name="structure" value={form.structure} onChange={updateField}>

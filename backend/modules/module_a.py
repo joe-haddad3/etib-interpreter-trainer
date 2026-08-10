@@ -265,6 +265,13 @@ DEFAULT_SCENARIO_FORMAT = (
     'Opening (substantive, no salutation) → Context/Background → 2–3 Main Arguments → '
     'Conclusion with a call to action. This is a one-speaker podium address.'
 )
+# Shared rule appended to every DIALOGUE format: the podium "open with a
+# substantive sentence" rule was making dialogue scenarios start with a stray
+# narration line before the first turn — this forces them to open in dialogue.
+_DIALOGUE_OPENING = (
+    ' IMPORTANT: start the script DIRECTLY with the first labelled speaker turn — '
+    'do NOT write any narration, heading, or standalone sentence before the first turn.'
+)
 SCENARIO_FORMATS = {
     'interview': (
         'FORMAT AS A BROADCAST INTERVIEW, not a speech. The "script" MUST alternate between the '
@@ -273,36 +280,49 @@ SCENARIO_FORMATS = {
         '     <Name/Guest>: <an extended, spoken first-person answer>\n'
         '   Write 3–5 such question→answer exchanges. The interviewer asks short, pointed questions; '
         'the guest answers at length in the first person, conversationally. There is NO call-to-action '
-        'conclusion and NO podium structure.'
+        'conclusion and NO podium structure.' + _DIALOGUE_OPENING
     ),
     'press conference': (
-        'FORMAT AS A PRESS CONFERENCE. Open with a short statement of the concrete announcement/decision, '
-        'then take 2–4 journalist questions, each written as "Journalist: <question>" followed by the '
-        'spokesperson\'s answer. End by signalling more questions can be taken — not with a rhetorical call to action.'
+        'FORMAT AS A PRESS CONFERENCE. Open with a short statement of the concrete announcement/decision '
+        '(labelled "Spokesperson:"), then take 2–4 journalist questions, each written as '
+        '"Journalist: <question>" followed by "Spokesperson: <answer>". End by signalling more questions '
+        'can be taken — not with a rhetorical call to action.' + _DIALOGUE_OPENING
     ),
     'political debate': (
         'FORMAT AS A DEBATE INTERVENTION. Open by directly rebutting an opposing position ("My colleague '
         'claims that… — but the facts say otherwise"), then argue 2–3 points combatively with rhetorical '
-        'questions and sharp contrasts, addressing both the opponent and the moderator/audience.'
+        'questions and sharp contrasts, addressing both the opponent and the moderator/audience. '
+        'This is a single speaker\'s turn (the opponent does not speak).'
     ),
     'panel discussion': (
-        'FORMAT AS A PANEL TURN. Begin by reacting to a previous panelist\'s point ("I want to build on / '
-        'push back on what was just said"), then make 2–3 shorter points, occasionally addressing the '
-        'moderator. Conversational, not a full keynote.'
+        'FORMAT AS A MULTI-SPEAKER PANEL — several people genuinely talking, not one monologue. The '
+        '"script" MUST alternate between a moderator and 2–3 NAMED panelists, each turn clearly labelled, '
+        'e.g.:\n'
+        '     Moderator: <frames the issue, then hands to a panelist with a question>\n'
+        '     <Panelist name>: <makes a point>\n'
+        '     <Another panelist>: <reacts to / pushes back on the previous panelist, then adds their own point>\n'
+        '     Moderator: <follow-up or hands to the next panelist>\n'
+        '   Write 5–7 turns total spread across the moderator and the panelists; the panelists must '
+        'actually respond to EACH OTHER, not give isolated speeches.' + _DIALOGUE_OPENING
     ),
     'live TV broadcast': (
-        'FORMAT AS LIVE ON-AIR COMMENTARY. Short, punchy, quotable segments aimed at a general public '
-        'audience, framing "what this means for viewers". No podium structure, no formal call to action.'
+        'FORMAT AS A LIVE TV NEWS SEGMENT — multiple speakers on air, not one monologue. Alternate between '
+        'a studio anchor and a correspondent/expert, clearly labelled, e.g.:\n'
+        '     Anchor: <introduces the story, asks the correspondent a question>\n'
+        '     Correspondent: <reports from the field, "what this means for viewers is…">\n'
+        '     Anchor: <follow-up question>\n'
+        '     Correspondent: <answers, hands back to studio>\n'
+        '   Write 4–6 turns. Short, punchy, quotable, for a general public audience.' + _DIALOGUE_OPENING
     ),
     'legal/court setting': (
         'FORMAT AS A COURT EXCHANGE. Alternate "Counsel: <question>" / "Witness: <answer>" (an examination), '
-        'or write a formal statement of fact, using precise qualified legal language. Question-and-answer '
-        'rhythm, not conference rhetoric.'
+        'using precise qualified legal language. Question-and-answer rhythm, not conference '
+        'rhetoric.' + _DIALOGUE_OPENING
     ),
     'medical/healthcare': (
         'FORMAT AS A CLINICAL CONSULTATION. Alternate between the clinician and the patient (or two '
         'clinicians), clearly labelled, with short empathetic exchanges explaining symptoms, diagnosis, '
-        'or treatment. Not a speech.'
+        'or treatment. Not a speech.' + _DIALOGUE_OPENING
     ),
     'public service consultation': (
         'FORMAT AS A PUBLIC-SERVICE CONSULTATION. A public-service officer explains a procedure directly to '
@@ -310,8 +330,10 @@ SCENARIO_FORMATS = {
         'answering the person\'s questions. Plain language, not a speech.'
     ),
     'diplomatic meeting': (
-        'FORMAT AS CLOSED-MEETING REMARKS addressed directly to counterparts: state shared interests, points '
-        'of negotiation, and concrete next steps. Pragmatic and courteous — no podium rhetoric, no public call to action.'
+        'FORMAT AS CLOSED-MEETING REMARKS addressed directly to counterparts ("Excellency, our two '
+        'delegations…"): state shared interests, specific points of negotiation, and concrete next steps '
+        'or a joint commitment. Pragmatic, courteous, first-person-plural — NO podium rhetoric, no public '
+        'call to action, no general essay on the topic.'
     ),
 }
 
