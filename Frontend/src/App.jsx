@@ -3178,13 +3178,13 @@ const [showAdvanced, setShowAdvanced] = useState(true);
                     <option value="food">{labels.domFood || 'Food & Hunger'}</option>
                     <option value="legal">{labels.domLegal || 'Legal'}</option>
                     <option value="medical">{labels.domMedical || 'Medical'}</option>
-                    <option value="diplomacy">{labels.domDiplomacy || 'Diplomacy'}</option> */}
+                    <option value="diplomacy">{labels.domDiplomacy || 'Diplomacy'}</option>
+                    <option value="human rights">{labels.domHumanRights || 'Human Rights'}</option> */}
               <SelectField label={labels.domain} id="f-domain" name="domain" value={form.domain} onChange={updateField}>
                 <option value="politics">{labels.domPolitics || 'Politics'}</option>
                 <option value="economics">{labels.domEconomics || 'Economics'}</option>
                 <option value="climate">{labels.domClimate || 'Climate & Environment'}</option>
                 <option value="health">{labels.domHealth || 'Health'}</option>
-                <option value="human rights">{labels.domHumanRights || 'Human Rights'}</option>
                 <option value="education">{labels.domEducation || 'Education'}</option>
                 <option value="technology">{labels.domTechnology || 'Technology & AI'}</option>
                 <option value="disarmament">{labels.domDisarmament || 'Disarmament'}</option>
