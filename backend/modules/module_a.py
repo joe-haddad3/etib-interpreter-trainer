@@ -464,13 +464,18 @@ SPEECH WRITING RULES
    "Mesdames et Messieurs", "أيها السادة", "أصحاب المعالي", "Your Majesties".
    Violation of this rule is a critical error.
 
-   REQUIRED opening style — choose one:
-   A) Direct substance: open with a fact, statistic, challenge, or bold claim.
-      Examples: "Three years ago, the world committed to..." / "The numbers are stark:" / "We are failing."
-   B) Rhetorical device: a question, a striking contrast, or a historical reference.
-      Examples: "What does security mean in 2025?" / "Half a century after..." / "هل نحن على الطريق الصحيح؟"
-   C) Contextual declaration: a precise statement specific to the topic.
-      Examples: "Climate finance stands at a crossroads." / "التعليم حق لا امتياز." / "La paix n'est pas un acquis."
+   REQUIRED opening — it MUST be specific to THIS exact topic, and DIFFERENT every time.
+   Pick ONE approach and write the sentence fresh from the topic itself:
+   A) Direct substance: a concrete fact, statistic, challenge, or bold claim taken from THIS topic.
+   B) Rhetorical device: a question, a sharp contrast, or a historical reference about THIS topic.
+   C) Contextual declaration: a precise statement that names the specific subject of THIS topic.
+
+   ANTI-FORMULA RULE (critical): do NOT open with a recycled stock phrase. In particular, NEVER
+   begin with "The numbers are stark", "In a world where...", "Today, we stand...", "We are failing",
+   "It is with great...", or any generic template that could introduce almost any speech. The first
+   sentence must be so specific to "{topic}" that it could NOT open a speech on any other subject,
+   and it must not repeat the opening you would give for a different topic. Vary the wording and the
+   chosen approach (A/B/C) from one generation to the next.
 
    If a protocol salutation is contextually necessary, embed it mid-paragraph AFTER the first sentence, never as the first words.
 
