@@ -535,3 +535,108 @@ def upload_glossary():
                                  'Expected columns like Term / Arabic / French / English.'}), 400
 
     return jsonify({'glossary': entries[:200]})
+
+
+# ── Per-user glossary correction memory ──────────────────────────────────────
+# Lina (7 Aug 2026): "can the platform remember, PER USER, the terms it
+# corrects, so the glossary improves over time?" Stored in MongoDB keyed by
+# user_id + normalized term, so a logged-in user's corrections follow their
+# account across sessions/devices (guests have no server memory — local only).
+_glossary_mongo = None
+_glossary_mem: dict = {}   # { user_id: { term_norm: {term, arabic, french, english, definition} } }
+_GLOSSARY_MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017')
+_GLOSSARY_MONGODB_DB = os.getenv('MONGODB_DB', 'etib_interpreter_trainer')
+_GLOSSARY_FIELDS = ('arabic', 'french', 'english', 'definition')
+
+
+def _glossary_user_id() -> str:
+    """User id from the auth token, or '' for guests/anonymous."""
+    try:
+        from modules.auth import get_user_from_token
+        token = (
+            request.args.get('auth_token', '') or
+            request.form.get('auth_token', '') or
+            (request.get_json(silent=True) or {}).get('auth_token', '')
+        ).strip()
+        user = get_user_from_token(token)
+        return user['id'] if user else ''
+    except Exception:
+        return ''
+
+
+def _glossary_corrections_collection():
+    global _glossary_mongo
+    if _glossary_mongo is not None:
+        return _glossary_mongo
+    try:
+        from pymongo import MongoClient, ASCENDING
+        client = MongoClient(_GLOSSARY_MONGODB_URI, serverSelectionTimeoutMS=2000)
+        client.admin.command('ping')
+        col = client[_GLOSSARY_MONGODB_DB]['glossary_corrections']
+        col.create_index([('user_id', ASCENDING), ('term_norm', ASCENDING)], unique=True)
+        _glossary_mongo = col
+    except Exception:
+        _glossary_mongo = None
+    return _glossary_mongo
+
+
+def _norm_glossary_term(term: str) -> str:
+    return str(term or '').strip().lower()
+
+
+@module_b_bp.route('/glossary/corrections', methods=['GET'])
+def get_glossary_corrections():
+    """Return every glossary correction saved by the logged-in user."""
+    user_id = _glossary_user_id()
+    if not user_id:
+        return jsonify({'corrections': []})   # guests: no server memory
+    col = _glossary_corrections_collection()
+    if col is not None:
+        docs = list(col.find({'user_id': user_id}, {'_id': 0, 'user_id': 0, 'updated_at': 0}))
+    else:
+        docs = list(_glossary_mem.get(user_id, {}).values())
+    return jsonify({'corrections': docs})
+
+
+@module_b_bp.route('/glossary/corrections', methods=['POST'])
+def save_glossary_corrections():
+    """Upsert one or more glossary corrections for the logged-in user.
+    Accepts {'correction': {...}} or {'corrections': [{...}, ...]}. Each item
+    needs a 'term' plus at least one of arabic/french/english/definition."""
+    user_id = _glossary_user_id()
+    if not user_id:
+        return jsonify({'error': 'login required'}), 401
+    data = request.get_json(silent=True) or {}
+    items = data.get('corrections')
+    if items is None and isinstance(data.get('correction'), dict):
+        items = [data['correction']]
+    if not isinstance(items, list):
+        return jsonify({'error': 'corrections must be a list or a single correction'}), 400
+
+    import datetime
+    col = _glossary_corrections_collection()
+    saved = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        term = str(item.get('term', '')).strip()
+        term_norm = _norm_glossary_term(term)
+        if not term_norm:
+            continue
+        record = {'term': term, 'term_norm': term_norm}
+        for field in _GLOSSARY_FIELDS:
+            value = item.get(field)
+            if isinstance(value, str) and value.strip():
+                record[field] = value.strip()
+        if not any(field in record for field in _GLOSSARY_FIELDS):
+            continue   # nothing worth storing (blank correction)
+        if col is not None:
+            col.update_one(
+                {'user_id': user_id, 'term_norm': term_norm},
+                {'$set': {**record, 'user_id': user_id, 'updated_at': datetime.datetime.utcnow()}},
+                upsert=True,
+            )
+        else:
+            _glossary_mem.setdefault(user_id, {})[term_norm] = record
+        saved += 1
+    return jsonify({'saved': saved})

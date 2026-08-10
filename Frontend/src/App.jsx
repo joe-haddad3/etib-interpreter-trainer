@@ -9,6 +9,8 @@ import {
   textToSpeech,
   downloadGlossary,
   uploadGlossary,
+  getGlossaryCorrections,
+  saveGlossaryCorrection,
   transcribeAudio,
   generateFeedback,
   evaluateWithAudio,
@@ -1607,6 +1609,30 @@ function applyGlossaryMemory(script) {
   return { ...script, glossary: applyGlossaryMemoryToList(script.glossary) };
 }
 
+// Merge server-side corrections (from the logged-in user's account) into the
+// local memory map, so applyGlossaryMemory (which reads localStorage) picks
+// them up. Called on login so a user's terms follow their account/device.
+function mergeServerGlossaryCorrections(corrections) {
+  if (!Array.isArray(corrections) || !corrections.length) return;
+  try {
+    const memory = loadGlossaryMemory();
+    for (const c of corrections) {
+      const key = normalizeGlossaryTerm(c?.term);
+      if (!key) continue;
+      const patch = { term: c.term };
+      for (const f of GLOSSARY_MEMORY_FIELDS) if (c[f]) patch[f] = c[f];
+      memory[key] = { ...(memory[key] || {}), ...patch };
+    }
+    localStorage.setItem(GLOSSARY_MEMORY_KEY, JSON.stringify(memory));
+  } catch { /* storage disabled — skip */ }
+}
+
+// Clear the local memory (on logout) so the next user on this browser does not
+// inherit the previous account's remembered corrections.
+function clearLocalGlossaryMemory() {
+  try { localStorage.removeItem(GLOSSARY_MEMORY_KEY); } catch { /* ignore */ }
+}
+
 // ── SVG icons ────────────────────────────────────────────────────────────────
 function glossaryValue(item, keys) {
   for (const key of keys) {
@@ -2178,6 +2204,18 @@ export default function App() {
     document.body.classList.toggle('rtl', isAr);
   }, [uiLang]);
 
+  // Pull this account's saved glossary corrections into local memory so they
+  // are auto-applied to future generated glossaries (Lina 7 Aug: per-user
+  // terminology memory tied to the profile, across sessions/devices).
+  useEffect(() => {
+    if (!currentUser || currentUser.id === 'guest') return;
+    let cancelled = false;
+    getGlossaryCorrections()
+      .then(r => { if (!cancelled) mergeServerGlossaryCorrections(r?.corrections); })
+      .catch(() => { /* offline / server waking — local memory still works */ });
+    return () => { cancelled = true; };
+  }, [currentUser]);
+
   function handleGuest() {
     saveAuthToken(null);
     setCurrentUserId('guest');
@@ -2233,6 +2271,10 @@ export default function App() {
     setActivePanel('module-a');
     setLastGeneratedScript(null);
     setSessionRestored(false);
+    // Clear this browser's glossary memory so the next user does not inherit
+    // the previous account's remembered corrections (server stays the source
+    // of truth and is re-fetched on the next login).
+    clearLocalGlossaryMemory();
     // Keep the account's snapshot on disk so it can be restored on next login;
     // it is namespaced per user, so it never leaks to a guest or another account.
   }
@@ -3781,6 +3823,11 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
     // We key on the term, so an edited equivalent/definition is reused whenever
     // the same term reappears in a later generation.
     rememberGlossaryCorrection(current[index]?.term, key, value);
+    // Persist to the user's account (server) too, so it follows them across
+    // sessions/devices. No-ops for guests (no token). Fire-and-forget.
+    if (GLOSSARY_MEMORY_FIELDS.includes(key) && (current[index]?.term || '').trim() && String(value || '').trim()) {
+      saveGlossaryCorrection({ term: current[index].term, [key]: value }).catch(() => {});
+    }
     setGlossaryMemoryCount(glossaryMemorySize());
     // Propagate upward so Module D evaluates terminology against the
     // student-corrected glossary (cahier des charges request).

@@ -187,6 +187,26 @@ export async function downloadGlossary(params) {
   return res.blob();
 }
 
+// Per-user glossary correction memory (Lina 7 Aug): a logged-in user's
+// corrected terms are stored server-side and follow their account.
+export async function getGlossaryCorrections() {
+  const token = getAuthToken();
+  if (!token) return { corrections: [] };   // guests: local-only, no server call
+  const res = await safeFetch(`${BASE}/module-b/glossary/corrections?auth_token=${encodeURIComponent(token)}`);
+  return parseJsonResponse(res);
+}
+
+export async function saveGlossaryCorrection(correction) {
+  const token = getAuthToken();
+  if (!token) return { saved: 0 };          // guests: nothing to persist server-side
+  const res = await safeFetch(`${BASE}/module-b/glossary/corrections`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(authBody({ correction })),
+  });
+  return parseJsonResponse(res);
+}
+
 export async function uploadGlossary(file) {
   const form = new FormData();
   form.append('glossary', file, file.name || 'glossary');
