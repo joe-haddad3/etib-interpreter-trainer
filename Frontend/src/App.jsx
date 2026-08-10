@@ -402,6 +402,8 @@ const UI = {
     glossaryAddTerm: 'Add term',
     glossaryEditDone: '✓ Done editing',
     glossaryEditHint: 'Review and correct the equivalents BEFORE recording your interpretation — the evaluation will then check your terminology against this approved glossary.',
+    glossaryMemoryNote: 'corrections remembered — they are re-applied automatically to future glossaries.',
+    glossaryMemoryClear: 'Forget saved corrections',
     webPageTab: 'Web page',
     webPageUrlPlaceholder: 'https://… paste the address of an article or report',
     webPageFetch: 'Fetch page',
@@ -872,6 +874,8 @@ const UI = {
     glossaryAddTerm: 'إضافة مصطلح',
     glossaryEditDone: '✓ إنهاء التعديل',
     glossaryEditHint: 'راجع المقابلات وصحّحها قبل تسجيل ترجمتك — سيتحقق التقييم من مصطلحاتك وفق هذا المسرد المعتمد.',
+    glossaryMemoryNote: 'تصحيحات محفوظة — تُطبَّق تلقائياً على المسارد القادمة.',
+    glossaryMemoryClear: 'حذف التصحيحات المحفوظة',
     webPageTab: 'صفحة ويب',
     webPageUrlPlaceholder: '…https:// الصق رابط مقال أو تقرير',
     webPageFetch: 'جلب الصفحة',
@@ -1342,6 +1346,8 @@ const UI = {
     glossaryAddTerm: 'Ajouter un terme',
     glossaryEditDone: '✓ Terminer la modification',
     glossaryEditHint: 'Relisez et corrigez les équivalents AVANT d\'enregistrer votre prestation — l\'évaluation vérifiera ensuite votre terminologie par rapport à ce glossaire validé.',
+    glossaryMemoryNote: 'corrections mémorisées — elles sont réappliquées automatiquement aux prochains glossaires.',
+    glossaryMemoryClear: 'Oublier les corrections enregistrées',
     webPageTab: 'Page web',
     webPageUrlPlaceholder: 'https://… collez l\'adresse d\'un article ou d\'un rapport',
     webPageFetch: 'Récupérer la page',
@@ -1538,6 +1544,68 @@ const VOICE_OPTIONS = {
     { label: 'Non-native accent (Male)', labelAr: 'لهجة غير أصلية - ذكر', accent: 'IN_m' },
   ]
 };
+
+// ── Glossary correction memory ───────────────────────────────────────────────
+// Lina feedback (6 Aug 2026): "to what extent can the platform RETAIN the
+// corrections the user makes, so glossary entries improve over time?"
+// We persist every equivalent/definition the user corrects, keyed by the term,
+// in localStorage. On each new generation these remembered corrections are
+// re-applied to matching terms — so the same term is never wrong twice for a
+// given user/browser. (Per-browser today; can be synced per-account later.)
+const GLOSSARY_MEMORY_KEY = 'etib_glossary_memory_v1';
+const GLOSSARY_MEMORY_FIELDS = ['arabic', 'french', 'english', 'definition'];
+
+function normalizeGlossaryTerm(term) {
+  return String(term || '').trim().toLowerCase();
+}
+
+function loadGlossaryMemory() {
+  try {
+    return JSON.parse(localStorage.getItem(GLOSSARY_MEMORY_KEY) || '{}') || {};
+  } catch { return {}; }
+}
+
+// Save one corrected field for a term. Empty values are ignored (a cleared cell
+// should not be remembered as a correction, and must not resurrect later).
+function rememberGlossaryCorrection(term, field, value) {
+  const key = normalizeGlossaryTerm(term);
+  if (!key || !GLOSSARY_MEMORY_FIELDS.includes(field)) return;
+  const val = String(value ?? '').trim();
+  if (!val) return;
+  try {
+    const memory = loadGlossaryMemory();
+    memory[key] = { ...(memory[key] || {}), [field]: val, term: String(term).trim() };
+    localStorage.setItem(GLOSSARY_MEMORY_KEY, JSON.stringify(memory));
+  } catch { /* storage full / disabled — corrections just won't persist */ }
+}
+
+// Return how many remembered corrections exist (for the UI hint).
+function glossaryMemorySize() {
+  return Object.keys(loadGlossaryMemory()).length;
+}
+
+// Apply remembered corrections onto a fresh glossary list (non-destructive:
+// only overrides a field when we actually remember a correction for that term).
+function applyGlossaryMemoryToList(glossary) {
+  if (!Array.isArray(glossary) || !glossary.length) return glossary;
+  const memory = loadGlossaryMemory();
+  if (!Object.keys(memory).length) return glossary;
+  return glossary.map(item => {
+    const remembered = memory[normalizeGlossaryTerm(item?.term)];
+    if (!remembered) return item;
+    const patched = { ...item };
+    for (const field of GLOSSARY_MEMORY_FIELDS) {
+      if (remembered[field]) patched[field] = remembered[field];
+    }
+    return patched;
+  });
+}
+
+// Apply remembered corrections to a whole generated-script object's glossary.
+function applyGlossaryMemory(script) {
+  if (!script || !Array.isArray(script.glossary)) return script;
+  return { ...script, glossary: applyGlossaryMemoryToList(script.glossary) };
+}
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
 function glossaryValue(item, keys) {
@@ -2862,13 +2930,12 @@ const [showAdvanced, setShowAdvanced] = useState(true);
 
   function updateField(event) {
     const { name, value, type, checked } = event.target;
-    // Changing topic or domain after attaching sources means the student
-    // changed their mind — clear sources so generation isn't grounded in
-    // now-irrelevant documents.
-    if ((name === 'topic' || name === 'domain') && (documentFiles.length > 0 || librarySources.length > 0)) {
-      setDocumentFiles([]);
-      setLibrarySources([]);
-    }
+    // NOTE: we deliberately do NOT auto-clear attached sources when the topic
+    // or domain changes. Doing so silently dropped the user's chosen source
+    // (Lina feedback 6 Aug: "the generated text was based on a UN document I
+    // did not choose") — because once the source was wiped, generation fell
+    // back to the auto UN-library lookup. Sources now persist until the user
+    // removes them explicitly via the chip's × button.
     setForm(current => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
   }
 
@@ -2908,7 +2975,8 @@ const [showAdvanced, setShowAdvanced] = useState(true);
         setError(labels.generationEmpty || 'No speech text was generated — please try again.');
         setStatus('error'); return;
       }
-      setResult(data); onGenerated(data); setStatus('success');
+      const remembered = applyGlossaryMemory(data);
+      setResult(remembered); onGenerated(remembered); setStatus('success');
     } catch (err) { setResult(null); onGenerated(null); setError(friendlyLlmError(err.message, labels)); setStatus('error'); }
   }
 
@@ -2955,7 +3023,8 @@ const [showAdvanced, setShowAdvanced] = useState(true);
         source_upload: true,
         mode: 'uploaded_source',
       };
-      setResult(generated); onGenerated(generated);
+      const rememberedGen = applyGlossaryMemory(generated);
+      setResult(rememberedGen); onGenerated(rememberedGen);
       if (materialsError) {
         // Surface a clear reason (invalid key, quota) instead of raw JSON.
         setError(`${labels.errorPrefix}: ${friendlyLlmError(materialsError, labels)}`);
@@ -3001,7 +3070,8 @@ const [showAdvanced, setShowAdvanced] = useState(true);
         setError(labels.generationEmpty || 'No speech text was generated — please try again.');
         setStatus('error'); return;
       }
-      setResult(data); onGenerated(data); setStatus('success');
+      const remembered = applyGlossaryMemory(data);
+      setResult(remembered); onGenerated(remembered); setStatus('success');
     } catch (err) { setResult(null); onGenerated(null); setError(friendlyLlmError(err.message, labels)); setStatus('error'); }
   }
 
@@ -3627,6 +3697,9 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
   const [audioWpm, setAudioWpm] = useState(null);
   const [editingGlossary, setEditingGlossary] = useState(false);
   const [glossaryUploading, setGlossaryUploading] = useState(false);
+  // Count of remembered glossary corrections (Lina 6 Aug) — drives the hint and
+  // the "forget" button. Refreshed after each edit so the count stays live.
+  const [glossaryMemoryCount, setGlossaryMemoryCount] = useState(() => glossaryMemorySize());
   const [materialsStatus, setMaterialsStatus] = useState('idle');
   const glossaryFileRef = useRef(null);
 
@@ -3703,6 +3776,12 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
       for (const alias of aliasKeys) delete next[alias];
       return next;
     });
+    // Remember this correction so future glossaries auto-apply it (Lina 6 Aug:
+    // "can the platform retain corrections so entries improve over time?").
+    // We key on the term, so an edited equivalent/definition is reused whenever
+    // the same term reappears in a later generation.
+    rememberGlossaryCorrection(current[index]?.term, key, value);
+    setGlossaryMemoryCount(glossaryMemorySize());
     // Propagate upward so Module D evaluates terminology against the
     // student-corrected glossary (cahier des charges request).
     onScriptUpdate?.({ ...lastGeneratedScript, glossary: updated });
@@ -3863,6 +3942,16 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
           <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>
             💡 {labels.glossaryEditHint}
           </p>
+          {glossaryMemoryCount > 0 && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.75rem',
+                        display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <span>🧠 {glossaryMemoryCount} {labels.glossaryMemoryNote}</span>
+              <button className="btn-secondary btn-sm" onClick={() => {
+                try { localStorage.removeItem(GLOSSARY_MEMORY_KEY); } catch { /* ignore */ }
+                setGlossaryMemoryCount(0);
+              }}>{labels.glossaryMemoryClear}</button>
+            </p>
+          )}
           <div className="table-responsive">
             <table className="glossary-table">
               <thead>

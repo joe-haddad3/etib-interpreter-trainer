@@ -455,6 +455,29 @@ _MONTH_NUMBERS = {
 
 _ARABIC_INDIC_TO_WESTERN = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
 
+# Year ranges are written many ways ("2015-16", "2015-2016", "2015 2016") but
+# express the SAME two years. The evaluator was flagging "2015-16" vs "2015 2016"
+# as a number error ("missing hyphen") — a false positive (Kevin, 6 Aug 2026).
+# Normalising every range to "<start> <end>" (expanding a 2-digit end to its full
+# year) makes all these renderings fingerprint identically, so the equivalence
+# filter un-flags them. Requires a 4-digit leading year so chapter numbers like
+# "16-4" are never treated as ranges.
+_YEAR_RANGE_RE = re.compile(r'(?<!\d)(\d{4})\s*[-–—]\s*(\d{2,4})(?!\d)')
+
+
+def _normalize_year_ranges(text: str) -> str:
+    def _expand(match: 're.Match') -> str:
+        start = int(match.group(1))
+        end_raw = match.group(2)
+        if len(end_raw) == 2:
+            end = (start // 100) * 100 + int(end_raw)   # 2015-16 → 2016
+            if end < start:                             # 1999-00 → 2000
+                end += 100
+        else:
+            end = int(end_raw)
+        return f'{start} {end}'
+    return _YEAR_RANGE_RE.sub(_expand, text)
+
 
 # Magnitude words multiply the number they follow — they are part of the VALUE,
 # not formatting. 'billion(s)' deliberately reads as 1e9 in this AR/FR/EN
@@ -488,6 +511,7 @@ def extract_numeric_fingerprint(text: str) -> list[float]:
     "2 billions" (2e9) do NOT — magnitude is value, not format.
     """
     normalized = str(text or '').translate(_ARABIC_INDIC_TO_WESTERN).lower()
+    normalized = _normalize_year_ranges(normalized)
     values: list[float] = []
 
     for phrase, month_number in _MONTH_NUMBERS.items():
@@ -723,6 +747,13 @@ Important reliability rule:
 - The transcript is an ASR estimate, not ground truth.
 - Do not over-penalize meaning or terminology in low-confidence regions.
 - Treat low-confidence words primarily as pronunciation/clarity evidence unless the surrounding meaning is clearly wrong.
+- COMPROMISED-RECORDING CHECK: if the transcript is clearly truncated, fragmentary, or full of
+  garbled/unintelligible stretches relative to the source (e.g. a poor connection dropped audio),
+  the recording — not necessarily the student — is at fault. In that case say so PROMINENTLY at the
+  start of overall_assessment ("The recording appears incomplete/unclear, so this evaluation is
+  unreliable — please re-record with a stable connection"), and do NOT report a falsely clean or
+  falsely low result from an unusable transcript. A missing error in an unusable recording is a
+  recording problem, not proof the student performed well.
 - For French and English, use audio fluency metrics and word confidence as stronger evidence for delivery quality than the raw transcript wording.
 - French-specific: do NOT mark a missing/omitted final plural "s" as an error from audio alone.
   French final plural endings are usually silent, so words like "délégué" and "délégués"
@@ -812,11 +843,23 @@ TASK 4 — FLUENCY ISSUES IN {target_language}:
 - Lapsus linguae: wrong word slipped out
 
 TASK 5 — LANGUAGE QUALITY IN {target_language}:
-Grammar errors in the INTERPRETATION language (not the source):
-- Arabic: wrong case endings (إعراب), verb agreement, wrong تشكيل
-- French: gender agreement, wrong tense, wrong preposition. Do not penalize silent final plural "s"
-  inferred only from ASR spelling.
-- English: tense, subject-verb agreement
+Grammar errors in the INTERPRETATION language (not the source). Be THOROUGH: read the
+transcript clause by clause and report EVERY clear grammatical error you can see in the
+text — do not stop at the first one, and do not wave errors through as "minor".
+- Arabic: verb–subject agreement, gender agreement, wrong تشكيل, broken إضافة/annexation,
+  wrong particle, malformed plural.
+  HONESTY RULE FOR ARABIC: final short-vowel case endings (إعراب: ـُ ـَ ـِ / tanwīn) are
+  usually NOT written in the ASR transcript. If the transcript has no diacritics, you CANNOT
+  confirm case endings from the text — do NOT claim the إعراب is correct, and do NOT invent
+  an error either. State plainly that case-ending accuracy is "not verifiable from the
+  transcript" and rely on the acoustic i'râb module when it is available. Only report an
+  Arabic grammar error you can actually see in the transcript's words (agreement, particles,
+  structure), not one that depends on unwritten vowels.
+- French: gender/number agreement, wrong tense or mood, wrong preposition, wrong auxiliary.
+  Do not penalize a silent final plural "s" inferred only from ASR spelling.
+- English: tense, subject-verb agreement, article/preposition errors.
+If you find NO grammatical error, say so explicitly — but only after actually checking; an
+empty grammar list must mean "I checked and found none", never "I did not look".
 STRICT EXCLUSIONS — do NOT flag any of the following as language errors:
 - Capitalization differences (e.g. "conférence des parties" vs "Conférence des Parties") — capitalization is a typographic convention, not a spoken-language error.
 - Official proper-noun casing for UN bodies, treaty names, or institutional titles — if the student said the right words, do not flag casing.
@@ -865,6 +908,12 @@ CRITICAL — do NOT flag format-only differences as errors:
   are the SAME date → correct.
 - Decimal separators differ: "8.8 billion" (EN) = "8,8 milliards" (FR) → correct.
 - Arabic-Indic digits (٢٠٢٦) and Western digits (2026) are the same number → correct.
+- YEAR RANGES written differently are the SAME range → correct: "2015-16", "2015-2016",
+  "2015 2016", "2015 à 2016", "2015 to 2016", "٢٠١٥-٢٠١٦" all express 2015–2016. A missing,
+  added, or different hyphen/dash/space BETWEEN years is FORMATTING, never a number error.
+  If the student said both correct years, mark it correct even if the punctuation differs.
+- More generally, a missing or different hyphen, dash, or space is punctuation, not a value —
+  never report "missing hyphen" (or similar punctuation notes) as a number error.
 Only flag a number/date when the VALUE the listener hears is actually different.
 
 CRITICAL — MAGNITUDE FALSE FRIENDS are VALUE errors, never format differences:
