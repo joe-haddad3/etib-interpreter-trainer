@@ -3170,6 +3170,12 @@ const [showAdvanced, setShowAdvanced] = useState(true);
                 <option value="extra_long">{labels.wordRangeExtraLongFull || 'Extra long — 1500–2200 words (≈12–18 min)'}</option>
                 <option value="marathon">{labels.wordRangeMarathonFull || 'Marathon — 2900–3600 words (≈24–30 min)'}</option>
               </SelectField>
+              {/* "migration" and "women" domains removed from the dropdown (10 Aug 2026,
+                  user request). ARCHIVED — their backend DOMAIN_QUERIES entries and the
+                  domMigration/domWomen labels are kept, so restore by pasting the
+                  <option> back:
+                    <option value="migration">{labels.domMigration || 'Migration & Refugees'}</option>
+                    <option value="women">{labels.domWomen || 'Women & Gender'}</option> */}
               <SelectField label={labels.domain} id="f-domain" name="domain" value={form.domain} onChange={updateField}>
                 <option value="politics">{labels.domPolitics || 'Politics'}</option>
                 <option value="diplomacy">{labels.domDiplomacy || 'Diplomacy'}</option>
@@ -3179,9 +3185,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
                 <option value="human rights">{labels.domHumanRights || 'Human Rights'}</option>
                 <option value="education">{labels.domEducation || 'Education'}</option>
                 <option value="technology">{labels.domTechnology || 'Technology & AI'}</option>
-                <option value="migration">{labels.domMigration || 'Migration & Refugees'}</option>
                 <option value="disarmament">{labels.domDisarmament || 'Disarmament'}</option>
-                <option value="women">{labels.domWomen || 'Women & Gender'}</option>
                 <option value="food">{labels.domFood || 'Food & Hunger'}</option>
                 <option value="legal">{labels.domLegal || 'Legal'}</option>
                 <option value="medical">{labels.domMedical || 'Medical'}</option>
