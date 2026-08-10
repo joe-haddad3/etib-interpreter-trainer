@@ -126,7 +126,7 @@ nav { display: flex; gap: 0.4rem; align-items: center; }
 /* ══════════════════════════════════
    MAIN
    ══════════════════════════════════ */
-main { padding: 2.5rem 0 4rem; display: flex; flex-direction: column; gap: 2rem; flex: 1 0 auto; }
+main { padding: 1.5rem 0 1.75rem; display: flex; flex-direction: column; gap: 2rem; flex: 1 0 auto; }
 
 /* ══════════════════════════════════
    HERO (login screen left panel)
@@ -149,7 +149,7 @@ main { padding: 2.5rem 0 4rem; display: flex; flex-direction: column; gap: 2rem;
   overflow: hidden;
   background: var(--primary);
   border-radius: 22px;
-  padding: 2.5rem;
+  padding: 2rem 2.5rem;
   color: #fff;
 }
 .hero-text::after {
@@ -262,7 +262,7 @@ main { padding: 2.5rem 0 4rem; display: flex; flex-direction: column; gap: 2rem;
   border: 1px solid rgba(27,58,107,0.2);
   border-inline-start: 3px solid var(--gold);
   border-radius: 22px;
-  padding: 2.2rem;
+  padding: 1.8rem 2.2rem;
   box-shadow: 0 12px 40px rgba(26,21,16,0.14);
 }
 .login-panel h2 {
