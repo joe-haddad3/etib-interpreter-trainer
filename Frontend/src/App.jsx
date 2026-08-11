@@ -2533,8 +2533,11 @@ function SettingsModal({ labels, onClose }) {
 
 function Header({ isAuthenticated, isGuest, activePanel, labels, onPanelChange, uiLang, onLanguageChange, onOpenSettings }) {
   const hasKey = Boolean(getStoredGroqKey());
-  // Progress needs an account — guests have no saved history to show.
-  const navItems = NAV_ITEMS.filter(item => item.id !== 'module-e' || !isGuest);
+  // Progress (module-e) is hidden from the UI for now (user request 11 Aug 2026):
+  // the ModuleProgress component, its panel, and the backend history/adaptive
+  // logic are all kept — to re-enable, restore the guest-only filter:
+  //   NAV_ITEMS.filter(item => item.id !== 'module-e' || !isGuest)
+  const navItems = NAV_ITEMS.filter(item => item.id !== 'module-e');
   return (
     <header className="fade-up">
       <div className="header-logos">
