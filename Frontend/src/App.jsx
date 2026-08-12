@@ -2721,8 +2721,8 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
 
       {/* Keep all panels mounted — state persists when switching tabs */}
       <div style={{ display: activePanel === 'module-a' ? 'block' : 'none' }}>
-        <ModuleA labels={labels} onGenerated={onGenerated} isRtl={isRtl} adaptiveParams={adaptiveParams}
-          onSourceAudio={setSharedAudioUrl} />
+        <ModuleA labels={labels} onGenerated={onGenerated} lastGeneratedScript={lastGeneratedScript}
+          isRtl={isRtl} adaptiveParams={adaptiveParams} onSourceAudio={setSharedAudioUrl} />
       </div>
       <div style={{ display: activePanel === 'module-b' ? 'block' : 'none' }}>
         <ModuleB labels={labels} lastGeneratedScript={lastGeneratedScript}
@@ -2942,7 +2942,7 @@ function SourcesPanel({ labels, language, domain, initialQuery, onSelectLibrary,
   );
 }
 
-function ModuleA({ labels, onGenerated, isRtl, adaptiveParams, onSourceAudio }) {
+function ModuleA({ labels, onGenerated, lastGeneratedScript, isRtl, adaptiveParams, onSourceAudio }) {
   const [form, setForm] = useState(initialSpeechForm);
   const sourceMediaRef = useRef(null);
   const [sourceMediaStatus, setSourceMediaStatus] = useState('idle');
@@ -3341,7 +3341,13 @@ const [showAdvanced, setShowAdvanced] = useState(true);
           <p style={{ marginTop: '1rem', color: 'var(--warm-gray)' }}>{labels.generating}</p>
         </div>
       )}
-      {result && <SpeechResult data={result} labels={labels} />}
+      {/* Show the just-generated speech, OR a restored session's speech text.
+          Before, this read only the local `result`, so after "Continue" the
+          summary/glossary came back (Module B reads lastGeneratedScript) but the
+          SPEECH TEXT stayed blank — the most important part. Fall back to the
+          restored script (user report 12 Aug 2026). */}
+      {(result || lastGeneratedScript?.script) &&
+        <SpeechResult data={result || lastGeneratedScript} labels={labels} />}
 
       {showLibrary && (
         <SourcesPanel
