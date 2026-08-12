@@ -3933,13 +3933,8 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
         {audioUrl && (
           <div style={{ marginTop: '1rem' }}>
             <audio key={audioUrl} controls src={audioUrl} style={{ width: '100%' }} />
-            {audioWpm && (
-              <div style={{ marginTop: '0.5rem', fontSize: '0.85rem',
-                            color: audioWpm > 120 ? '#a15c00' : '#2f6b3a' }}>
-                🕐 {labels.measuredRate}: ~{audioWpm} {labels.wordsPerMinute}
-                {audioWpm > 120 ? ` — ${labels.rateTooFastHint}` : ''}
-              </div>
-            )}
+            {/* Measured-pace line removed (user request 12 Aug 2026). audioWpm
+                is still computed but no longer shown under the player. */}
             <a className="btn-secondary btn-sm" href={audioUrl} download={`speech_${language}.mp3`}
               style={{ display: 'inline-block', marginTop: '0.5rem' }}>
               ⬇ {labels.downloadAudio}
