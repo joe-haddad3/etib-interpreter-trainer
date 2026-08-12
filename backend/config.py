@@ -60,6 +60,7 @@ TTS_VOICES = {
     },
     'en': {
         'US': 'en-US-JennyNeural',
+        'US_m': 'en-US-GuyNeural',      # US male — for two-voice dialogues
         'GB': 'en-GB-SoniaNeural',
         'GB_m': 'en-GB-RyanNeural',
         'AU': 'en-AU-NatashaNeural',

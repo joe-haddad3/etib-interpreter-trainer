@@ -164,12 +164,71 @@ def _split_dialogue_turns(text: str):
     return turns
 
 
-def _assign_dialogue_voices(turns: list, language: str) -> list:
+# Accurate gender per voice (the config keys are NOT reliable — e.g. Lebanese
+# "Rami" is male but its key "LB" has no _m suffix). Used to pick a contrasting
+# second voice for two-voice dialogues.
+_VOICE_GENDER = {
+    'ar-LB-RamiNeural': 'm', 'ar-LB-LaylaNeural': 'f',
+    'ar-SA-ZariyahNeural': 'f', 'ar-SA-HamedNeural': 'm',
+    'ar-EG-SalmaNeural': 'f', 'ar-EG-ShakirNeural': 'm',
+    'ar-MA-MounaNeural': 'f', 'ar-MA-JamalNeural': 'm',
+    'fr-FR-DeniseNeural': 'f', 'fr-FR-HenriNeural': 'm',
+    'fr-CA-SylvieNeural': 'f', 'fr-CA-AntoineNeural': 'm',
+    'en-US-JennyNeural': 'f', 'en-US-GuyNeural': 'm',
+    'en-GB-SoniaNeural': 'f', 'en-GB-RyanNeural': 'm',
+    'en-AU-NatashaNeural': 'f', 'en-IE-EmilyNeural': 'f', 'en-IE-ConnorNeural': 'm',
+    'en-IN-NeerjaNeural': 'f', 'en-IN-PrabhatNeural': 'm',
+}
+
+
+def _gender_of(voice_name: str) -> str:
+    return _VOICE_GENDER.get(voice_name, 'f')
+
+
+def _voice_base(voice_key: str) -> str:
+    return re.sub(r'_(m|f)$', '', voice_key)   # 'LB'/'LB_m'/'LB_f' → 'LB'
+
+
+def _dialogue_voice_list(language: str, accent: str) -> list:
+    """Ordered voices for a dialogue, RESPECTING the user's accent choice:
+    speaker 1 = the picked voice, speaker 2 = a contrasting voice (prefer the
+    same accent, opposite gender), speaker 3 = any other distinct voice.
+    Fixes: changing the accent (e.g. British → American) now changes the audio."""
+    voices_map = TTS_VOICES.get(language, TTS_VOICES['en'])   # {key: voice_name}
+    first_voice = get_voice(language, accent)
+    first_key = accent if accent in voices_map else next(
+        (k for k, v in voices_map.items() if v == first_voice), None)
+    ordered, used = [first_voice], {first_voice}
+    first_gender = _gender_of(first_voice)
+
+    # 2nd: same accent, opposite gender (e.g. GB female → GB male, LB male → LB female)
+    if first_key:
+        for k, v in voices_map.items():
+            if v not in used and _voice_base(k) == _voice_base(first_key) and _gender_of(v) != first_gender:
+                ordered.append(v); used.add(v); break
+    # else: any opposite-gender voice
+    if len(ordered) < 2:
+        for v in voices_map.values():
+            if v not in used and _gender_of(v) != first_gender:
+                ordered.append(v); used.add(v); break
+    # last resort: any other distinct voice
+    if len(ordered) < 2:
+        for v in voices_map.values():
+            if v not in used:
+                ordered.append(v); used.add(v); break
+    # 3rd distinct voice for panels (3+ speakers)
+    for v in voices_map.values():
+        if v not in used:
+            ordered.append(v); used.add(v); break
+    return ordered or DIALOGUE_VOICES.get(language, DIALOGUE_VOICES['en'])
+
+
+def _assign_dialogue_voices(turns: list, language: str, accent: str = None) -> list:
     order = []
     for speaker, _ in turns:
         if speaker not in order:
             order.append(speaker)
-    voices = DIALOGUE_VOICES.get(language, DIALOGUE_VOICES['en'])
+    voices = _dialogue_voice_list(language, accent)
     mapping = {s: voices[i % len(voices)] for i, s in enumerate(order)}
     return [(mapping[s], t) for s, t in turns]
 
@@ -190,14 +249,14 @@ async def _dialogue_tts_async(voiced_turns: list, rate: str) -> list:
     return await asyncio.gather(*[_tts_bytes_async(t, v, rate) for v, t in voiced_turns])
 
 
-def run_dialogue_tts(text: str, language: str, rate_adjustment: int = 0):
+def run_dialogue_tts(text: str, language: str, accent: str = None, rate_adjustment: int = 0):
     """Two-voice audio for a labelled dialogue. Returns (path, filename,
     voices_used) or None when the text is not a dialogue (caller falls back to
-    single-voice run_tts)."""
+    single-voice run_tts). The user's accent choice picks the first speaker's voice."""
     turns = _split_dialogue_turns(text)
     if not turns:
         return None
-    voiced = _assign_dialogue_voices(turns, language)
+    voiced = _assign_dialogue_voices(turns, language, accent)
     if language == 'ar':
         voiced = [(v, _prepare_arabic_tts_text(t)) for v, t in voiced]
     rate_str = f'{rate_adjustment:+d}%' if rate_adjustment != 0 else '+0%'
@@ -261,7 +320,7 @@ def text_to_speech():
         result = None
         if DIALOGUE_TTS_ENABLED:
             try:
-                result = run_dialogue_tts(params['text'], language, rate_adjustment)
+                result = run_dialogue_tts(params['text'], language, accent, rate_adjustment)
             except Exception:
                 result = None   # any dialogue-TTS failure → single-voice fallback
 
