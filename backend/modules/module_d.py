@@ -300,7 +300,7 @@ def _compute_adaptive_params(sessions: list) -> dict:
     }
 
 
-def _eval_llm_call(client, messages, max_tokens=6000, temperature=0.2):
+def _eval_llm_call(client, messages, max_tokens=6000, temperature=0.1):
     """
     One evaluation LLM call with a rate-limit-aware retry.
 
@@ -696,6 +696,11 @@ _SCORING_POLICY_FORM = (
     'terminology correctly in correct target-language must score high EVEN IF the meaning drifted or\n'
     'there were pauses. Ignore the "3+ HIGH-importance omissions" cap below; base the score on the\n'
     'dimensions listed here.\n'
+    'MODE CONSISTENCY: the PRIMARY scored elements (numbers, names, terminology, target-language\n'
+    'grammar) are identical regardless of the interpretation mode. The SAME rendering of the SAME\n'
+    'content must receive a very similar overall_score in consecutive, sight, or simultaneous mode —\n'
+    'the mode only changes how pauses/décalage are interpreted, which is a minor factor. Do NOT give a\n'
+    'materially different overall_score to the same interpretation just because the mode label differs.\n'
 )
 _SCORING_POLICY_FULL = ''
 
@@ -882,8 +887,21 @@ TASK 6 — NUMBERS AND DATES:
 Extract every number, percentage, date, statistic from the SOURCE speech.
 Check each one in the STUDENT interpretation. Flag wrong or missing numbers.
 
-TASK 7 — TERMINOLOGY:
-Key domain-specific terms from the source — were they rendered with the correct equivalent in the target language?
+TASK 7 — TERMINOLOGY (a PRIMARY scored dimension — be thorough, this is what the student most wants checked):
+Go TERM BY TERM. When an APPROVED GLOSSARY is provided above, for EVERY glossary term:
+  1. Find what the student actually said for that concept in the transcript.
+  2. Compare it to the approved target-language equivalent.
+  3. Flag a terminology issue whenever the student used a DIFFERENT, imprecise, weakened, partial, or
+     near-miss rendering instead of the approved equivalent — even a SMALL deviation counts (e.g.
+     approved "seuil de pauvreté" but the student said "limite de pauvreté", or approved "مفوضية" but
+     the student said "منظمة"). Report the expected equivalent vs. what the student said.
+For terms NOT in the glossary, check whether each domain-specific term was rendered with a correct,
+standard target-language equivalent.
+IMPORTANT — do NOT create false errors (a wrong correction is worse than a missed one): a genuinely
+valid, standard alternative is NOT an error — e.g. an official abbreviation vs. the full name ("OMS"
+for "Organisation mondiale de la Santé"), or a well-established synonym that means EXACTLY the same
+thing in this context. Flag a term only when the student's rendering is actually wrong, weaker, or
+genuinely diverges from the approved/expected term — but when it does diverge, do NOT let it pass.
 
 TASK 8 — PAUSES & FLOW:
 {silence_count} pause(s) longer than {silence_threshold} seconds were detected: {silence_examples}
