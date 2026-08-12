@@ -270,6 +270,8 @@ const UI = {
     coverageTitle: 'Content coverage',
     coverageHint: 'How much of the source speech was conveyed',
     translationErrors: 'Translation errors',
+    meaningCheckTitle: 'Meaning check',
+    meaningCheckNote: 'Possible changes of meaning — shown to help you learn; they do NOT affect your score. The same idea can be phrased differently, so only genuine changes of meaning are listed.',
     sourceSaid: 'Source said',
     studentSaid: 'Student said',
     correctTranslation: 'Correct',
@@ -742,6 +744,8 @@ const UI = {
     coverageTitle: 'تغطية المحتوى',
     coverageHint: 'مقدار ما تم نقله من الخطاب المصدر',
     translationErrors: 'أخطاء الترجمة',
+    meaningCheckTitle: 'التحقق من المعنى',
+    meaningCheckNote: 'تغييرات محتملة في المعنى — تُعرض لمساعدتك على التعلّم ولا تؤثر في علامتك. يمكن التعبير عن الفكرة نفسها بكلمات مختلفة، لذا لا يُذكر سوى التغييرات الفعلية في المعنى.',
     sourceSaid: 'ما قاله المصدر',
     studentSaid: 'ما قاله الطالب',
     correctTranslation: 'الترجمة الصحيحة',
@@ -1214,6 +1218,8 @@ const UI = {
     coverageTitle: 'Couverture du contenu',
     coverageHint: 'Quantité du discours source transmise',
     translationErrors: 'Erreurs de traduction',
+    meaningCheckTitle: 'Vérification du sens',
+    meaningCheckNote: 'Changements de sens possibles — affichés pour vous aider à progresser ; ils n\'affectent PAS votre note. La même idée peut être formulée différemment, donc seuls les véritables changements de sens sont signalés.',
     sourceSaid: 'Source a dit',
     studentSaid: "L'étudiant a dit",
     correctTranslation: 'Traduction correcte',
@@ -5222,6 +5228,33 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                     </span>
                   </div>
                   {n.note && <div className="eval-explanation" dir="auto">{n.note}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Meaning check (informational) — clear mistranslations shown to the
+              student with WHERE + the CORRECT form (Kevin, 12 Aug: a wrong-meaning
+              word wasn't being surfaced). Re-added after being removed 16 July;
+              does NOT affect the score (score_on_meaning stays off), and valid
+              paraphrases are never listed. */}
+          {(report.translation_errors || []).length > 0 && (
+            <div className="card">
+              <h3 className="report-section-title">🧭 {labels.meaningCheckTitle}</h3>
+              <p className="info-tip" style={{ fontSize: '0.8rem', marginBottom: '0.6rem' }}>ℹ️ {labels.meaningCheckNote}</p>
+              {report.translation_errors.map((t, i) => (
+                <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--sienna)', paddingInlineStart: '0.75rem', marginBottom: '0.6rem' }}>
+                  <div style={{ fontSize: '0.84rem' }}>
+                    <span style={{ color: 'var(--warm-gray)' }}>{labels.sourceText}: </span>
+                    <strong dir="auto">{t.source_text}</strong>
+                    <span style={{ color: 'var(--warm-gray)' }}> · {labels.studentSaidShort}: </span>
+                    <strong style={{ color: 'var(--sienna)' }} className={isAr ? 'arabic' : ''} dir="auto">{t.student_said || '—'}</strong>
+                    {t.correct_translation && (<>
+                      <span style={{ color: 'var(--warm-gray)' }}> · {labels.expectedLabel}: </span>
+                      <strong style={{ color: 'var(--sage)' }} className={isAr ? 'arabic' : ''} dir="auto">{t.correct_translation}</strong>
+                    </>)}
+                  </div>
+                  {t.explanation && <div className="eval-explanation" dir="auto">{t.explanation}</div>}
                 </div>
               ))}
             </div>

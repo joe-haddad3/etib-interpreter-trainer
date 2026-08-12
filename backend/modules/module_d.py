@@ -801,7 +801,17 @@ Do NOT accept these excuses:
 - "approximate" — approximation is an error in interpretation
 - "implied by context" — the student must say it, not imply it
 
-List EVERY translation error you find. Do not stop early. Do not summarize multiple errors into one.
+BUT — the SAME idea expressed in DIFFERENT valid words is NOT an error. Interpretation conveys ideas,
+not word-for-word wording, so a legitimate paraphrase or a synonym with the SAME meaning must NEVER
+be flagged. Flag ONLY a genuine CHANGE of meaning — a different or opposite sense, or a wrong/weakened
+term — for example source "solidarity" rendered as "opposition", or "increase" for "decrease".
+For every such error ALWAYS fill: source_text (WHERE — the exact source phrase), student_said (what
+the student actually said), and correct_translation (the CORRECT form). These meaning observations are
+shown to the student to help them learn even though, this round, they do NOT affect the score — so do
+report clear ones (a wrong-meaning word left unreported helps no one), but never invent one from a
+valid paraphrase.
+
+List EVERY genuine translation error you find. Do not stop early. Do not summarize multiple errors into one.
 If the student said nothing for a source segment → put it under missing_content, not here.
 
 TASK 2 — CONTENT COVERAGE:
