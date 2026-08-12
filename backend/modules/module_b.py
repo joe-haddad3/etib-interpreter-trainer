@@ -90,6 +90,129 @@ def run_tts(text: str, language: str, accent: str = None,
     return output_path, filename
 
 
+# ── Multi-voice (dialogue) TTS ───────────────────────────────────────────────
+# Lina/team request: the 2-speaker scenarios (interview, court, medical, panel,
+# broadcast) should be VOICED by two different voices in the same audio, not one
+# narrator reading both parts. run_tts() above is the ORIGINAL single-voice path
+# and is kept untouched. To fully revert to single-voice, set the flag below to
+# False (the /tts route then always uses run_tts).
+DIALOGUE_TTS_ENABLED = True
+
+# Contrasting voices per language, alternating gender so the two speakers sound
+# clearly different. Speaker order of first appearance maps to this list.
+DIALOGUE_VOICES = {
+    'ar': ['ar-LB-RamiNeural', 'ar-LB-LaylaNeural', 'ar-SA-HamedNeural'],
+    'fr': ['fr-FR-HenriNeural', 'fr-FR-DeniseNeural', 'fr-CA-AntoineNeural'],
+    'en': ['en-GB-RyanNeural', 'en-US-JennyNeural', 'en-IN-PrabhatNeural'],
+}
+
+_ROLE_WORDS = {
+    'interviewer', 'guest', 'moderator', 'panelist', 'panellist', 'anchor',
+    'correspondent', 'spokesperson', 'journalist', 'reporter', 'counsel',
+    'witness', 'clinician', 'patient', 'doctor', 'nurse', 'host', 'officer',
+    'expert', 'presenter', 'speaker', 'chair', 'delegate', 'applicant',
+}
+
+# A speaker label at the start, after a newline, or after sentence punctuation:
+# 1–3 capitalised words (covers "Interviewer", "Dr. Smith", "First Last") + ":".
+_LABEL_RE = re.compile(
+    r'(?:^|\n|(?<=[.!?…”"]))[\s\-–—]*'
+    r'([A-Z][\w.\'’\-]*(?:\s+[A-Z][\w.\'’\-]*){0,2})\s*:\s'
+)
+
+
+def _is_speaker_label(label: str, count: int) -> bool:
+    low = label.strip().lower().rstrip('.')
+    if low in _ROLE_WORDS:
+        return True
+    if re.match(r'^(dr|mr|mrs|ms|prof|sir|madam|hon)\.?\s', low):
+        return True
+    words = label.split()
+    if len(words) >= 2 and all(w[:1].isupper() for w in words):   # First Last
+        return True
+    return count >= 2   # a recurring label is almost certainly a speaker
+
+
+def _split_dialogue_turns(text: str):
+    """Return [(speaker, spoken_text), ...] for a labelled dialogue, or None
+    when the text is a single-speaker monologue (fewer than 2 real speakers)."""
+    text = str(text or '')
+    matches = list(_LABEL_RE.finditer(text))
+    if len(matches) < 2:
+        return None
+    counts = {}
+    for m in matches:
+        counts[m.group(1).strip()] = counts.get(m.group(1).strip(), 0) + 1
+    quals = [m for m in matches if _is_speaker_label(m.group(1).strip(), counts[m.group(1).strip()])]
+    if len(quals) < 2 or len({m.group(1).strip() for m in quals}) < 2:
+        return None
+    turns = []
+    for i, m in enumerate(quals):
+        speaker = m.group(1).strip()
+        start = m.end()
+        end = quals[i + 1].start() if i + 1 < len(quals) else len(text)
+        spoken = text[start:end].strip()
+        if spoken:
+            turns.append((speaker, spoken))
+    # any substantial preamble before the first label → keep it (spoken by the
+    # first voice) so no content is lost
+    pre = text[:quals[0].start()].strip()
+    if pre and len(pre.split()) >= 3 and turns:
+        turns[0] = (turns[0][0], pre + ' ' + turns[0][1])
+    if len(turns) < 2 or len({s for s, _ in turns}) < 2:
+        return None
+    return turns
+
+
+def _assign_dialogue_voices(turns: list, language: str) -> list:
+    order = []
+    for speaker, _ in turns:
+        if speaker not in order:
+            order.append(speaker)
+    voices = DIALOGUE_VOICES.get(language, DIALOGUE_VOICES['en'])
+    mapping = {s: voices[i % len(voices)] for i, s in enumerate(order)}
+    return [(mapping[s], t) for s, t in turns]
+
+
+async def _tts_bytes_async(text: str, voice: str, rate: str) -> bytes:
+    """Synthesize one turn and return the MP3 bytes (no temp file)."""
+    import edge_tts
+    communicate = edge_tts.Communicate(text, voice, rate=rate)
+    buf = bytearray()
+    async for chunk in communicate.stream():
+        if chunk.get('type') == 'audio' and chunk.get('data'):
+            buf.extend(chunk['data'])
+    return bytes(buf)
+
+
+async def _dialogue_tts_async(voiced_turns: list, rate: str) -> list:
+    # gather preserves order → the clips concatenate in reading order
+    return await asyncio.gather(*[_tts_bytes_async(t, v, rate) for v, t in voiced_turns])
+
+
+def run_dialogue_tts(text: str, language: str, rate_adjustment: int = 0):
+    """Two-voice audio for a labelled dialogue. Returns (path, filename,
+    voices_used) or None when the text is not a dialogue (caller falls back to
+    single-voice run_tts)."""
+    turns = _split_dialogue_turns(text)
+    if not turns:
+        return None
+    voiced = _assign_dialogue_voices(turns, language)
+    if language == 'ar':
+        voiced = [(v, _prepare_arabic_tts_text(t)) for v, t in voiced]
+    rate_str = f'{rate_adjustment:+d}%' if rate_adjustment != 0 else '+0%'
+    parts = asyncio.run(_dialogue_tts_async(voiced, rate_str))
+    combined = b''.join(p for p in parts if p)
+    if not combined:
+        return None   # synthesis failed — let the caller fall back
+    filename = f'speech_{uuid.uuid4().hex[:8]}.mp3'
+    output_path = os.path.join(AUDIO_OUTPUT_FOLDER, filename)
+    with open(output_path, 'wb') as fh:
+        fh.write(combined)
+    voices_used = list(dict.fromkeys(v for v, _ in voiced))
+    return output_path, filename, voices_used
+
+
 def _audio_duration_seconds(path: str) -> float | None:
     """Duration of a generated audio file via PyAV (already a dependency)."""
     try:
@@ -129,20 +252,37 @@ def text_to_speech():
     if not params or not params.get('text'):
         return jsonify({'error': 'text is required'}), 400
 
+    language = params.get('language', 'ar')
+    accent = params.get('accent')
+    rate_adjustment = params.get('rate_adjustment', 0)
     try:
-        path, filename = run_tts(
-            text=params['text'],
-            language=params.get('language', 'ar'),
-            accent=params.get('accent'),
-            rate_adjustment=params.get('rate_adjustment', 0)
-        )
+        # Two-speaker scenarios (interview/court/medical/panel/broadcast) get two
+        # voices in one file; everything else falls back to single-voice run_tts.
+        result = None
+        if DIALOGUE_TTS_ENABLED:
+            try:
+                result = run_dialogue_tts(params['text'], language, rate_adjustment)
+            except Exception:
+                result = None   # any dialogue-TTS failure → single-voice fallback
+
+        if result:
+            path, filename, voices_used = result
+            is_dialogue = True
+        else:
+            path, filename = run_tts(text=params['text'], language=language,
+                                     accent=accent, rate_adjustment=rate_adjustment)
+            voices_used = [get_voice(language, accent)]
+            is_dialogue = False
+
         duration = _audio_duration_seconds(path)
         word_count = len(str(params['text']).split())
         wpm = round(word_count / (duration / 60.0)) if duration and duration > 1 else None
         return jsonify({
             'audio_url': f'/api/module-b/audio/{filename}',
             'filename': filename,
-            'voice_used': get_voice(params.get('language', 'ar'), params.get('accent')),
+            'voice_used': voices_used[0],
+            'voices_used': voices_used,
+            'dialogue': is_dialogue,
             'duration_seconds': round(duration, 1) if duration else None,
             'words_per_minute': wpm,
         })
