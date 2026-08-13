@@ -74,11 +74,53 @@ def _prepare_arabic_tts_text(text: str) -> str:
     return text
 
 
+# ── Natural pacing ───────────────────────────────────────────────────────────
+# Lina (7 Aug): the audio "feels too fast", and slowing it with the rate slider
+# sounds ARTIFICIAL (edge-tts uniformly stretches the voice → robotic). The
+# natural way to slow interpretation audio is a short PAUSE between sentences
+# (breathing room for the interpreter), not stretching the words. We synthesise
+# sentence-by-sentence and splice a small silence between them. Set the flag to
+# False to revert to the original single-call synthesis.
+NATURAL_PACING_ENABLED = True
+_INTER_SENTENCE_PAUSE_MS = 300
+_SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?؟…])\s+|\n{1,}')
+
+
+def _silence_mp3_bytes(ms: int = _INTER_SENTENCE_PAUSE_MS, sr: int = 24000) -> bytes:
+    """A short silent MP3 (24 kHz mono, matching edge-tts) to splice between clips."""
+    import io as _io, numpy as _np, av as _av
+    buf = _io.BytesIO()
+    out = _av.open(buf, 'w', format='mp3')
+    st = out.add_stream('libmp3lame', rate=sr)
+    st.layout = 'mono'
+    n = int(sr * ms / 1000)
+    frame = _av.AudioFrame.from_ndarray(_np.zeros((1, n), dtype=_np.int16), format='s16', layout='mono')
+    frame.sample_rate = sr
+    for p in st.encode(frame):
+        out.mux(p)
+    for p in st.encode(None):
+        out.mux(p)
+    out.close()
+    return buf.getvalue()
+
+
+def _split_sentences(text: str) -> list:
+    return [s.strip() for s in _SENTENCE_SPLIT_RE.split(str(text or '')) if s.strip()]
+
+
+async def _multi_tts_bytes_async(chunks: list, voice: str, rate: str) -> list:
+    return await asyncio.gather(*[_tts_bytes_async(c, voice, rate) for c in chunks])
+
+
 def run_tts(text: str, language: str, accent: str = None,
             rate_adjustment: int = 0) -> str:
     """
     Convert text to speech. Returns path to the generated MP3 file.
-    rate_adjustment: percentage change from normal speed (-50 to +50)
+    rate_adjustment: percentage change from normal speed (-50 to +50).
+    Natural pacing: for a normal-length speech, sentences are synthesised
+    separately and spliced with a short pause so the delivery is calmer without
+    the artificial voice-stretch. Very long speeches (or any failure) fall back
+    to the original single call.
     """
     if language == 'ar':
         text = _prepare_arabic_tts_text(text)
@@ -86,6 +128,19 @@ def run_tts(text: str, language: str, accent: str = None,
     rate_str = f'{rate_adjustment:+d}%' if rate_adjustment != 0 else '+0%'
     filename = f'speech_{uuid.uuid4().hex[:8]}.mp3'
     output_path = os.path.join(AUDIO_OUTPUT_FOLDER, filename)
+
+    sentences = _split_sentences(text)
+    if NATURAL_PACING_ENABLED and 2 <= len(sentences) <= 25:
+        try:
+            parts = asyncio.run(_multi_tts_bytes_async(sentences, voice, rate_str))
+            combined = _silence_mp3_bytes().join(p for p in parts if p)
+            if combined:
+                with open(output_path, 'wb') as fh:
+                    fh.write(combined)
+                return output_path, filename
+        except Exception:
+            pass   # any pacing failure → original single-call synthesis below
+
     asyncio.run(_tts_async(text, voice, output_path, rate_str))
     return output_path, filename
 
@@ -261,7 +316,11 @@ def run_dialogue_tts(text: str, language: str, accent: str = None, rate_adjustme
         voiced = [(v, _prepare_arabic_tts_text(t)) for v, t in voiced]
     rate_str = f'{rate_adjustment:+d}%' if rate_adjustment != 0 else '+0%'
     parts = asyncio.run(_dialogue_tts_async(voiced, rate_str))
-    combined = b''.join(p for p in parts if p)
+    # short pause between turns so the speaker changes sound natural
+    try:
+        combined = _silence_mp3_bytes(250).join(p for p in parts if p)
+    except Exception:
+        combined = b''.join(p for p in parts if p)
     if not combined:
         return None   # synthesis failed — let the caller fall back
     filename = f'speech_{uuid.uuid4().hex[:8]}.mp3'

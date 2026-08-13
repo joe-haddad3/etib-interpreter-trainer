@@ -588,6 +588,15 @@ ARABIC LANGUAGE REQUIREMENTS — STRICTLY ENFORCED
   Examples: الأمم المتحدة، منظمة الصحة العالمية، الاتحاد الأوروبي، صندوق النقد الدولي
 - Maintain a formal MSA register throughout (no colloquial forms).
 - Use proper Arabic punctuation: ، ؛ ؟ — not Latin equivalents.
+- GRAMMAR (نحو وصرف) — must be flawless MSA:
+  • Correct verb–subject agreement (person, number, gender) and correct gender agreement of adjectives.
+  • Correct إضافة (annexation), correct particles/حروف الجر, correct use of إنّ/كان وأخواتها.
+  • Sound and broken plurals used correctly; correct dual forms; no invented or malformed words.
+  • Where a case ending (إعراب) is written, it must be correct — but do not over-vocalize; write clean unvocalized MSA.
+- SPELLING (إملاء): correct hamza forms (أ إ آ ء ئ ؤ), correct تاء مربوطة (ة) vs هاء (ه) and ألف مقصورة (ى) vs ياء (ي).
+  Never split a word with a space in the middle and never join two words; keep every word whole and correctly spaced.
+- SELF-REVIEW: before returning, re-read the entire Arabic "script" and silently FIX any grammatical,
+  morphological, or spelling error so the final text reads as polished, publishable Modern Standard Arabic.
 - NUMBERS: Write ALL numbers using Eastern Arabic-Indic numerals: ٠١٢٣٤٥٦٧٨٩
   Example: write ٧٠٠ مليون شخص — NOT 700 مليون شخص
   Example: write ٨،٢٪ — NOT 8.2%
