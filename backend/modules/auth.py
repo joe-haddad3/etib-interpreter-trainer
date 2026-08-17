@@ -284,11 +284,10 @@ def validate_groq_key():
     try:
         from groq import Groq
         client = Groq(api_key=key)
-        client.chat.completions.create(
-            model='llama-3.1-8b-instant',
-            messages=[{'role': 'user', 'content': 'Hi'}],
-            max_tokens=1,
-        )
+        # Validate the key without depending on any specific model (Groq retires
+        # models — 17 Aug 2026 llama-3.1-8b-instant was gone). Listing models
+        # succeeds for any valid key and 401s for an invalid one.
+        client.models.list()
         return jsonify({'valid': True})
     except Exception as exc:
         msg = str(exc)

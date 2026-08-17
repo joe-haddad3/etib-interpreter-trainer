@@ -143,6 +143,7 @@ def _generate_with_groq(
         )
 
     from groq import Groq
+    from config import groq_extra_params
     client = Groq(api_key=key)
 
     response = client.chat.completions.create(
@@ -150,8 +151,9 @@ def _generate_with_groq(
         messages=messages,
         max_tokens=max_tokens,
         temperature=temperature,
+        **groq_extra_params(PRIMARY_LLM_MODEL),
     )
-    return response.choices[0].message.content.strip()
+    return (response.choices[0].message.content or '').strip()
 
 
 # ── Local Aya ─────────────────────────────────────────────────────────────────

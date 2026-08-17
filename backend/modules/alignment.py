@@ -117,7 +117,7 @@ def compare_against_source(
     source_text:   str,
     language:      str = 'ar',
     groq_api_key:  str = None,
-    llm_model:     str = 'llama-3.3-70b-versatile',
+    llm_model:     str = 'openai/gpt-oss-120b',
     threshold:     float = 0.65
 ) -> dict:
     """
@@ -205,6 +205,7 @@ def _llm_pronounce_analysis(
             uncertain=words_str
         )
 
+        from config import groq_extra_params
         response = client.chat.completions.create(
             model=llm_model,
             messages=[
@@ -213,6 +214,7 @@ def _llm_pronounce_analysis(
                 {'role': 'user', 'content': prompt}
             ],
             max_tokens=800,
+            **groq_extra_params(llm_model),
             temperature=0.1
         )
         content = response.choices[0].message.content.strip()

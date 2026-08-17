@@ -33,7 +33,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
-from config import PRIMARY_LLM_MODEL, UPLOAD_FOLDER, EVALUATION_SCORE_ON_MEANING
+from config import PRIMARY_LLM_MODEL, UPLOAD_FOLDER, EVALUATION_SCORE_ON_MEANING, groq_extra_params
 
 def _current_user_id() -> str:
     """Extract user id from auth token in request args, form, or JSON body."""
@@ -315,7 +315,8 @@ def _eval_llm_call(client, messages, max_tokens=6000, temperature=0.1):
     try:
         return client.chat.completions.create(
             model=PRIMARY_LLM_MODEL, messages=messages,
-            max_tokens=max_tokens, temperature=temperature)
+            max_tokens=max_tokens, temperature=temperature,
+            **groq_extra_params(PRIMARY_LLM_MODEL))
     except Exception as exc:
         msg = str(exc)
         if '429' not in msg and not re.search(r'rate.?limit|too large|tokens per minute|tpm', msg, re.I):
@@ -326,7 +327,8 @@ def _eval_llm_call(client, messages, max_tokens=6000, temperature=0.1):
         _time.sleep(wait)
         return client.chat.completions.create(
             model=PRIMARY_LLM_MODEL, messages=messages,
-            max_tokens=min(max_tokens, 3000), temperature=temperature)
+            max_tokens=min(max_tokens, 3000), temperature=temperature,
+            **groq_extra_params(PRIMARY_LLM_MODEL))
 
 
 def _extract_json(text: str) -> dict:

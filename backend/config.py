@@ -23,8 +23,19 @@ ARABIC_WRAPPER_API_KEY = os.getenv('ARABIC_WRAPPER_API_KEY', '').strip()
 ARABIC_WRAPPER_TIMEOUT = int(os.getenv('ARABIC_WRAPPER_TIMEOUT', '180'))
 
 LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'groq')  # groq | local_aya | remote_aya
-PRIMARY_LLM_MODEL = 'llama-3.3-70b-versatile'   # via Groq (free)
+PRIMARY_LLM_MODEL = 'openai/gpt-oss-120b'        # via Groq (free) — llama-3.3-70b
+                                                 # was retired by Groq (17 Aug 2026).
 FALLBACK_LLM_MODEL = 'gemini-1.5-flash'          # via Google AI Studio (free)
+
+
+def groq_extra_params(model: str) -> dict:
+    """gpt-oss / qwen on Groq are REASONING models — they emit chain-of-thought
+    that breaks our strict-JSON parsing (and can eat the token budget). Hide the
+    reasoning and keep it short so only the JSON answer comes back. Passed via
+    extra_body since the installed groq SDK doesn't accept these as kwargs."""
+    if 'gpt-oss' in model or 'qwen' in model:
+        return {'extra_body': {'reasoning_effort': 'low', 'reasoning_format': 'hidden'}}
+    return {}
 LOCAL_MODEL_ID = os.getenv('LOCAL_MODEL_ID', 'CohereLabs/aya-expanse-8b')
 LOCAL_MODEL_PATH = os.getenv('LOCAL_MODEL_PATH', '').strip()
 LOCAL_MODEL_DEVICE_MAP = os.getenv('LOCAL_MODEL_DEVICE_MAP', 'auto')
