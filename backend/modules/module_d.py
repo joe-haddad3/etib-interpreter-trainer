@@ -300,7 +300,7 @@ def _compute_adaptive_params(sessions: list) -> dict:
     }
 
 
-def _eval_llm_call(client, messages, max_tokens=6000, temperature=0.1):
+def _eval_llm_call(client, messages, max_tokens=4000, temperature=0.1):
     """
     One evaluation LLM call with a rate-limit-aware retry.
 
@@ -327,7 +327,7 @@ def _eval_llm_call(client, messages, max_tokens=6000, temperature=0.1):
         _time.sleep(wait)
         return client.chat.completions.create(
             model=PRIMARY_LLM_MODEL, messages=messages,
-            max_tokens=min(max_tokens, 3000), temperature=temperature,
+            max_tokens=min(max_tokens, 2500), temperature=temperature,
             **groq_extra_params(PRIMARY_LLM_MODEL))
 
 
