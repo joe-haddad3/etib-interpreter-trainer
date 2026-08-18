@@ -459,7 +459,7 @@ const UI = {
     heroTitlePre: 'Master interpretation with ',
     heroTitleEm: 'AI-generated',
     heroTitlePost: ' speeches',
-    heroParagraph: 'An adaptive training platform that generates realistic conference speeches, builds multilingual glossaries, and evaluates your interpretation performance across Arabic, French, and English.',
+    heroParagraph: 'An adaptive training platform that generates speeches simulating authentic communication situations, builds multilingual glossaries, and evaluates your interpretation performance across Arabic, French, and English.',
     guestBtn: 'Continue as Guest',
     orSep: '— or —',
     srcPanelTitle: 'Add Source',
