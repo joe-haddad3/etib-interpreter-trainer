@@ -300,7 +300,7 @@ def _compute_adaptive_params(sessions: list) -> dict:
     }
 
 
-def _eval_llm_call(client, messages, max_tokens=4000, temperature=0.1):
+def _eval_llm_call(client, messages, max_tokens=3500, temperature=0.1):
     """
     One evaluation LLM call with a rate-limit-aware retry.
 
@@ -759,22 +759,10 @@ AUDIO-BASED FLUENCY AND RELIABILITY:
 LOW-CONFIDENCE WORDS (Whisper was uncertain about these — possible pronunciation issues):
 {uncertain_words}
 
-Important reliability rule:
-- The transcript is an ASR estimate, not ground truth.
-- Do not over-penalize meaning or terminology in low-confidence regions.
-- Treat low-confidence words primarily as pronunciation/clarity evidence unless the surrounding meaning is clearly wrong.
-- COMPROMISED-RECORDING CHECK: if the transcript is clearly truncated, fragmentary, or full of
-  garbled/unintelligible stretches relative to the source (e.g. a poor connection dropped audio),
-  the recording — not necessarily the student — is at fault. In that case say so PROMINENTLY at the
-  start of overall_assessment ("The recording appears incomplete/unclear, so this evaluation is
-  unreliable — please re-record with a stable connection"), and do NOT report a falsely clean or
-  falsely low result from an unusable transcript. A missing error in an unusable recording is a
-  recording problem, not proof the student performed well.
-- For French and English, use audio fluency metrics and word confidence as stronger evidence for delivery quality than the raw transcript wording.
-- French-specific: do NOT mark a missing/omitted final plural "s" as an error from audio alone.
-  French final plural endings are usually silent, so words like "délégué" and "délégués"
-  are acoustically identical. Only flag singular/plural if surrounding audible grammar clearly proves
-  the number is wrong, such as a wrong article, determiner, verb agreement, or changed meaning.
+RELIABILITY: the transcript is an ASR estimate — don't over-penalise meaning/terminology in low-
+confidence spots. COMPROMISED-RECORDING CHECK: if it's clearly truncated/garbled vs the source (bad
+connection), say so at the START of `summary` and mark the evaluation unreliable — do NOT infer a clean
+or low result from an unusable recording. FR: a silent final plural "s" from ASR alone is not an error.
 
 EVALUATION TASKS — check every category thoroughly:
 
@@ -782,124 +770,36 @@ TASK 1 — TRANSLATION ACCURACY {translation_task_note}:
 Go through the source speech sentence by sentence. For each sentence ask:
 "Did the student convey the EXACT meaning in {target_language}?"
 
-Flag ALL of the following as translation_errors:
-- Wrong word choice that changes meaning (e.g. "increase" when source said "decrease")
-- A vague or weakened rendering (e.g. "problem" when source said "crisis")
-- A term from the wrong domain (e.g. "durable" vs "développement durable")
-- An opposite meaning (e.g. "approve" vs "reject")
-- A concept rendered in a way a listener would understand differently
-
-IMPORTANT: Do NOT put number, percentage, statistic, or date errors here — those are handled exclusively in TASK 10 (number_accuracy). translation_errors is only for meaning/wording errors.
-
-CRITICAL EXCEPTION — official target-language abbreviations and equivalents:
-When the student interprets into {target_language}, using the official {target_language}-language
-name or abbreviation for an international body is ALWAYS correct — do NOT flag it as an error.
-Examples (EN → FR): ESCWA → CESAO, SDGs → ODD, WHO → OMS, UNDP → PNUD, EU → UE.
-Stating BOTH the source-language and target-language abbreviation together (e.g. "CESAO-ESCWA")
-is also standard bilingual UN practice and must NOT be flagged as an error.
-
-Do NOT accept these excuses:
-- "close enough" — if meaning shifted, it is an error
-- "approximate" — approximation is an error in interpretation
-- "implied by context" — the student must say it, not imply it
-
-BUT — the SAME idea expressed in DIFFERENT valid words is NOT an error. Interpretation conveys ideas,
-not word-for-word wording, so a legitimate paraphrase or a synonym with the SAME meaning must NEVER
-be flagged. Flag ONLY a genuine CHANGE of meaning — a different or opposite sense, or a wrong/weakened
-term — for example source "solidarity" rendered as "opposition", or "increase" for "decrease".
-For every such error ALWAYS fill: source_text (WHERE — the exact source phrase), student_said (what
-the student actually said), and correct_translation (the CORRECT form). These meaning observations are
-shown to the student to help them learn even though, this round, they do NOT affect the score — so do
-report clear ones (a wrong-meaning word left unreported helps no one), but never invent one from a
-valid paraphrase.
-
-List EVERY genuine translation error you find. Do not stop early. Do not summarize multiple errors into one.
-If the student said nothing for a source segment → put it under missing_content, not here.
+Flag ONLY a GENUINE change of meaning — a wrong, opposite, or weakened word (e.g. source "solidarity"
+said as "opposition", "increase" for "decrease", "problem" for "crisis"). For each, fill source_text
+(the exact source phrase = WHERE), student_said, and correct_translation (the CORRECT form) so the
+student learns; report clear ones even though meaning does NOT affect the score this round (a wrong-
+meaning word left unreported helps no one). NEVER flag a valid paraphrase or a synonym with the SAME
+meaning — the same idea in different words is correct. Do NOT put number/date errors here (use
+number_accuracy). Official target-language equivalents/abbreviations are always correct (WHO→OMS,
+EU→UE, and dual forms like "CESAO-ESCWA"). If the student said nothing for a segment → missing_content.
 
 TASK 2 — CONTENT COVERAGE:
-List every important idea, fact, number, name, or argument from the source speech.
-For each one, state whether it was COVERED, PARTIALLY COVERED, or MISSING in the student's interpretation.
+Mark an idea MISSING only if completely absent (not mentioned, implied, or reformulated). Paraphrase =
+covered; shorter wording is NOT missing (interpretation is always shorter than the source). Put genuinely
+absent important ideas in missing_content. coverage_score 0-10 on CONTENT only: empty missing_content ⇒
+9-10; 1 minor item ⇒ ≥8; lower only if you can list multiple important ideas that are completely absent.
 
-CRITICAL RULES for coverage assessment:
-- An idea is COVERED if the student expressed the same meaning in the target language, even with different words, structure, or phrasing. Paraphrase = covered.
-- An idea is MISSING only if it is completely absent — not mentioned, not implied, not reformulated.
-- Do NOT mark an idea as missing just because the student used fewer words than the source.
-- Interpretation is always shorter than the source — a skilled interpreter conveys the same content in fewer, more direct words.
-- The source and target languages are different — do not expect word-for-word translation.
-
-coverage_score rubric (0–10, base this ONLY on content, not length or style):
-- 9–10: All important ideas, facts, names, and numbers present
-- 7–8: Almost all content covered; only minor or peripheral details missing
-- 5–6: Main ideas present but several supporting facts or arguments missing
-- 3–4: Some main ideas missing; significant information loss
-- 0–2: Most content absent; interpretation is fragmentary
-
-MANDATORY scoring rule: if missing_content is EMPTY (you found nothing genuinely missing),
-coverage_score MUST be 9 or 10. If missing_content has only 1 minor item, coverage_score
-MUST be at least 8. Do NOT give 7 or lower unless you can explicitly list multiple important
-ideas that are completely absent. Condensed phrasing, paraphrase, or shorter wording are NOT
-reasons to lower the score — interpretation is always shorter than the source.
-
-Only add an item to missing_content if an important idea or fact is genuinely and completely absent.
-
-TASK 3 — PRONUNCIATION FLAGS:
-The uncertain words listed above are words Whisper was not confident about.
-IMPORTANT: low ASR confidence does NOT mean the word was mispronounced — ASR is often uncertain
-about rare words, technical terms, proper nouns, or words with silent letters even when spoken
-correctly. Only flag a word as a pronunciation issue if you have CLEAR EVIDENCE the student said
-it incorrectly — not just because the confidence score is low.
-NEVER flag these as pronunciation errors:
-- French silent final letters (s, t, d, x, p, g, ent) — they are CORRECT French pronunciation.
-  "délégués" sounds identical to "délégué" — this is correct, not a mistake.
-- Correct target-language renderings of proper nouns or acronyms.
-- Words that were simply unfamiliar to the ASR engine.
-Only report genuine mispronunciations where the student clearly said the wrong sounds.
-
-TASK 4 — FLUENCY ISSUES IN {target_language}:
-- Hesitations: vocal fillers only — آ، يعني، أقصد (Arabic) / euh, heu (French) / um, uh, er (English),
-  plus words cut mid-way and restarted. Discourse words (donc, alors, en fait, like, you know) are
-  legitimate speech — never hesitations.
-- Repetitions: words said twice in a row
-- False starts: ONLY a genuinely abandoned multi-word phrase — the student starts a sentence,
-  abandons it entirely, and says something different (e.g. "The delegates have... We must act now.").
-  A single cut word, a filler, or a repeated word is NOT a false start — those are hesitations
-  or repetitions and must not be duplicated here. If there is no clearly abandoned phrase in the
-  transcript, return an EMPTY false_starts list. Never invent one.
-- Auto-corrections: student corrects themselves mid-sentence
-- Lapsus linguae: wrong word slipped out
+TASK 3 — FLUENCY (fill false_starts, auto_corrections, lapsus_linguae — DELIVERY is a MINOR factor):
+A false_start is ONLY a genuinely abandoned phrase (started, dropped, said something else); a single
+cut word / filler / repeat is NOT a false start — if none, return []. auto_corrections = self-fixes
+mid-sentence; lapsus_linguae = a wrong word slipped out. (Pronunciation is TASK 11.)
 
 TASK 5 — LANGUAGE QUALITY IN {target_language}:
-Grammar errors in the INTERPRETATION language (not the source). Be THOROUGH: read the
-transcript clause by clause and report EVERY clear grammatical error you can see in the
-text — do not stop at the first one, and do not wave errors through as "minor".
-- Arabic: verb–subject agreement, gender agreement, wrong تشكيل, broken إضافة/annexation,
-  wrong particle, malformed plural.
-  HONESTY RULE FOR ARABIC: final short-vowel case endings (إعراب: ـُ ـَ ـِ / tanwīn) are
-  usually NOT written in the ASR transcript. If the transcript has no diacritics, you CANNOT
-  confirm case endings from the text — do NOT claim the إعراب is correct, and do NOT invent
-  an error either. State plainly that case-ending accuracy is "not verifiable from the
-  transcript" and rely on the acoustic i'râb module when it is available. Only report an
-  Arabic grammar error you can actually see in the transcript's words (agreement, particles,
-  structure), not one that depends on unwritten vowels.
-- French: gender/number agreement, wrong tense or mood, wrong preposition, wrong auxiliary.
-  Do not penalize a silent final plural "s" inferred only from ASR spelling.
-- English: tense, subject-verb agreement, article/preposition errors.
-If you find NO grammatical error, say so explicitly — but only after actually checking; an
-empty grammar list must mean "I checked and found none", never "I did not look".
-STRICT EXCLUSIONS — do NOT flag any of the following as language errors:
-- Capitalization differences (e.g. "conférence des parties" vs "Conférence des Parties") — capitalization is a typographic convention, not a spoken-language error.
-- Official proper-noun casing for UN bodies, treaty names, or institutional titles — if the student said the right words, do not flag casing.
-- Stylistic or register variation where the meaning is the same (e.g. formal vs informal equivalents of the same correct idea).
-- Paraphrases that convey the correct meaning even if worded differently from the source.
-Do NOT flag number formatting as a language error (e.g. "8,8 milliards" is correct French —
-French uses a comma as the decimal separator, English uses a period). Whether the NUMBER VALUE
-itself is correct is judged separately in TASK 10, not here.
+Report clear grammar errors in the TARGET language, clause by clause (agreement, tense/mood,
+preposition, particles, malformed plural, broken إضافة). ARABIC HONESTY: final case endings
+(إعراب/tanwīn) are usually NOT in the transcript — do not claim they're correct and do not invent
+them; only flag Arabic errors visible in the words (agreement/particles/structure), and say case-
+ending accuracy is "not verifiable from the transcript". FR: don't penalise a silent final plural "s"
+from ASR spelling. Do NOT flag capitalisation, official casing, number formatting (8,8 vs 8.8), or
+paraphrases with the same meaning.
 
-TASK 6 — NUMBERS AND DATES:
-Extract every number, percentage, date, statistic from the SOURCE speech.
-Check each one in the STUDENT interpretation. Flag wrong or missing numbers.
-
-TASK 7 — TERMINOLOGY (a PRIMARY scored dimension — be thorough, this is what the student most wants checked):
+TASK 6 — TERMINOLOGY (a PRIMARY scored dimension — be thorough, this is what the student most wants checked):
 Go TERM BY TERM. When an APPROVED GLOSSARY is provided above, for EVERY glossary term:
   1. Find what the student actually said for that concept in the transcript.
   2. Compare it to the approved target-language equivalent.
@@ -915,111 +815,37 @@ for "Organisation mondiale de la Santé"), or a well-established synonym that me
 thing in this context. Flag a term only when the student's rendering is actually wrong, weaker, or
 genuinely diverges from the approved/expected term — but when it does diverge, do NOT let it pass.
 
-TASK 8 — PAUSES & FLOW:
-{silence_count} pause(s) longer than {silence_threshold} seconds were detected: {silence_examples}
-Apply the mode guidance above: in simultaneous mode, a controlled décalage/EVS lag is NOT a pause
-error — only flag a pause as disruptive if it clearly made the interpreter lose the thread or
-exceeds what normal décalage management would explain. In consecutive mode, a pause before starting
-the restitution or while consulting notes is expected. For genuinely disruptive pauses only, note
-what information was likely delayed or lost because of it.
-
-TASK 9 — REPETITIONS:
-{repetition_count} repeated word(s)/phrase(s) were detected: {repetition_examples}
-For each, judge whether it is a meaningless disfluency (stalling while thinking) or a productive
-self-correction (catching and fixing a mistake). Comment on what this reveals about the student's
-processing under pressure.
+TASK 7 — PAUSES & REPETITIONS (fill pause_analysis, repetition_analysis — MINOR):
+{silence_count} pause(s) >{silence_threshold}s: {silence_examples}; {repetition_count} repetition(s):
+{repetition_examples}. NEVER penalise normal interpreter pauses/décalage (simultaneous EVS lag,
+consecutive note-reading). Only flag a pause that clearly lost the thread. Comment briefly.
 
 TASK 10 — NUMBERS, DATES & STATISTICS (cross-language check):
-Extract EVERY number, percentage, date, and statistic from the SOURCE speech.
-For each one, find what the student actually said in {target_language} (numbers may appear as digits
-or spelled out words — both count). Mark each as correct or incorrect.
-A wrong number, date, or statistic is a SERIOUS interpretation error — it can mislead an entire
-negotiation — so flag it clearly even if the rest of the sentence was fine.
+For EVERY source number/percentage/date/statistic (digits or spelled-out), find what the student said
+and mark correct/incorrect. If they said a DIFFERENT value, put it in student_said (empty only if
+omitted). FORMAT differences are CORRECT, not errors: date word order, decimal comma vs point,
+Arabic-Indic vs Western digits, and year ranges written differently ("2015-16" = "2015 2016" =
+"٢٠١٥-٢٠١٦"); a missing/different hyphen, dash or space is never a number error. But MAGNITUDE false
+friends ARE value errors: FR "billion" for EN "trillion", billion↔trillion, million↔milliard,
+مليون↔مليار — a 1000× change, always flag it.
 
-CRITICAL — fill student_said correctly:
-- If the student said a DIFFERENT number in place of the correct one (e.g., said 100 instead of 98),
-  set student_said to what they actually said ("100") — do NOT leave student_said empty in this case.
-- Only set student_said to "" or null if the number was completely omitted with no replacement.
-- This distinction is essential: "said 100 instead of 98" is a substitution error, not a missing number.
-
-CRITICAL — do NOT flag format-only differences as errors:
-- Date word order differs between languages: "29 June 2026", "June 29, 2026" and "٢٩ يونيو ٢٠٢٦"
-  are the SAME date → correct.
-- Decimal separators differ: "8.8 billion" (EN) = "8,8 milliards" (FR) → correct.
-- Arabic-Indic digits (٢٠٢٦) and Western digits (2026) are the same number → correct.
-- YEAR RANGES written differently are the SAME range → correct: "2015-16", "2015-2016",
-  "2015 2016", "2015 à 2016", "2015 to 2016", "٢٠١٥-٢٠١٦" all express 2015–2016. A missing,
-  added, or different hyphen/dash/space BETWEEN years is FORMATTING, never a number error.
-  If the student said both correct years, mark it correct even if the punctuation differs.
-- More generally, a missing or different hyphen, dash, or space is punctuation, not a value —
-  never report "missing hyphen" (or similar punctuation notes) as a number error.
-Only flag a number/date when the VALUE the listener hears is actually different.
-
-CRITICAL — MAGNITUDE FALSE FRIENDS are VALUE errors, never format differences:
-- English "billion" (10^9) = French "milliard" = Arabic "مليار".
-- English "trillion" (10^12) = French "mille milliards" / "2 000 milliards" = Arabic "تريليون".
-- A student saying French "billion(s)" when the source says English "trillion" is using the
-  English false-friend: the listener hears 10^9 — a 1000x magnitude ERROR. Mark it incorrect.
-- Any billion↔trillion, million↔milliard, or مليون↔مليار substitution changes the value by
-  a factor of 1000 or more — always flag it, even when the leading digits match.
-
-TASK 11 — PRONUNCIATION IN {target_language}:
-LOW-CONFIDENCE WORDS the speech recognizer was unsure about: {uncertain_words}
-CRITICAL: low ASR confidence ≠ mispronunciation. ASR is routinely uncertain about rare words,
-technical terms, proper nouns, and words with silent letters even when spoken perfectly correctly.
-Do NOT flag a word as mispronounced just because ASR scored it low.
-For French: silent final letters (s, t, d, x, p, ent) are CORRECT — "partenaires" and
-"partenaire" sound identical; this is correct French pronunciation, not an error.
-Only give pronunciation feedback when you have clear evidence the student said the sounds wrong.
-Give specific, actionable pronunciation feedback for {target_language}:
-- Arabic: تشكيل/إعراب (case endings), emphatic vs plain consonants (ص/س، ض/د، ط/ت، ظ/ذ، ق/ك),
-  hamza ء placement, تاء مربوطة pronunciation, vowel length (مد/قصر)
-- French: nasal vowels, liaison, silent final letters, gender-driven endings affecting sound
-- English: word stress, "th" sounds (θ/ð), vowel reduction in unstressed syllables
-For each low-confidence word above, explain the likely mispronunciation and give the correct way to say it.
+TASK 8 — PRONUNCIATION (pronunciation_flags, pronunciation_assessment):
+Low-confidence words: {uncertain_words}. Low ASR confidence ≠ mispronunciation — flag only clear wrong
+sounds (FR silent final letters are correct). Give brief, actionable feedback for {target_language}
+(AR: تشكيل/إعراب, emphatics ص/س ط/ت, hamza; FR: nasals, liaison; EN: stress, "th").
 
 TASK 12 — PROPER NOUNS (people, organizations, places, treaties):
 {proper_nouns_block}
-For EVERY proper noun in the source, classify the student's rendering as one of:
-- "correct": the name is present and recognizably right in {target_language}. A legitimate
-  target-language form counts as correct (e.g. "United Nations" → "ONU" or "الأمم المتحدة";
-  transliteration into Arabic script is correct rendering, NOT distortion).
-  Official target-language abbreviations are always correct: ESCWA → CESAO (FR), SDGs → ODD (FR),
-  WHO → OMS (FR), UNDP → PNUD (FR). Capitalisation differences NEVER make a name "distorted".
-  A correct translation or paraphrase of a name is "correct", not "distorted".
-- "distorted": the name appears but clearly MISPRONOUNCED or garbled — wrong syllables, wrong
-  letters, clearly altered sound (e.g. "Mobuto Seko" instead of "Mobutu Sese Seko").
-  Do NOT use "distorted" for: capitalisation variants, accepted target-language equivalents,
-  bilingual dual abbreviations (e.g. "CESAO-ESCWA"), or stylistic name variants with correct meaning.
-  Hyphenation differences are NEVER errors: "Jean-Pierre" vs "Jean Pierre", "New-York" vs "New York",
-  or any hyphen-vs-space variant must be marked "correct", not "distorted".
-  In a spoken exam a distorted name means the student got the sounds/syllables wrong — quote exactly
-  what the recognizer heard so the student can compare.
-- "missing": the name was omitted entirely.
-Names are identity-critical in interpretation — a distorted head-of-state or organization name
-can be a diplomatic incident. Flag every genuine mispronunciation and omission.
+For EVERY source name classify the student's rendering as: "correct" (present and recognizable — a
+target-language form/abbreviation/transliteration is correct, e.g. UN→ONU/الأمم المتحدة, WHO→OMS;
+capitalisation and hyphen-vs-space variants are ALWAYS correct); "distorted" (audibly garbled/wrong
+syllables — quote what was heard, e.g. "Mobuto Seko" for "Mobutu Sese Seko"); or "missing" (omitted).
 
-Give overall_score 0-10 and coverage_score 0-10.
-{scoring_policy}STRICTNESS APPLIES TO overall_score ONLY. coverage_score follows the MANDATORY rubric in TASK 2:
-empty missing_content = coverage 9-10, no exceptions. A complete interpretation gets full coverage
-credit even when other error types (grammar, pronunciation, hesitations) lower the overall_score.
-Be strict on overall_score — most student interpretations score 4–7:
-- 9-10: Exceptional — virtually no errors, complete coverage, professional fluency
-- 7-8: Good — only 1-2 minor errors, no significant meaning loss
-- 5-6: Acceptable — several errors but core meaning mostly preserved
-- 3-4: Weak — multiple mistranslations or significant information loss
-- 0-2: Very poor — major errors, incomplete, or incomprehensible
-SCORING PHILOSOPHY — an interpreter transmits MEANING, not words. Never grade against a
-word-for-word machine-translation ideal: judge whether the LISTENER received the same message.
-If you found 3+ HIGH-importance omissions or 3+ wrong numbers/names, overall_score cannot
-exceed 6. Stylistic preferences, wording nuances, and acceptable paraphrases NEVER lower the score.
-Only fill translation_errors when the student's rendering says something factually DIFFERENT
-from the source (the listener is misled) — a valid paraphrase or a more general term that keeps
-the message intact is NOT a translation error.
-MANDATORY consistency rule: the score must match the errors you actually listed.
-- missing_content empty + numbers/names correct → overall_score MUST be at least 8.
-- only 1-2 minor issues in total → overall_score MUST be at least 7.
-Do not default to 5-6 "to be safe" when your own findings show a good interpretation.
+SCORING: {scoring_policy}coverage_score follows TASK 2 (empty missing_content ⇒ 9-10). overall_score
+0-10, strict (most 4-7): 9-10 near-perfect; 7-8 only 1-2 minor issues; 5-6 several errors but meaning
+kept; 3-4 multiple mistranslations/loss; 0-2 very poor. An interpreter transmits MEANING not words —
+paraphrases/stylistic choices NEVER lower the score. The score MUST match the errors you listed: empty
+missing_content + correct numbers/names ⇒ overall_score ≥8; 1-2 minor issues ⇒ ≥7. Don't default to 5-6.
 
 Return ONLY valid compact JSON (no markdown, no explanation outside the JSON):
 {{
