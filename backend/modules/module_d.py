@@ -825,7 +825,10 @@ For EVERY source number/percentage/date/statistic (digits or spelled-out), find 
 and mark correct/incorrect. If they said a DIFFERENT value, put it in student_said (empty only if
 omitted). FORMAT differences are CORRECT, not errors: date word order, decimal comma vs point,
 Arabic-Indic vs Western digits, and year ranges written differently ("2015-16" = "2015 2016" =
-"٢٠١٥-٢٠١٦"); a missing/different hyphen, dash or space is never a number error. But MAGNITUDE false
+"٢٠١٥-٢٠١٦"); a missing/different hyphen, dash, slash or space is never a number error. In
+particular a REFERENCE/RESOLUTION number like "52/199" is CORRECT if the student said its component
+numbers (52 and 199) in order — the "/" is punctuation, not spoken; never flag "slash missing" or
+"mis-ordered" when both numbers are present in the right order. But MAGNITUDE false
 friends ARE value errors: FR "billion" for EN "trillion", billion↔trillion, million↔milliard,
 مليون↔مليار — a 1000× change, always flag it.
 
@@ -1238,7 +1241,7 @@ def detect_repetitions_from_text(full_text: str, language: str = 'ar') -> list:
     words = []
     for match in re.finditer(r'\w+', full_text or '', flags=re.UNICODE):
         word = normalize_repetition_word(match.group(0))
-        if word and word not in skip_words:
+        if word and word not in skip_words and not _is_number_token(word, language):
             words.append({
                 'word': word,
                 'key': repetition_compare_key(word, language),
@@ -1649,7 +1652,7 @@ def detect_repetitions(segments: list, language: str = 'ar') -> list:
     for seg in segments:
         for w in seg.get('words', []):
             clean = normalize_repetition_word(w.get('word', ''))
-            if clean and clean not in skip_words:
+            if clean and clean not in skip_words and not _is_number_token(clean, language):
                 all_words.append({
                     'word': clean,
                     'key': repetition_compare_key(clean, language),
@@ -2632,6 +2635,35 @@ _SHORT_PARTICLES = {
            'هو', 'هي', 'هم', 'لا', 'قد', 'كما', 'مع', 'أو', 'لم', 'عن', 'إن', 'لكن'},
 }
 
+# Number-component words repeat NATURALLY when speaking a multi-digit number
+# ("cinq cent quatre-vingt-dix-neuf", "deux mille") — they must NOT be flagged as
+# disfluency repetitions (Lina 18 Aug). Digit tokens (599 / ٥٩٩) are skipped too.
+_NUMBER_WORDS = {
+    'en': {'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+           'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen',
+           'nineteen', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety',
+           'hundred', 'thousand', 'million', 'billion', 'trillion', 'point', 'percent'},
+    'fr': {'zéro', 'zero', 'un', 'une', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf',
+           'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'vingt', 'vingts', 'trente',
+           'quarante', 'cinquante', 'soixante', 'cent', 'cents', 'mille', 'million', 'millions',
+           'milliard', 'milliards', 'virgule', 'pour', 'demi', 'et'},
+    'ar': {'صفر', 'واحد', 'اثنان', 'اثنين', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
+           'عشرة', 'عشر', 'عشرون', 'عشرين', 'ثلاثون', 'ثلاثين', 'أربعون', 'أربعين', 'خمسون', 'خمسين',
+           'ستون', 'ستين', 'سبعون', 'سبعين', 'ثمانون', 'ثمانين', 'تسعون', 'تسعين', 'مئة', 'مائة', 'مئتان',
+           'ألف', 'آلاف', 'ألفان', 'مليون', 'ملايين', 'مليار', 'مليارات', 'فاصلة', 'بالمئة', 'بالمائة'},
+}
+
+
+def _is_number_token(word: str, language: str = 'en') -> bool:
+    """True if the token is a number word or a digit string (incl. hyphenated
+    French compounds like "quatre-vingt-dix-neuf") — these recur naturally when
+    speaking numbers and must not count as repetitions."""
+    if not word:
+        return False
+    num_words = _NUMBER_WORDS.get(language, set())
+    parts = [p for p in re.split(r'[-\s]', str(word).lower()) if p]
+    return bool(parts) and all(p in num_words or p.isdigit() for p in parts)
+
 
 def detect_repetitions_timing_window(segments: list, language: str = 'ar',
                                       max_gap_seconds: float = 1.5) -> list:
@@ -2655,7 +2687,7 @@ def detect_repetitions_timing_window(segments: list, language: str = 'ar',
         if i in consumed_as_second:
             continue
         word = normalize_repetition_word(w['word'])
-        if len(word) < 2 or word in skip_words:
+        if len(word) < 2 or word in skip_words or _is_number_token(word, language):
             continue
         for j in range(i + 1, len(words)):
             nw = words[j]
