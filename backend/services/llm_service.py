@@ -41,7 +41,7 @@ def _active_groq_key() -> str | None:
         pass
     return GROQ_API_KEY or None
 
-GEMINI_MODEL = 'gemini-1.5-flash-latest'
+GEMINI_MODEL = 'gemini-2.5-flash'
 
 
 def generate_text(
@@ -105,6 +105,9 @@ def _generate_with_gemini(
         'generationConfig': {
             'maxOutputTokens': max_tokens,
             'temperature': temperature,
+            # Gemini 2.5 "thinking" eats the output budget and truncates our JSON —
+            # disable it so the full structured response always comes back.
+            'thinkingConfig': {'thinkingBudget': 0},
         },
     }
 

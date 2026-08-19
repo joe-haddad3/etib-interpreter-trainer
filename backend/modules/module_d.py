@@ -300,35 +300,21 @@ def _compute_adaptive_params(sessions: list) -> dict:
     }
 
 
-def _eval_llm_call(client, messages, max_tokens=3500, temperature=0.1):
-    """
-    One evaluation LLM call with a rate-limit-aware retry.
-
-    Tester feedback (Aug 2026): "Groq tokens used up" even with a FRESH key.
-    Cause: Groq admits a request against the per-minute token budget using
-    prompt + max_tokens, so a long transcript + max_tokens=6000 can exceed a
-    free-tier TPM limit in a SINGLE request — switching keys never helps.
-    Strategy: on a 429, wait the short suggested delay and retry once with a
-    smaller completion budget (the report JSON almost always fits in 3000).
-    """
+def _eval_llm_call(messages, max_tokens=3500, temperature=0.1):
+    """One evaluation LLM call, PROVIDER-AGNOSTIC (Groq or Gemini per
+    LLM_PROVIDER) via generate_text, with a rate-limit-aware retry. Returns text."""
     import time as _time
+    from services.llm_service import generate_text
     try:
-        return client.chat.completions.create(
-            model=PRIMARY_LLM_MODEL, messages=messages,
-            max_tokens=max_tokens, temperature=temperature,
-            **groq_extra_params(PRIMARY_LLM_MODEL))
+        return generate_text(messages=messages, max_tokens=max_tokens, temperature=temperature)
     except Exception as exc:
         msg = str(exc)
-        if '429' not in msg and not re.search(r'rate.?limit|too large|tokens per minute|tpm', msg, re.I):
+        if '429' not in msg and not re.search(r'rate.?limit|too large|tokens per minute|tpm|quota|resource.?exhausted', msg, re.I):
             raise
-        # Honour Groq's "Please try again in 7.66s" hint when it is short.
         m = re.search(r'try again in ([0-9.]+)s', msg)
         wait = min(float(m.group(1)) if m else 5.0, 20.0)
         _time.sleep(wait)
-        return client.chat.completions.create(
-            model=PRIMARY_LLM_MODEL, messages=messages,
-            max_tokens=min(max_tokens, 2500), temperature=temperature,
-            **groq_extra_params(PRIMARY_LLM_MODEL))
+        return generate_text(messages=messages, max_tokens=min(max_tokens, 2500), temperature=temperature)
 
 
 def _extract_json(text: str) -> dict:
@@ -2904,8 +2890,6 @@ def generate_feedback():
     s = algo.get('summary', {})
 
     try:
-        from utils.groq_client import get_groq_client
-        client = get_groq_client()
 
         rep_examples  = ', '.join(f'"{r["word"]}"' for r in (algo.get('repetitions', [])[:3]))
         hes_examples  = ', '.join(f'"{h["word"]}"' for h in (algo.get('hesitation_words', [])[:3]))
@@ -2941,7 +2925,7 @@ def generate_feedback():
             proper_nouns_block=build_proper_nouns_block(source_script),
         )
 
-        response = _eval_llm_call(client, [
+        response = _eval_llm_call([
             {
                 'role': 'system',
                 'content': (
@@ -2952,7 +2936,7 @@ def generate_feedback():
             {'role': 'user', 'content': prompt}
         ])
 
-        llm_result = _extract_json(response.choices[0].message.content)
+        llm_result = _extract_json(response)
         llm_result = strip_foreign_script_chars(llm_result)
         llm_result = remove_false_missing_translation_errors(llm_result, transcript_text)
         llm_result = clean_translation_error_items(llm_result)
@@ -3152,8 +3136,6 @@ def full_evaluation():
         fluency = build_audio_fluency_report(transcript, all_word_scores, algo.get('long_silences', []))
 
         # Step 3: LLM analysis with accurate data
-        from utils.groq_client import get_groq_client
-        client = get_groq_client()
 
         lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English', 'unknown': 'an unknown language'}
         rep_examples     = ', '.join(f'"{r.get("word","")}"' for r in algo.get('repetitions', [])[:3])
@@ -3206,13 +3188,13 @@ def full_evaluation():
         }
 
         try:
-            response = _eval_llm_call(client, [
+            response = _eval_llm_call([
                 {'role': 'system', 'content':
                  'You are an expert interpreter training evaluator at ETIB Beirut. '
                  'Return only valid JSON. Be thorough — detect ALL error types listed.'},
                 {'role': 'user', 'content': prompt}
             ])
-            llm_result = _extract_json(response.choices[0].message.content)
+            llm_result = _extract_json(response)
         except Exception as llm_err:
             import traceback; traceback.print_exc()
             return jsonify({
@@ -3380,11 +3362,9 @@ def tashkeel_compare():
         return jsonify({'error': 'Tashkeel comparison is for Arabic only'}), 400
 
     try:
-        from utils.groq_client import get_groq_client
-        client = get_groq_client()
+        from services.llm_service import generate_text
 
-        response = client.chat.completions.create(
-            model=PRIMARY_LLM_MODEL,
+        response = generate_text(
             messages=[
                 {
                     'role': 'system',
@@ -3406,7 +3386,7 @@ def tashkeel_compare():
             temperature=0.1
         )
 
-        result = _extract_json(response.choices[0].message.content)
+        result = _extract_json(response)
         return jsonify(result)
 
     except json.JSONDecodeError as e:
