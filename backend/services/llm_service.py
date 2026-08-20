@@ -7,6 +7,7 @@ specific cloud or local model client.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -41,7 +42,12 @@ def _active_groq_key() -> str | None:
         pass
     return GROQ_API_KEY or None
 
-GEMINI_MODEL = 'gemini-3.5-flash'
+# gemini-3.5-flash-lite, NOT gemini-3.5-flash: the regular flash model has a
+# punishing free-tier cap of only 20 requests/DAY, and it burns its whole output
+# budget on hidden "thinking" (needs thinkingBudget:0). The -lite model has a far
+# larger free-tier daily allowance (~1000/day) AND doesn't think by default, so
+# speeches come back full-length with no workaround. Overridable via env.
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.5-flash-lite')
 
 
 def generate_text(
@@ -70,6 +76,24 @@ def generate_text(
 
 
 # ── Gemini — raw REST (no SDK, no httpx conflicts) ───────────────────────────
+
+def _gemini_retry_delay(resp: Any, attempt: int) -> float:
+    """Seconds to wait before retrying a 429/503. Honours the API's suggested
+    retryDelay / Retry-After when present, capped at 15s so a request can't hang."""
+    # Retry-After header (seconds)
+    header = (resp.headers.get('Retry-After') or '').strip()
+    if header.isdigit():
+        return min(15.0, float(header))
+    # RetryInfo.retryDelay in the JSON error body, e.g. "7s"
+    try:
+        for detail in resp.json().get('error', {}).get('details', []) or []:
+            delay = str(detail.get('retryDelay', '')).rstrip('s')
+            if delay.replace('.', '', 1).isdigit():
+                return min(15.0, float(delay))
+    except Exception:
+        pass
+    return min(15.0, 5.0 * (attempt + 1))  # 5s, then 10s
+
 
 def _generate_with_gemini(
     messages: list[dict[str, str]],
@@ -100,19 +124,20 @@ def _generate_with_gemini(
     # Prepend system instruction directly into the user turn — works on all API versions
     combined = f"{system_text}\n\n{user_text}".strip() if system_text else user_text
 
+    gen_config: dict[str, Any] = {
+        'maxOutputTokens': max_tokens,
+        'temperature': temperature,
+    }
+    # The full (non-lite) flash models are REASONING models: they spend the whole
+    # maxOutputTokens budget on hidden "thinking" and return truncated/empty text
+    # unless thinkingBudget:0 disables it. The -lite models DON'T think by default
+    # and REJECT this field (400), so only send it for a non-lite model.
+    if 'lite' not in GEMINI_MODEL and 'latest' not in GEMINI_MODEL:
+        gen_config['thinkingConfig'] = {'thinkingBudget': 0}
+
     payload: dict[str, Any] = {
         'contents': [{'role': 'user', 'parts': [{'text': combined}]}],
-        'generationConfig': {
-            'maxOutputTokens': max_tokens,
-            'temperature': temperature,
-            # gemini-3.5-flash is a REASONING model: by default it spends the
-            # whole maxOutputTokens budget on hidden "thinking" (thoughtsTokenCount),
-            # returning content:{} with finishReason MAX_TOKENS — which truncated
-            # our speeches (75 words for a 120-180 request). thinkingBudget:0
-            # disables thinking so the full budget goes to the actual answer.
-            # (This is the Gemini equivalent of Groq's reasoning_effort:'low'.)
-            'thinkingConfig': {'thinkingBudget': 0},
-        },
+        'generationConfig': gen_config,
     }
 
     url = (
@@ -120,11 +145,19 @@ def _generate_with_gemini(
         f'{GEMINI_MODEL}:generateContent?key={key}'
     )
 
-    resp = requests.post(url, json=payload, timeout=120)
-    if not resp.ok:
-        raise RuntimeError(
-            f'Gemini API error {resp.status_code}: {resp.text[:400]}'
-        )
+    # The free tier caps REQUESTS PER MINUTE. A burst of big speeches (a marathon
+    # is several calls) can briefly 429 / 503 even though there is plenty of daily
+    # quota left. Wait out the short window and retry so the user never sees it.
+    import time
+    resp = None
+    for attempt in range(3):
+        resp = requests.post(url, json=payload, timeout=120)
+        if resp.ok:
+            break
+        if resp.status_code in (429, 503) and attempt < 2:
+            time.sleep(_gemini_retry_delay(resp, attempt))
+            continue
+        raise RuntimeError(f'Gemini API error {resp.status_code}: {resp.text[:400]}')
 
     data = resp.json()
     try:
