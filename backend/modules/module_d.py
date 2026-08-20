@@ -300,11 +300,16 @@ def _compute_adaptive_params(sessions: list) -> dict:
     }
 
 
-def _eval_llm_call(messages, max_tokens=3500, temperature=0.1):
+def _eval_llm_call(messages, max_tokens=None, temperature=0.1):
     """One evaluation LLM call, PROVIDER-AGNOSTIC (Groq or Gemini per
     LLM_PROVIDER) via generate_text, with a rate-limit-aware retry. Returns text."""
     import time as _time
     from services.llm_service import generate_text
+    from config import LLM_PROVIDER
+    if max_tokens is None:
+        # Groq free tier caps at 8k tokens/min (prompt+max_tokens) -> keep it small;
+        # Gemini has ~1M/min headroom, so give the JSON plenty of room.
+        max_tokens = 6000 if 'gemini' in LLM_PROVIDER.lower() else 3500
     try:
         return generate_text(messages=messages, max_tokens=max_tokens, temperature=temperature)
     except Exception as exc:
