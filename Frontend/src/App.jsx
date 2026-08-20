@@ -41,7 +41,7 @@ import {
 function friendlyLlmError(message, labels) {
   const m = String(message || '');
   if (/invalid[_\s-]?api[_\s-]?key|invalid api key|\b401\b|authentication|unauthorized/i.test(m)) {
-    return labels.keyInvalid || 'Your Groq API key was rejected — check it in Settings.';
+    return labels.keyInvalid || 'The AI service rejected the request (authentication). Please contact the administrator.';
   }
   if (/rate.?limit|quota|\b429\b|tokens per|tpd|tpm/i.test(m)) {
     return labels.llmQuotaError || m;
@@ -499,7 +499,7 @@ const UI = {
     pnDistorted: 'Distorted — likely mispronounced',
     pnMissing: 'Omitted',
     llmFailedWarning: 'AI language analysis could not complete — showing automatic detections only. Scores may be incomplete.',
-    llmQuotaError: 'The Groq per-minute limit was reached (it happens with long speeches). The platform already retried once — wait about 1 minute and run the evaluation again. Adding another key only helps if your DAILY quota is exhausted.',
+    llmQuotaError: 'The AI service hit its per-minute limit — this can happen with long speeches or several requests in a row. The platform already retried automatically; just wait about a minute and try again. The shared limit resets on its own — nothing to configure.',
     keyRequired: 'A personal (free) Groq API key is required — create yours at console.groq.com (2 minutes, no credit card) and add it in Settings.',
     keyInvalid: 'Your Groq API key was rejected (invalid or expired). Open Settings, delete it, and paste a fresh key from console.groq.com.',
     sameLangError: 'The source and interpretation languages must be different — interpretation is always between two languages.',
@@ -973,7 +973,7 @@ const UI = {
     pnDistorted: 'محرَّف — نطق خاطئ على الأرجح',
     pnMissing: 'محذوف',
     llmFailedWarning: 'لم يتمكن التحليل اللغوي بالذكاء الاصطناعي من الاكتمال — يُعرض الرصد التلقائي فقط. قد تكون الدرجات غير مكتملة.',
-    llmQuotaError: 'تم بلوغ حد Groq في الدقيقة (يحدث مع الخطابات الطويلة). أعادت المنصة المحاولة تلقائياً — انتظر نحو دقيقة ثم أعد تشغيل التقييم. إضافة مفتاح آخر لا تفيد إلا إذا نفدت حصتك اليومية.',
+    llmQuotaError: 'بلغت خدمة الذكاء الاصطناعي حدّها في الدقيقة — قد يحدث ذلك مع الخطابات الطويلة أو عند إرسال عدة طلبات متتالية. أعادت المنصة المحاولة تلقائياً؛ انتظر نحو دقيقة ثم أعد المحاولة. يُعاد ضبط الحدّ المشترك تلقائياً — لا حاجة لأي إعداد.',
     keyRequired: 'مفتاح Groq API شخصي (مجاني) مطلوب — أنشئ مفتاحك على console.groq.com (دقيقتان، بدون بطاقة ائتمان) وأضفه في الإعدادات.',
     keyInvalid: 'تم رفض مفتاح Groq API الخاص بك (غير صالح أو منتهي). افتح الإعدادات واحذفه والصق مفتاحاً جديداً من console.groq.com.',
     sameLangError: 'يجب أن تختلف لغة المصدر عن لغة الترجمة الشفوية — فالترجمة الفورية تكون دائماً بين لغتين مختلفتين.',
@@ -1447,7 +1447,7 @@ const UI = {
     pnDistorted: 'Déformé — probablement mal prononcé',
     pnMissing: 'Omis',
     llmFailedWarning: "L'analyse linguistique IA n'a pas pu se terminer — seules les détections automatiques sont affichées. Les scores peuvent être incomplets.",
-    llmQuotaError: "La limite Groq par minute a été atteinte (fréquent avec les longs discours). La plateforme a déjà réessayé automatiquement — attendez environ 1 minute puis relancez l'évaluation. Ajouter une autre clé n'aide que si votre quota QUOTIDIEN est épuisé.",
+    llmQuotaError: "Le service d'IA a atteint sa limite par minute — cela peut arriver avec de longs discours ou plusieurs requêtes d'affilée. La plateforme a déjà réessayé automatiquement ; attendez environ une minute puis réessayez. La limite partagée se réinitialise d'elle-même — rien à configurer.",
     keyRequired: "Une clé Groq API personnelle (gratuite) est requise — créez la vôtre sur console.groq.com (2 minutes, sans carte bancaire) et ajoutez-la dans les Paramètres.",
     keyInvalid: "Votre clé Groq API a été refusée (invalide ou expirée). Ouvrez les Paramètres, supprimez-la et collez une nouvelle clé depuis console.groq.com.",
     sameLangError: "La langue source et la langue d'interprétation doivent être différentes — l'interprétation se fait toujours entre deux langues.",
@@ -4994,7 +4994,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
         const errText = String(data.error || '').toLowerCase();
         const isQuota = /rate.?limit|quota|429|tokens per|tpd|tpm|capacity/.test(errText);
         throw new Error(isQuota
-          ? (labels.llmQuotaError || 'Your Groq API tokens are used up for now — wait for the limit to reset (or use another API key in Settings), then run the evaluation again.')
+          ? (labels.llmQuotaError || 'The AI service is temporarily rate-limited — wait about a minute, then run the evaluation again. The shared limit resets on its own.')
           : (labels.llmDownError || 'The AI evaluation service did not respond — try again in a moment.'));
       }
       // Attach pronunciation report for the pronunciation panel
