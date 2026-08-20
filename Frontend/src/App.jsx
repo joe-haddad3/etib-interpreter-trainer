@@ -1801,6 +1801,10 @@ const initialSpeechForm = {
 
 // If the student pastes a full text instead of a short topic, treat the pasted
 // text as the SOURCE DOCUMENT (grounding) rather than as a topic string.
+// The platform now uses a central server-side key (Gemini), so students no
+// longer need a personal Groq key. Set this back to true to re-require one.
+const REQUIRE_PERSONAL_KEY = false;
+
 const TOPIC_AS_SOURCE_THRESHOLD = 300;
 
 // ── Module E — Progress & Adaptive Difficulty ─────────────────────────────────
@@ -2995,7 +2999,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   async function handleSubmit(event) {
     event.preventDefault();
     // Personal Groq key is mandatory (16 July feedback) — no shared-quota use.
-    if (!getStoredGroqKey()) {
+    if (REQUIRE_PERSONAL_KEY && !getStoredGroqKey()) {
       setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
       setStatus('error');
       return;
@@ -3035,7 +3039,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   // transcribe it → becomes the source script, and its audio plays in Module C.
   async function handleSourceMediaUpload(file) {
     if (!file) return;
-    if (!getStoredGroqKey()) {
+    if (REQUIRE_PERSONAL_KEY && !getStoredGroqKey()) {
       setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
       setStatus('error');
       return;
@@ -3102,7 +3106,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   const hasSources = documentFiles.length > 0 || librarySources.length > 0;
 
   async function handleDocumentGenerate() {
-    if (!getStoredGroqKey()) {
+    if (REQUIRE_PERSONAL_KEY && !getStoredGroqKey()) {
       setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
       setStatus('error');
       return;
@@ -4950,7 +4954,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
   const interpMode = lastTranscript?.mode || 'consecutive';
 
   async function handleEvaluate() {
-    if (!getStoredGroqKey()) {
+    if (REQUIRE_PERSONAL_KEY && !getStoredGroqKey()) {
       setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
       setStatus('error');
       return;
