@@ -105,6 +105,13 @@ def _generate_with_gemini(
         'generationConfig': {
             'maxOutputTokens': max_tokens,
             'temperature': temperature,
+            # gemini-3.5-flash is a REASONING model: by default it spends the
+            # whole maxOutputTokens budget on hidden "thinking" (thoughtsTokenCount),
+            # returning content:{} with finishReason MAX_TOKENS — which truncated
+            # our speeches (75 words for a 120-180 request). thinkingBudget:0
+            # disables thinking so the full budget goes to the actual answer.
+            # (This is the Gemini equivalent of Groq's reasoning_effort:'low'.)
+            'thinkingConfig': {'thinkingBudget': 0},
         },
     }
 
@@ -121,7 +128,17 @@ def _generate_with_gemini(
 
     data = resp.json()
     try:
-        return data['candidates'][0]['content']['parts'][0]['text'].strip()
+        candidate = data['candidates'][0]
+        parts = candidate.get('content', {}).get('parts', []) or []
+        text = ''.join(p.get('text', '') for p in parts).strip()
+        if text:
+            return text
+        # Empty content — usually finishReason MAX_TOKENS with the whole budget
+        # eaten by thinking. Surfaced clearly so it never silently truncates.
+        raise RuntimeError(
+            f"Gemini returned no text (finishReason="
+            f"{candidate.get('finishReason')}); raise maxOutputTokens or check thinkingConfig."
+        )
     except (KeyError, IndexError) as exc:
         raise RuntimeError(f'Unexpected Gemini response shape: {data}') from exc
 

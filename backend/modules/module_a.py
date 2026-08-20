@@ -498,7 +498,7 @@ SPEECH WRITING RULES
    - At least one acronym (UN, WHO, GDP, IMF, etc.)
    - Country or region names
 
-5. The "script" field MUST stay between {word_count_min} and {word_count_max} words. Expand with concrete examples, data, and elaboration until it is close to {word_count} words.
+5. LENGTH IS MANDATORY. The "script" field MUST contain AT LEAST {word_count_min} words and no more than {word_count_max} (aim for about {word_count}). A speech shorter than {word_count_min} words is INVALID — before you finish, count the words and, if you are under {word_count_min}, keep adding concrete examples, statistics, background and elaboration until you are safely inside the range.
 
 6. MCQ rules: Write 5 questions that test SPECIFIC content from the speech.
    - Mix the question types: AT LEAST 2 questions about ideas, arguments, positions, or cause-effect
@@ -1515,46 +1515,59 @@ def dense_fallback_response_fields() -> dict:
     }
 
 
-def _expand_script_to_word_count(script: str, target_word_count: int, language: str) -> str:
-    """If the script falls noticeably short of the requested word count, ask
-    the LLM to expand it (preserving wording/facts) until it gets closer."""
-    actual = len(script.split())
-    if not script or actual >= target_word_count * 0.9:
-        return script
-
+def _expand_script_to_word_count(script: str, target_word_count: int, language: str,
+                                 min_word_count: int | None = None) -> str:
+    """If the script falls short of the requested MINIMUM, lengthen it via the
+    LLM (preserving wording/facts), LOOPING until it reaches the minimum or a few
+    attempts have run. Fixes short generations landing below the range (e.g. 75
+    words for a 120-180 'Short' request), which happened once we moved off Groq."""
+    min_words = min_word_count if min_word_count else int(target_word_count * 0.9)
     lang_name = LANGUAGE_NAMES.get(language, 'English')
-    try:
-        expanded = generate_text(
-            messages=[
-                {
-                    'role': 'system',
-                    'content': (
-                        f'You expand conference speech scripts written in {lang_name}. '
-                        'Keep all existing wording, facts, and structure intact, and add '
-                        'further elaboration, examples, transitions, and detail until the '
-                        'text reaches the target word count. '
-                        'Return ONLY the expanded speech text — no JSON, no headings, no commentary.'
-                    ),
-                },
-                {
-                    'role': 'user',
-                    'content': (
-                        f'Target length: {target_word_count} words (current: {actual} words).\n\n'
-                        f'Speech:\n{script}'
-                    ),
-                },
-            ],
-            max_tokens=min(6000, max(1500, int(target_word_count * 2.5))),
-            temperature=0.6,
-        )
-        expanded = expanded.strip()
-        if language == 'ar':
-            expanded = _clean_arabic_script(expanded)
-        if len(expanded.split()) > actual:
-            return expanded
-    except Exception:
-        pass
-    return script
+    current = script.strip()
+    actual = len(current.split())
+    if not current or actual >= min_words:
+        return current
+
+    for _ in range(3):
+        try:
+            expanded = generate_text(
+                messages=[
+                    {
+                        'role': 'system',
+                        'content': (
+                            f'You lengthen conference speech scripts written in {lang_name}. '
+                            'Keep ALL existing wording, facts, names, numbers, the opening and '
+                            'the message intact; do NOT shorten. ADD substantive elaboration, '
+                            'concrete examples, statistics and transitions so the speech gets '
+                            f'longer. The result MUST be AT LEAST {min_words} words (aim for '
+                            f'about {target_word_count}). Return ONLY the expanded speech text — '
+                            'no JSON, no headings, no commentary.'
+                        ),
+                    },
+                    {
+                        'role': 'user',
+                        'content': (
+                            f'This speech is only {actual} words; lengthen it to at least '
+                            f'{min_words} words (do not shorten it, keep the same topic and '
+                            f'opening):\n\n{current}'
+                        ),
+                    },
+                ],
+                max_tokens=min(6000, max(2000, int(target_word_count * 3))),
+                temperature=0.6,
+            )
+            expanded = expanded.strip()
+            if language == 'ar':
+                expanded = _clean_arabic_script(expanded)
+            if len(expanded.split()) > actual:
+                current, actual = expanded, len(expanded.split())
+            else:
+                break   # no progress — stop looping
+        except Exception:
+            break
+        if actual >= min_words:
+            break
+    return current
 
 
 def _trim_script_to_word_count(script: str, target_word_count: int, language: str) -> str:
@@ -1685,7 +1698,7 @@ def build_generation_response(generated: dict, params: dict, mode: str = 'genera
     # word script, so running them would TRUNCATE the very speech chunking was
     # built to produce. Long-form sections are already length-tuned and cleaned.
     if reflow:
-        script = _expand_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
+        script = _expand_script_to_word_count(script, target_word_count, params.get('language', 'ar'), word_count_settings['min'])
         script = _trim_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
         if params.get('language', 'ar') == 'ar':
             script = _proofread_arabic_script(script)
