@@ -123,3 +123,17 @@ DEFAULT_DIFFICULTY = 'intermediate'
 # as informational feedback but never lower overall_score. Set the env var
 # EVALUATION_SCORE_ON_MEANING=true to restore full meaning-based scoring.
 EVALUATION_SCORE_ON_MEANING = os.getenv('EVALUATION_SCORE_ON_MEANING', 'false').lower() == 'true'
+
+# ETIB feedback (Lina, 21 Aug 2026): "Pour l'evaluation, il faudrait supprimer
+# tout ce qui est en rapport avec le sens et le contenu. Les etudiants doivent
+# savoir exactement ce qui peut etre evalue par IA (terminologie, nombres/dates,
+# silences, hesitations, eventuellement les fautes de langue)."
+# EVALUATION_SCORE_ON_MEANING above already keeps meaning OUT OF THE SCORE.
+# This second flag keeps it out of the REPORT entirely: when False, the
+# meaning/content blocks (translation_errors, missing_content, coverage_score)
+# are dropped from the response and the LLM is told not to produce them, so a
+# student never sees an automatic meaning judgement. Set the env var
+# EVALUATION_REPORT_MEANING=true to show them again as informational feedback
+# (that is what Kevin asked for on 12 Aug 2026 — the two requests conflict, so
+# the behaviour is a single switch instead of a hard-coded choice).
+EVALUATION_REPORT_MEANING = os.getenv('EVALUATION_REPORT_MEANING', 'false').lower() == 'true'

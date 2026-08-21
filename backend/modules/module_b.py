@@ -71,6 +71,12 @@ def _prepare_arabic_tts_text(text: str) -> str:
     # Remaining decimal separators (٫ U+066B, Arabic comma ،, dot, comma)
     # between digits → the spoken word فاصلة
     text = re.sub(rf'({_AR_D})\s*[٫،.,]\s*(?={_AR_D})', r'\1 فاصلة ', text)
+    # Percent sign after a figure: edge-tts reads ٪ inconsistently in Arabic
+    # (sometimes silently) — say it out loud instead. ETIB feedback 21 Aug 2026:
+    # figures are among the most error-prone Arabic outputs.
+    text = re.sub(rf'({_AR_D})\s*[٪%]', r'\1 في المائة', text)
+    # A hyphen/dash BETWEEN two figures is a range, not a minus sign.
+    text = re.sub(rf'({_AR_D})\s*[-–—]\s*(?={_AR_D})', r'\1 إلى ', text)
     return text
 
 

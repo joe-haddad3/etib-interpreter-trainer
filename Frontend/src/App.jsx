@@ -277,6 +277,43 @@ const UI = {
     correctTranslation: 'Correct',
     missingContent: 'Missing content',
     scoreScopeNote: 'This score reflects terminology, target-language accuracy, numbers/names, and delivery (pauses, décalage, fluency). Meaning/coverage below is shown for your information and does not affect the score at this stage.',
+    aiDisclaimerTitle: '\u26a0\ufe0f AI disclaimer \u2014 read this before you rely on any output',
+    aiDisclaimerShort: 'This platform uses AI to write the speeches, read them aloud, transcribe your interpretation and comment on it. AI output can be wrong \u2014 check it before you learn from it.',
+    aiDisclaimerMore: 'Read the full disclaimer',
+    aiDisclaimerLess: 'Hide the disclaimer',
+    aiDisclaimerGen: 'Generated speeches: the text is produced by a large language model. It can contain invented figures, non-existent report or resolution names, factual mistakes, and cultural or political bias. Never treat it as a source of facts \u2014 it is training material. In Arabic, number agreement (\u0627\u0644\u0639\u062f\u062f \u0648\u0623\u062d\u0643\u0627\u0645\u0647) and dates are the most error-prone parts.',
+    aiDisclaimerTts: 'Synthetic audio (TTS): the voice can mispronounce names, acronyms, dates and figures \u2014 especially in Arabic. What you hear does not always match the written text. Edit the text before generating the audio if a passage sounds wrong.',
+    aiDisclaimerStt: 'Transcription (STT): your recording is transcribed automatically. The transcript is an estimate, not a certain record of what you said. Arabic, code-switching and background noise lower its accuracy noticeably. Correct the transcript before running the evaluation.',
+    aiDisclaimerEval: 'Evaluation: the report is an automatic training aid \u2014 not a grade, and not a substitute for your instructor. It judges only the categories listed below; anything else it says is indicative.',
+    aiDisclaimerAdvice: 'What we ask of you: verify terminology in the official bases, check figures and names against the source, correct the transcript, and report anything that looks wrong to your instructor.',
+    aiDisclaimerAck: 'I understand',
+    evalScopeTitle: '🎯 What the AI evaluates \u2014 and what it does not',
+    evalScopeYes: 'Evaluated automatically: terminology (against your approved glossary), numbers and dates, proper names, target-language correctness (grammar and morphology), silences and pauses, hesitations, repetitions, speech rate, pronunciation clarity \u2014 plus Arabic case endings (\u0627\u0644\u0625\u0639\u0631\u0627\u0628) when the Arabic acoustic module is enabled.',
+    evalScopeNo: 'NOT evaluated: fidelity of meaning, coverage and completeness, omitted ideas, style and register. These need a human interpreter trainer, so the platform deliberately does not judge them.',
+    evalScopeNote: 'Your score is built only from the categories in the first list.',
+    termBasesTitle: 'Reference terminology bases',
+    termBasesHint: 'Equivalents follow the official bases below. Use the 🔍 link on a row to check that term in each base before you record \u2014 the corrected entry is what the evaluation checks your terminology against.',
+    termCheckLabel: 'Check',
+    ownTextBtn: '\u270d\ufe0f Use my own text (no AI)',
+    ownTextTitle: '\u270d\ufe0f My own text \u2014 audio only, no AI generation',
+    ownTextHint: 'Paste a text you already have. It is used EXACTLY as written: no AI rewriting, no AI generation. Then go to \u201cAudio & materials\u201d to have it read aloud, and interpret it as usual.',
+    ownTextPlaceholder: 'Paste your text here\u2026',
+    ownTextUse: 'Use this text as-is',
+    ownTextEmpty: 'Paste a text first.',
+    ownTextBadge: 'Your own text \u2014 not AI-generated',
+    ownTextMaterialsHint: 'This text was added as-is, so it has no summary, MCQ or glossary yet. Generate them with the button if you want them \u2014 the text itself is never changed.',
+    scriptTitle: 'Speech text',
+    editScriptBtn: '\u270e Edit the text',
+    editScriptDone: '\u2713 Done',
+    editScriptHint: 'Correct the text BEFORE generating the audio \u2014 mistakes, awkward figures, wrong names. The audio, your interpretation and the evaluation all use this edited version.',
+    scriptRestore: '\u21ba Restore the original',
+    editTranscriptBtn: '\u270e Correct the transcript',
+    editTranscriptDone: '\u2713 Save the correction',
+    editTranscriptHint: 'The transcript is what the speech recognizer heard. Correct any recognition error BEFORE the evaluation, so a machine mistake is not counted as yours. Pauses, hesitations and speech rate keep being measured from your real recording.',
+    transcriptEditedBadge: 'transcript corrected by you',
+    micWarmingUp: 'Preparing the microphone\u2026',
+    micReadyHint: 'Wait for \u201cRecording\u201d before you start speaking.',
+    mediaAsrWarning: 'This text comes from the automatic transcription of your file. Its accuracy depends on the audio quality (and is lower in Arabic): re-read it and correct it in \u201cAudio & materials\u201d before using it as a source.',
     fluencyScore: 'Fluency score',
     pauseAnalysisTitle: 'Pauses & flow',
     repetitionAnalysisTitle: 'Repetitions — analysis',
@@ -751,6 +788,43 @@ const UI = {
     correctTranslation: 'الترجمة الصحيحة',
     missingContent: 'محتوى مفقود',
     scoreScopeNote: 'تعكس هذه الدرجة الالتزام بالمصطلحات، وصحّة اللغة الهدف، والأرقام والأسماء، والأداء (التوقّفات، إدارة الفارق الزمني، السلاسة). أمّا المعنى/التغطية المعروضان أدناه فهما للاطّلاع فقط ولا يؤثّران في الدرجة في هذه المرحلة.',
+    aiDisclaimerTitle: '\u26a0\ufe0f \u062a\u0646\u0628\u064a\u0647 \u0628\u0634\u0623\u0646 \u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a \u2014 \u0627\u0642\u0631\u0623\u0647 \u0642\u0628\u0644 \u0627\u0644\u0627\u0639\u062a\u0645\u0627\u062f \u0639\u0644\u0649 \u0623\u064a \u0645\u062e\u0631\u062c\u0627\u062a',
+    aiDisclaimerShort: '\u062a\u0633\u062a\u062e\u062f\u0645 \u0647\u0630\u0647 \u0627\u0644\u0645\u0646\u0635\u0651\u0629 \u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a \u0644\u0643\u062a\u0627\u0628\u0629 \u0627\u0644\u062e\u0637\u0627\u0628\u0627\u062a \u0648\u0642\u0631\u0627\u0621\u062a\u0647\u0627 \u0635\u0648\u062a\u064a\u0627\u064b \u0648\u062a\u0641\u0631\u064a\u063a \u0623\u062f\u0627\u0626\u0643 \u0648\u0627\u0644\u062a\u0639\u0644\u064a\u0642 \u0639\u0644\u064a\u0647. \u0642\u062f \u062a\u0643\u0648\u0646 \u0627\u0644\u0645\u062e\u0631\u062c\u0627\u062a \u062e\u0627\u0637\u0626\u0629: \u062a\u062d\u0642\u0651\u0642 \u0645\u0646\u0647\u0627 \u0642\u0628\u0644 \u0623\u0646 \u062a\u062a\u0639\u0644\u0651\u0645 \u0645\u0646\u0647\u0627.',
+    aiDisclaimerMore: '\u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u062a\u0646\u0628\u064a\u0647 \u0643\u0627\u0645\u0644\u0627\u064b',
+    aiDisclaimerLess: '\u0625\u062e\u0641\u0627\u0621 \u0627\u0644\u062a\u0646\u0628\u064a\u0647',
+    aiDisclaimerGen: '\u0627\u0644\u062e\u0637\u0627\u0628\u0627\u062a \u0627\u0644\u0645\u0648\u0644\u0651\u064e\u062f\u0629: \u0627\u0644\u0646\u0635 \u0645\u0646 \u0625\u0646\u062a\u0627\u062c \u0646\u0645\u0648\u0630\u062c \u0644\u063a\u0648\u064a \u0643\u0628\u064a\u0631\u060c \u0648\u0642\u062f \u064a\u062a\u0636\u0645\u0651\u0646 \u0623\u0631\u0642\u0627\u0645\u0627\u064b \u0645\u062e\u062a\u0644\u064e\u0642\u0629 \u0648\u0623\u0633\u0645\u0627\u0621 \u062a\u0642\u0627\u0631\u064a\u0631 \u0623\u0648 \u0642\u0631\u0627\u0631\u0627\u062a \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f\u0629 \u0648\u0623\u062e\u0637\u0627\u0621 \u0648\u0642\u0627\u0626\u0639\u064a\u0629 \u0648\u0627\u0646\u062d\u064a\u0627\u0632\u0627\u062a \u062b\u0642\u0627\u0641\u064a\u0629 \u0623\u0648 \u0633\u064a\u0627\u0633\u064a\u0629. \u0644\u0627 \u062a\u0639\u062f\u0651\u0647 \u0645\u0635\u062f\u0631\u0627\u064b \u0644\u0644\u0645\u0639\u0644\u0648\u0645\u0627\u062a\u061b \u0625\u0646\u0651\u0645\u0627 \u0647\u0648 \u0645\u0627\u062f\u0629 \u062a\u062f\u0631\u064a\u0628\u064a\u0629. \u0648\u0641\u064a \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u062a\u064f\u0639\u062f\u0651 \u0623\u062d\u0643\u0627\u0645 \u0627\u0644\u0639\u062f\u062f \u0648\u0627\u0644\u062a\u0648\u0627\u0631\u064a\u062e \u0623\u0643\u062b\u0631 \u0627\u0644\u0645\u0648\u0627\u0636\u0639 \u0639\u0631\u0636\u0629\u064b \u0644\u0644\u062e\u0637\u0623.',
+    aiDisclaimerTts: '\u0627\u0644\u0635\u0648\u062a \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a: \u0642\u062f \u064a\u064f\u0646\u0637\u064e\u0642 \u0627\u0644\u0623\u0633\u0645\u0627\u0621 \u0648\u0627\u0644\u0627\u062e\u062a\u0635\u0627\u0631\u0627\u062a \u0648\u0627\u0644\u062a\u0648\u0627\u0631\u064a\u062e \u0648\u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0646\u0637\u0642\u0627\u064b \u062e\u0627\u0637\u0626\u0627\u064b\u060c \u062e\u0635\u0648\u0635\u0627\u064b \u0641\u064a \u0627\u0644\u0639\u0631\u0628\u064a\u0629. \u0645\u0627 \u062a\u0633\u0645\u0639\u0647 \u0644\u0627 \u064a\u0637\u0627\u0628\u0642 \u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0643\u062a\u0648\u0628 \u062f\u0627\u0626\u0645\u0627\u064b. \u0635\u062d\u0651\u062d \u0627\u0644\u0646\u0635 \u0642\u0628\u0644 \u062a\u0648\u0644\u064a\u062f \u0627\u0644\u0635\u0648\u062a \u0625\u0646 \u0628\u062f\u0627 \u0645\u0642\u0637\u0639 \u0645\u0627 \u063a\u064a\u0631 \u0633\u0644\u064a\u0645.',
+    aiDisclaimerStt: '\u0627\u0644\u062a\u0641\u0631\u064a\u063a \u0627\u0644\u0635\u0648\u062a\u064a: \u064a\u064f\u0641\u0631\u0651\u064e\u063a \u062a\u0633\u062c\u064a\u0644\u0643 \u0622\u0644\u064a\u0627\u064b\u060c \u0648\u0627\u0644\u0646\u0635 \u0627\u0644\u0646\u0627\u062a\u062c \u062a\u0642\u062f\u064a\u0631 \u0644\u0627 \u064a\u0642\u064a\u0646. \u062a\u0646\u062e\u0641\u0636 \u062f\u0642\u0651\u062a\u0647 \u0641\u064a \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u0648\u0645\u0639 \u0627\u0644\u062a\u0646\u0627\u0648\u0628 \u0627\u0644\u0644\u063a\u0648\u064a \u0648\u0627\u0644\u0636\u062c\u064a\u062c. \u0635\u062d\u0651\u062d \u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0641\u0631\u0651\u064e\u063a \u0642\u0628\u0644 \u062a\u0634\u063a\u064a\u0644 \u0627\u0644\u062a\u0642\u064a\u064a\u0645.',
+    aiDisclaimerEval: '\u0627\u0644\u062a\u0642\u064a\u064a\u0645: \u0627\u0644\u062a\u0642\u0631\u064a\u0631 \u0623\u062f\u0627\u0629 \u062a\u062f\u0631\u064a\u0628 \u0622\u0644\u064a\u0629\u060c \u0648\u0644\u064a\u0633 \u0639\u0644\u0627\u0645\u0629 \u0648\u0644\u0627 \u0628\u062f\u064a\u0644\u0627\u064b \u0639\u0646 \u0623\u0633\u062a\u0627\u0630\u0643. \u0648\u0647\u0648 \u0644\u0627 \u064a\u062d\u0643\u0645 \u0625\u0644\u0627\u0651 \u0641\u064a \u0627\u0644\u0641\u0626\u0627\u062a \u0627\u0644\u0645\u0630\u0643\u0648\u0631\u0629 \u0623\u062f\u0646\u0627\u0647\u060c \u0648\u0645\u0627 \u0639\u062f\u0627\u0647\u0627 \u0625\u0634\u0627\u0631\u064a \u0641\u0642\u0637.',
+    aiDisclaimerAdvice: '\u0645\u0627 \u0646\u0637\u0644\u0628\u0647 \u0645\u0646\u0643: \u062a\u062d\u0642\u0651\u0642 \u0645\u0646 \u0627\u0644\u0645\u0635\u0637\u0644\u062d\u0627\u062a \u0641\u064a \u0627\u0644\u0642\u0648\u0627\u0639\u062f \u0627\u0644\u0631\u0633\u0645\u064a\u0629\u060c \u0648\u0642\u0627\u0631\u0646 \u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0648\u0627\u0644\u0623\u0633\u0645\u0627\u0621 \u0628\u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0635\u062f\u0631\u060c \u0648\u0635\u062d\u0651\u062d \u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0641\u0631\u0651\u064e\u063a\u060c \u0648\u0623\u0628\u0644\u063a \u0623\u0633\u062a\u0627\u0630\u0643 \u0628\u0623\u064a \u0646\u062a\u064a\u062c\u0629 \u062a\u0628\u062f\u0648 \u062e\u0627\u0637\u0626\u0629.',
+    aiDisclaimerAck: '\u0641\u0647\u0645\u062a',
+    evalScopeTitle: '🎯 \u0645\u0627 \u064a\u064f\u0642\u064a\u0651\u0645\u0647 \u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a \u2014 \u0648\u0645\u0627 \u0644\u0627 \u064a\u064f\u0642\u064a\u0651\u0645\u0647',
+    evalScopeYes: '\u0645\u0627 \u064a\u064f\u0642\u064a\u0651\u0645 \u0622\u0644\u064a\u0627\u064b: \u0627\u0644\u0645\u0635\u0637\u0644\u062d\u0627\u062a (\u0642\u064a\u0627\u0633\u0627\u064b \u0625\u0644\u0649 \u0645\u0633\u0631\u062f\u0643 \u0627\u0644\u0645\u0639\u062a\u0645\u062f)\u060c \u0648\u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0648\u0627\u0644\u062a\u0648\u0627\u0631\u064a\u062e\u060c \u0648\u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u0623\u0639\u0644\u0627\u0645\u060c \u0648\u0633\u0644\u0627\u0645\u0629 \u0627\u0644\u0644\u063a\u0629 \u0627\u0644\u0647\u062f\u0641 (\u0627\u0644\u0646\u062d\u0648 \u0648\u0627\u0644\u0635\u0631\u0641)\u060c \u0648\u0627\u0644\u0635\u0645\u062a \u0648\u0627\u0644\u062a\u0648\u0642\u0651\u0641\u0627\u062a\u060c \u0648\u0627\u0644\u062a\u0631\u062f\u0651\u062f\u060c \u0648\u0627\u0644\u062a\u0643\u0631\u0627\u0631\u060c \u0648\u0633\u0631\u0639\u0629 \u0627\u0644\u0625\u0644\u0642\u0627\u0621\u060c \u0648\u0648\u0636\u0648\u062d \u0627\u0644\u0646\u0637\u0642 \u2014 \u0625\u0636\u0627\u0641\u0629\u064b \u0625\u0644\u0649 \u0623\u0648\u0627\u062e\u0631 \u0627\u0644\u0643\u0644\u0645 (\u0627\u0644\u0625\u0639\u0631\u0627\u0628) \u0639\u0646\u062f \u062a\u0641\u0639\u064a\u0644 \u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0635\u0648\u062a\u064a\u0629 \u0627\u0644\u0639\u0631\u0628\u064a\u0629.',
+    evalScopeNo: '\u0645\u0627 \u0644\u0627 \u064a\u064f\u0642\u064a\u0651\u0645: \u0623\u0645\u0627\u0646\u0629 \u0646\u0642\u0644 \u0627\u0644\u0645\u0639\u0646\u0649\u060c \u0648\u0627\u0644\u062a\u063a\u0637\u064a\u0629 \u0648\u0627\u0644\u0627\u0643\u062a\u0645\u0627\u0644\u060c \u0648\u0627\u0644\u0623\u0641\u0643\u0627\u0631 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0629\u060c \u0648\u0627\u0644\u0623\u0633\u0644\u0648\u0628 \u0648\u0627\u0644\u0645\u0633\u062a\u0648\u0649 \u0627\u0644\u0644\u063a\u0648\u064a. \u0647\u0630\u0647 \u0645\u0646 \u0627\u062e\u062a\u0635\u0627\u0635 \u0627\u0644\u0645\u062f\u0631\u0651\u0628 \u0627\u0644\u0628\u0634\u0631\u064a\u060c \u0648\u0644\u0630\u0644\u0643 \u062a\u0645\u062a\u0646\u0639 \u0627\u0644\u0645\u0646\u0635\u0651\u0629 \u0639\u0646 \u0627\u0644\u062d\u0643\u0645 \u0641\u064a\u0647\u0627 \u0639\u0645\u062f\u0627\u064b.',
+    evalScopeNote: '\u062a\u064f\u0628\u0646\u0649 \u062f\u0631\u062c\u062a\u0643 \u0645\u0646 \u0641\u0626\u0627\u062a \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0623\u0648\u0644\u0649 \u0648\u062d\u062f\u0647\u0627.',
+    termBasesTitle: '\u0642\u0648\u0627\u0639\u062f \u0627\u0644\u0645\u0635\u0637\u0644\u062d\u0627\u062a \u0627\u0644\u0645\u0631\u062c\u0639\u064a\u0629',
+    termBasesHint: '\u062a\u062a\u0628\u0639 \u0627\u0644\u0645\u0642\u0627\u0628\u0644\u0627\u062a \u0627\u0644\u0642\u0648\u0627\u0639\u062f \u0627\u0644\u0631\u0633\u0645\u064a\u0629 \u0623\u062f\u0646\u0627\u0647. \u0627\u0633\u062a\u062e\u062f\u0645 \u0631\u0627\u0628\u0637 🔍 \u0641\u064a \u0643\u0644 \u0633\u0637\u0631 \u0644\u0644\u062a\u062d\u0642\u0651\u0642 \u0645\u0646 \u0627\u0644\u0645\u0635\u0637\u0644\u062d \u0641\u064a \u0643\u0644 \u0642\u0627\u0639\u062f\u0629 \u0642\u0628\u0644 \u0627\u0644\u062a\u0633\u062c\u064a\u0644 \u2014 \u0641\u0627\u0644\u0645\u062f\u062e\u0644 \u0627\u0644\u0645\u0635\u062d\u0651\u064e\u062d \u0647\u0648 \u0645\u0627 \u064a\u0642\u064a\u0633 \u0639\u0644\u064a\u0647 \u0627\u0644\u062a\u0642\u064a\u064a\u0645 \u0645\u0635\u0637\u0644\u062d\u0627\u062a\u0643.',
+    termCheckLabel: '\u062a\u062d\u0642\u0651\u0642',
+    ownTextBtn: '\u270d\ufe0f \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0646\u0635\u0651\u064a \u0627\u0644\u062e\u0627\u0635 (\u0628\u0644\u0627 \u0630\u0643\u0627\u0621 \u0627\u0635\u0637\u0646\u0627\u0639\u064a)',
+    ownTextTitle: '\u270d\ufe0f \u0646\u0635\u0651\u064a \u0627\u0644\u062e\u0627\u0635 \u2014 \u0635\u0648\u062a \u0641\u0642\u0637 \u0628\u0644\u0627 \u062a\u0648\u0644\u064a\u062f',
+    ownTextHint: '\u0627\u0644\u0635\u0642 \u0646\u0635\u0651\u0627\u064b \u0644\u062f\u064a\u0643 \u0645\u0633\u0628\u0642\u0627\u064b. \u0633\u064a\u064f\u0633\u062a\u062e\u062f\u0645 \u0643\u0645\u0627 \u0647\u0648 \u062a\u0645\u0627\u0645\u0627\u064b: \u0628\u0644\u0627 \u0625\u0639\u0627\u062f\u0629 \u0635\u064a\u0627\u063a\u0629 \u0648\u0644\u0627 \u062a\u0648\u0644\u064a\u062f. \u062b\u0645\u0651 \u0627\u0646\u062a\u0642\u0644 \u0625\u0644\u0649 \u00ab\u0627\u0644\u0635\u0648\u062a \u0648\u0627\u0644\u0645\u0648\u0627\u062f\u00bb \u0644\u062a\u062d\u0648\u064a\u0644\u0647 \u0625\u0644\u0649 \u0635\u0648\u062a \u062b\u0645\u0651 \u062a\u0631\u062c\u0645\u0647 \u0643\u0627\u0644\u0645\u0639\u062a\u0627\u062f.',
+    ownTextPlaceholder: '\u0627\u0644\u0635\u0642 \u0646\u0635\u0651\u0643 \u0647\u0646\u0627\u2026',
+    ownTextUse: '\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0647\u0630\u0627 \u0627\u0644\u0646\u0635 \u0643\u0645\u0627 \u0647\u0648',
+    ownTextEmpty: '\u0627\u0644\u0635\u0642 \u0646\u0635\u0651\u0627\u064b \u0623\u0648\u0651\u0644\u0627\u064b.',
+    ownTextBadge: '\u0646\u0635\u0651\u0643 \u0627\u0644\u062e\u0627\u0635 \u2014 \u063a\u064a\u0631 \u0645\u0648\u0644\u0651\u064e\u062f \u0628\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a',
+    ownTextMaterialsHint: '\u0623\u064f\u0636\u064a\u0641 \u0647\u0630\u0627 \u0627\u0644\u0646\u0635 \u0643\u0645\u0627 \u0647\u0648\u060c \u0641\u0644\u0627 \u064a\u062a\u0636\u0645\u0651\u0646 \u0645\u0644\u062e\u0651\u0635\u0627\u064b \u0648\u0644\u0627 \u0623\u0633\u0626\u0644\u0629 \u0627\u062e\u062a\u064a\u0627\u0631 \u0645\u0646 \u0645\u062a\u0639\u062f\u0651\u062f \u0648\u0644\u0627 \u0645\u0633\u0631\u062f\u0627\u064b. \u0648\u0644\u0651\u062f\u0647\u0627 \u0628\u0627\u0644\u0632\u0631 \u0625\u0646 \u0623\u0631\u062f\u062a \u2014 \u0648\u0644\u0646 \u064a\u062a\u063a\u064a\u0651\u0631 \u0627\u0644\u0646\u0635 \u0646\u0641\u0633\u0647.',
+    scriptTitle: '\u0646\u0635 \u0627\u0644\u062e\u0637\u0627\u0628',
+    editScriptBtn: '\u270e \u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0646\u0635',
+    editScriptDone: '\u2713 \u062a\u0645\u0651',
+    editScriptHint: '\u0635\u062d\u0651\u062d \u0627\u0644\u0646\u0635 \u0642\u0628\u0644 \u062a\u0648\u0644\u064a\u062f \u0627\u0644\u0635\u0648\u062a \u2014 \u0627\u0644\u0623\u062e\u0637\u0627\u0621 \u0648\u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u063a\u064a\u0631 \u0627\u0644\u0645\u0648\u0641\u0651\u0642\u0629 \u0648\u0627\u0644\u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u062e\u0627\u0637\u0626\u0629. \u064a\u0639\u062a\u0645\u062f \u0627\u0644\u0635\u0648\u062a \u0648\u0627\u0644\u062a\u0631\u062c\u0645\u0629 \u0648\u0627\u0644\u062a\u0642\u064a\u064a\u0645 \u062c\u0645\u064a\u0639\u0627\u064b \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0646\u0633\u062e\u0629 \u0627\u0644\u0645\u0635\u062d\u0651\u062d\u0629.',
+    scriptRestore: '\u21ba \u0627\u0633\u062a\u0639\u0627\u062f\u0629 \u0627\u0644\u0646\u0635 \u0627\u0644\u0623\u0635\u0644\u064a',
+    editTranscriptBtn: '\u270e \u062a\u0635\u062d\u064a\u062d \u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0641\u0631\u0651\u064e\u063a',
+    editTranscriptDone: '\u2713 \u062d\u0641\u0638 \u0627\u0644\u062a\u0635\u062d\u064a\u062d',
+    editTranscriptHint: '\u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0641\u0631\u0651\u064e\u063a \u0647\u0648 \u0645\u0627 \u0633\u0645\u0639\u0647 \u0646\u0638\u0627\u0645 \u0627\u0644\u062a\u0639\u0631\u0651\u0641 \u0639\u0644\u0649 \u0627\u0644\u0643\u0644\u0627\u0645. \u0635\u062d\u0651\u062d \u0623\u064a \u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u062a\u0639\u0631\u0651\u0641 \u0642\u0628\u0644 \u0627\u0644\u062a\u0642\u064a\u064a\u0645 \u0643\u064a \u0644\u0627 \u064a\u064f\u062d\u0633\u064e\u0628 \u062e\u0637\u0623 \u0627\u0644\u0622\u0644\u0629 \u0639\u0644\u064a\u0643. \u062a\u0628\u0642\u0649 \u0627\u0644\u062a\u0648\u0642\u0651\u0641\u0627\u062a \u0648\u0627\u0644\u062a\u0631\u062f\u0651\u062f \u0648\u0633\u0631\u0639\u0629 \u0627\u0644\u0625\u0644\u0642\u0627\u0621 \u0645\u0642\u064a\u0633\u0629 \u0645\u0646 \u062a\u0633\u062c\u064a\u0644\u0643 \u0627\u0644\u0641\u0639\u0644\u064a.',
+    transcriptEditedBadge: '\u0646\u0635 \u0645\u0641\u0631\u0651\u064e\u063a \u0635\u062d\u0651\u062d\u062a\u064e\u0647 \u0628\u0646\u0641\u0633\u0643',
+    micWarmingUp: '\u062c\u0627\u0631\u064d \u062a\u0647\u064a\u0626\u0629 \u0627\u0644\u0645\u064a\u0643\u0631\u0648\u0641\u0648\u0646\u2026',
+    micReadyHint: '\u0627\u0646\u062a\u0638\u0631 \u0638\u0647\u0648\u0631 \u00ab\u062c\u0627\u0631\u064d \u0627\u0644\u062a\u0633\u062c\u064a\u0644\u00bb \u0642\u0628\u0644 \u0623\u0646 \u062a\u0628\u062f\u0623 \u0627\u0644\u0643\u0644\u0627\u0645.',
+    mediaAsrWarning: '\u0647\u0630\u0627 \u0627\u0644\u0646\u0635 \u0646\u0627\u062a\u062c \u0639\u0646 \u062a\u0641\u0631\u064a\u063a \u0622\u0644\u064a \u0644\u0645\u0644\u0641\u0643. \u062a\u062a\u0648\u0642\u0651\u0641 \u062f\u0642\u0651\u062a\u0647 \u0639\u0644\u0649 \u062c\u0648\u062f\u0629 \u0627\u0644\u0635\u0648\u062a (\u0648\u0647\u064a \u0623\u062f\u0646\u0649 \u0641\u064a \u0627\u0644\u0639\u0631\u0628\u064a\u0629): \u0623\u0639\u062f \u0642\u0631\u0627\u0621\u062a\u0647 \u0648\u0635\u062d\u0651\u062d\u0647 \u0641\u064a \u00ab\u0627\u0644\u0635\u0648\u062a \u0648\u0627\u0644\u0645\u0648\u0627\u062f\u00bb \u0642\u0628\u0644 \u0627\u0639\u062a\u0645\u0627\u062f\u0647 \u0645\u0635\u062f\u0631\u0627\u064b.',
     fluencyScore: 'درجة السلاسة',
     pauseAnalysisTitle: 'التوقفات والانسيابية',
     repetitionAnalysisTitle: 'تحليل التكرارات',
@@ -1225,6 +1299,43 @@ const UI = {
     correctTranslation: 'Traduction correcte',
     missingContent: 'Contenu manquant',
     scoreScopeNote: 'Ce score reflète la conformité terminologique, la correction de la langue cible, les chiffres/noms et la restitution technique (pauses, gestion du décalage, fluidité). Le sens/la couverture ci-dessous sont affichés à titre informatif et n\'influencent pas le score à ce stade.',
+    aiDisclaimerTitle: '\u26a0\ufe0f Avertissement IA \u2014 \u00e0 lire avant de vous fier \u00e0 un r\u00e9sultat',
+    aiDisclaimerShort: 'Cette plateforme utilise l\'IA pour r\u00e9diger les discours, les lire \u00e0 voix haute, transcrire votre prestation et la commenter. Les sorties IA peuvent \u00eatre erron\u00e9es : v\u00e9rifiez-les avant d\'apprendre dessus.',
+    aiDisclaimerMore: 'Lire l\'avertissement complet',
+    aiDisclaimerLess: 'Masquer l\'avertissement',
+    aiDisclaimerGen: 'Discours g\u00e9n\u00e9r\u00e9s : le texte est produit par un grand mod\u00e8le de langue. Il peut contenir des chiffres invent\u00e9s, des noms de rapports ou de r\u00e9solutions inexistants, des erreurs factuelles et des biais culturels ou politiques. Ne le consid\u00e9rez jamais comme une source de faits : c\'est un support d\'entra\u00eenement. En arabe, l\'accord du nombre (\u0627\u0644\u0639\u062f\u062f \u0648\u0623\u062d\u0643\u0627\u0645\u0647) et les dates sont les points les plus fragiles.',
+    aiDisclaimerTts: 'Audio synth\u00e9tique (TTS) : la voix peut mal prononcer les noms, sigles, dates et chiffres \u2014 surtout en arabe. Ce que vous entendez ne correspond pas toujours au texte \u00e9crit. Corrigez le texte avant de g\u00e9n\u00e9rer l\'audio si un passage sonne mal.',
+    aiDisclaimerStt: 'Transcription (STT) : votre enregistrement est transcrit automatiquement. La transcription est une estimation, pas ce que vous avez certainement dit. L\'arabe, l\'alternance codique et le bruit de fond en d\u00e9gradent nettement la pr\u00e9cision. Corrigez la transcription avant de lancer l\'\u00e9valuation.',
+    aiDisclaimerEval: '\u00c9valuation : le rapport est une aide \u00e0 l\'entra\u00eenement automatique, ni une note ni un substitut \u00e0 votre enseignant. Il ne juge que les cat\u00e9gories list\u00e9es ci-dessous ; tout le reste est indicatif.',
+    aiDisclaimerAdvice: 'Ce que nous vous demandons : v\u00e9rifier la terminologie dans les bases officielles, contr\u00f4ler chiffres et noms par rapport \u00e0 la source, corriger la transcription, et signaler \u00e0 votre enseignant tout r\u00e9sultat douteux.',
+    aiDisclaimerAck: 'J\'ai compris',
+    evalScopeTitle: '🎯 Ce que l\'IA \u00e9value \u2014 et ce qu\'elle n\'\u00e9value pas',
+    evalScopeYes: '\u00c9valu\u00e9 automatiquement : terminologie (par rapport \u00e0 votre glossaire valid\u00e9), chiffres et dates, noms propres, correction de la langue cible (grammaire et morphologie), silences et pauses, h\u00e9sitations, r\u00e9p\u00e9titions, d\u00e9bit, clart\u00e9 de prononciation \u2014 ainsi que les finales casuelles arabes (\u0627\u0644\u0625\u0639\u0631\u0627\u0628) lorsque le module acoustique arabe est activ\u00e9.',
+    evalScopeNo: 'NON \u00e9valu\u00e9 : la fid\u00e9lit\u00e9 du sens, la couverture et la compl\u00e9tude, les id\u00e9es omises, le style et le registre. Cela rel\u00e8ve d\'un formateur humain : la plateforme ne les juge d\u00e9lib\u00e9r\u00e9ment pas.',
+    evalScopeNote: 'Votre score est construit uniquement \u00e0 partir des cat\u00e9gories de la premi\u00e8re liste.',
+    termBasesTitle: 'Bases terminologiques de r\u00e9f\u00e9rence',
+    termBasesHint: 'Les \u00e9quivalents suivent les bases officielles ci-dessous. Utilisez le lien 🔍 d\'une ligne pour v\u00e9rifier le terme dans chaque base avant d\'enregistrer \u2014 c\'est la fiche corrig\u00e9e qui sert de r\u00e9f\u00e9rence \u00e0 l\'\u00e9valuation terminologique.',
+    termCheckLabel: 'V\u00e9rifier',
+    ownTextBtn: '\u270d\ufe0f Utiliser mon propre texte (sans IA)',
+    ownTextTitle: '\u270d\ufe0f Mon propre texte \u2014 audio seulement, sans g\u00e9n\u00e9ration IA',
+    ownTextHint: 'Collez un texte que vous avez d\u00e9j\u00e0. Il est utilis\u00e9 EXACTEMENT tel quel : aucune r\u00e9\u00e9criture, aucune g\u00e9n\u00e9ration par l\'IA. Passez ensuite \u00e0 \u00ab Audio & supports \u00bb pour le faire lire, puis interpr\u00e9tez-le normalement.',
+    ownTextPlaceholder: 'Collez votre texte ici\u2026',
+    ownTextUse: 'Utiliser ce texte tel quel',
+    ownTextEmpty: 'Collez d\'abord un texte.',
+    ownTextBadge: 'Votre propre texte \u2014 non g\u00e9n\u00e9r\u00e9 par IA',
+    ownTextMaterialsHint: 'Ce texte a \u00e9t\u00e9 ajout\u00e9 tel quel : il n\'a donc ni r\u00e9sum\u00e9, ni QCM, ni glossaire. G\u00e9n\u00e9rez-les avec le bouton si vous les souhaitez \u2014 le texte lui-m\u00eame n\'est jamais modifi\u00e9.',
+    scriptTitle: 'Texte du discours',
+    editScriptBtn: '\u270e Modifier le texte',
+    editScriptDone: '\u2713 Termin\u00e9',
+    editScriptHint: 'Corrigez le texte AVANT de g\u00e9n\u00e9rer l\'audio \u2014 erreurs, chiffres mal formul\u00e9s, noms erron\u00e9s. L\'audio, votre interpr\u00e9tation et l\'\u00e9valuation utilisent tous cette version corrig\u00e9e.',
+    scriptRestore: '\u21ba R\u00e9tablir l\'original',
+    editTranscriptBtn: '\u270e Corriger la transcription',
+    editTranscriptDone: '\u2713 Enregistrer la correction',
+    editTranscriptHint: 'La transcription est ce que la reconnaissance vocale a entendu. Corrigez toute erreur de reconnaissance AVANT l\'\u00e9valuation, pour qu\'une erreur de la machine ne soit pas compt\u00e9e comme la v\u00f4tre. Les pauses, h\u00e9sitations et le d\u00e9bit restent mesur\u00e9s sur votre enregistrement r\u00e9el.',
+    transcriptEditedBadge: 'transcription corrig\u00e9e par vous',
+    micWarmingUp: 'Pr\u00e9paration du microphone\u2026',
+    micReadyHint: 'Attendez l\'affichage \u00ab Enregistrement \u00bb avant de commencer \u00e0 parler.',
+    mediaAsrWarning: 'Ce texte provient de la transcription automatique de votre fichier. Sa pr\u00e9cision d\u00e9pend de la qualit\u00e9 audio (et reste plus faible en arabe) : relisez-le et corrigez-le dans \u00ab Audio & supports \u00bb avant de l\'utiliser comme source.',
     fluencyScore: 'Score de fluidité',
     pauseAnalysisTitle: 'Pauses et rythme',
     repetitionAnalysisTitle: 'Répétitions — analyse',
@@ -1640,6 +1751,58 @@ function clearLocalGlossaryMemory() {
 }
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
+// ── Reference terminology bases (ETIB feedback, Lina — 21 Aug 2026) ─────────
+// "Est-il possible d'ajouter comme référence des bases terminologiques
+//  existantes ?"  None of these bases exposes a free public API (UNTERM, IATE
+// and EUR-Lex sit behind WAFs; FranceTerme and the Vitrine linguistique are
+// HTML-only), so the platform cannot query them server-side. It does the two
+// things that actually change the result instead:
+//   1. the generation prompt names them as the AUTHORITY ORDER every equivalent
+//      must follow (backend module_a.TERMINOLOGY_AUTHORITY_BLOCK);
+//   2. every glossary row carries a one-click search into each base, so a term
+//      is verified against the real source before the student records — and the
+//      corrected row is what Module D checks the terminology against.
+// Search URL patterns verified against the live sites on 21 Aug 2026.
+const TERMINOLOGY_BASES = [
+  { id: 'unterm',      label: 'UNTERM',       title: 'UNTERM — United Nations terminology (AR/FR/EN)',
+    url: t => `https://unterm.un.org/unterm2/en/search?q=${encodeURIComponent(t)}` },
+  { id: 'iate',        label: 'IATE',         title: 'IATE — EU interinstitutional terminology',
+    url: t => `https://iate.europa.eu/search/result?query=${encodeURIComponent(t)}` },
+  { id: 'eurovoc',     label: 'EuroVoc',      title: 'EuroVoc / EUR-Lex — EU multilingual thesaurus',
+    url: t => `https://eur-lex.europa.eu/search.html?scope=EURLEX&text=${encodeURIComponent(t)}&type=quick` },
+  { id: 'franceterme', label: 'FranceTerme',  title: 'FranceTerme — termes officiels recommandés (FR)',
+    url: t => `https://www.culture.fr/franceterme/Resultats-de-recherche?q=${encodeURIComponent(t)}` },
+  { id: 'oqlf',        label: 'OQLF',         title: 'Vitrine linguistique — Office québécois de la langue française',
+    url: t => `https://vitrinelinguistique.oqlf.gouv.qc.ca/resultats-de-recherche?tx_solr%5Bq%5D=${encodeURIComponent(t)}` },
+  { id: 'certtal',     label: 'ETIB-CERTTAL', title: 'Base terminologique ETIB–CERTTAL (USJ)',
+    url: t => `https://etib-certtal-terminologie.usj.edu.lb/?s=${encodeURIComponent(t)}&post_type=product` },
+];
+
+// One row of "check this term in <base>" links. Uses the term itself, falling
+// back to whichever equivalent exists, so an empty "term" cell still searches.
+function TermCheckLinks({ item, labels }) {
+  const query = String(
+    item.term || glossaryArabicValue(item) ||
+    glossaryValue(item, ['french', 'French', 'fr', 'FR']) ||
+    glossaryValue(item, ['english', 'English', 'en', 'EN']) || ''
+  ).trim();
+  if (!query) return null;
+  return (
+    <span style={{ display: 'inline-flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      <span style={{ fontSize: '0.75rem', color: 'var(--warm-gray)' }} aria-hidden="true">🔎</span>
+      {TERMINOLOGY_BASES.map(base => (
+        <a key={base.id} href={base.url(query)} target="_blank" rel="noopener noreferrer"
+          title={`${labels.termCheckLabel}: ${base.title}`}
+          style={{ fontSize: '0.7rem', color: 'var(--primary)', textDecoration: 'none',
+                   border: '1px solid var(--border, #ddd)', borderRadius: 5, padding: '0.05rem 0.3rem',
+                   whiteSpace: 'nowrap' }}>
+          {base.label}
+        </a>
+      ))}
+    </span>
+  );
+}
+
 function glossaryValue(item, keys) {
   for (const key of keys) {
     const value = item?.[key];
@@ -1957,10 +2120,14 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                     <div className="progress-stat-label">{labels.progressFluency}</div>
                     <div className="progress-stat-value" style={{ color: Number(latest.fluency_score) >= 7 ? 'var(--sage)' : 'var(--gold)' }}>{fmtScore(latest.fluency_score)}</div>
                   </div>
-                  <div className="progress-stat-card" style={{ minWidth: 90 }}>
-                    <div className="progress-stat-label">{labels.progressCoverage}</div>
-                    <div className="progress-stat-value" style={{ color: Number(latest.coverage_score) >= 7 ? 'var(--sage)' : 'var(--gold)' }}>{fmtScore(latest.coverage_score)}</div>
-                  </div>
+                  {/* Coverage only exists when meaning is in scope — hidden
+                      otherwise rather than shown as a meaningless 0.0. */}
+                  {latest.coverage_score != null && Number(latest.coverage_score) > 0 && (
+                    <div className="progress-stat-card" style={{ minWidth: 90 }}>
+                      <div className="progress-stat-label">{labels.progressCoverage}</div>
+                      <div className="progress-stat-value" style={{ color: Number(latest.coverage_score) >= 7 ? 'var(--sage)' : 'var(--gold)' }}>{fmtScore(latest.coverage_score)}</div>
+                    </div>
+                  )}
                 </div>
                 <div style={{ flex: 1, minWidth: 200 }}>
                   {latest.summary && <p dir="auto" style={{ fontSize: '0.88rem', color: 'var(--warm-gray)', marginBottom: '0.5rem', fontStyle: 'italic' }}>"{latest.summary}"</p>}
@@ -2100,7 +2267,9 @@ function ModuleProgress({ labels, refresh, onApplyParams }) {
                       <div className="session-detail-scores">
                         <div><span className="session-detail-label">{labels.progressOverall}</span><ScoreBadge score={s.overall_score} /></div>
                         <div><span className="session-detail-label">{labels.progressFluency}</span><ScoreBadge score={s.fluency_score} /></div>
-                        <div><span className="session-detail-label">{labels.progressCoverage}</span><ScoreBadge score={s.coverage_score} /></div>
+                        {s.coverage_score != null && Number(s.coverage_score) > 0 && (
+                          <div><span className="session-detail-label">{labels.progressCoverage}</span><ScoreBadge score={s.coverage_score} /></div>
+                        )}
                       </div>
                       {s.summary && <p style={{ fontSize: '0.82rem', color: 'var(--warm-gray)', marginTop: '0.6rem', fontStyle: 'italic' }}>"{s.summary}"</p>}
                       {(s.strengths || []).length > 0 && (
@@ -2691,6 +2860,86 @@ function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
   );
 }
 
+// ── AI disclaimer (ETIB feedback, Lina — 21 Aug 2026) ────────────────────
+// "Ne faudrait-il pas ajouter dans la plateforme un avertissement (AI disclaimer)
+//  qui prévient les usagers des limites et de la nécessité de faire preuve de
+//  vigilance lors de l'utilisation des sorties ?"
+// The one-line warning is ALWAYS visible — it is not dismissible, because a
+// disclaimer a student can hide forever stops being one. Only the detail is
+// collapsible, and it stays open once opened for the session.
+const AI_DISCLAIMER_ACK_KEY = 'etib_ai_disclaimer_ack_v1';
+
+function AiDisclaimer({ labels, compact = false }) {
+  // Opens itself until the student has read it once, so the full text is seen
+  // at least one time; after that the one-line warning stays but the detail is
+  // collapsed. The warning line itself is never dismissible.
+  const [acked, setAcked] = useState(() => {
+    try { return localStorage.getItem(AI_DISCLAIMER_ACK_KEY) === '1'; } catch { return false; }
+  });
+  const [open, setOpen] = useState(!acked);
+
+  function acknowledge() {
+    try { localStorage.setItem(AI_DISCLAIMER_ACK_KEY, '1'); } catch { /* private mode */ }
+    setAcked(true);
+    setOpen(false);
+  }
+  return (
+    <div className="card" style={{
+      background: '#fff8e6', border: '1px solid #f0d9a8', borderRadius: 10,
+      padding: compact ? '0.7rem 0.9rem' : '0.9rem 1.2rem', marginBottom: '1rem',
+    }}>
+      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+          <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>{labels.aiDisclaimerTitle}</p>
+          <p style={{ fontSize: '0.85rem', margin: '0.35rem 0 0', lineHeight: 1.55 }}>{labels.aiDisclaimerShort}</p>
+        </div>
+        <button type="button" className="btn-secondary btn-sm" onClick={() => setOpen(v => !v)}
+          style={{ whiteSpace: 'nowrap' }}>
+          {open ? labels.aiDisclaimerLess : labels.aiDisclaimerMore}
+        </button>
+      </div>
+      {open && (
+        <ul style={{ margin: '0.85rem 0 0', paddingInlineStart: '1.1rem', fontSize: '0.83rem', lineHeight: 1.65 }}>
+          <li>{labels.aiDisclaimerGen}</li>
+          <li>{labels.aiDisclaimerTts}</li>
+          <li>{labels.aiDisclaimerStt}</li>
+          <li>{labels.aiDisclaimerEval}</li>
+          <li><strong>{labels.aiDisclaimerAdvice}</strong></li>
+          <li>{labels.aboutEvalStorage}</li>
+        </ul>
+      )}
+      {open && !acked && (
+        <button type="button" className="btn-primary btn-sm" onClick={acknowledge}
+          style={{ marginTop: '0.75rem' }}>
+          {labels.aiDisclaimerAck}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── What the automatic evaluation judges — and what it deliberately does not ──
+// ETIB (21 Aug 2026): "Les étudiants doivent savoir exactement ce qui peut être
+// évalué par IA (terminologie, nombres/dates, silences, hésitations,
+// éventuellement les fautes de langue)." Shown before recording (Module C) and
+// on top of the report (Module D) so the scope is never a surprise.
+function EvalScopePanel({ labels, style }) {
+  return (
+    <div className="card" style={{ background: '#f2f7f2', border: '1px solid #cfe0cf', ...style }}>
+      <p style={{ fontWeight: 700, fontSize: '0.88rem', margin: 0 }}>{labels.evalScopeTitle}</p>
+      <p style={{ fontSize: '0.83rem', margin: '0.5rem 0 0', lineHeight: 1.6 }}>
+        <span style={{ color: 'var(--sage)', fontWeight: 700 }}>✓ </span>{labels.evalScopeYes}
+      </p>
+      <p style={{ fontSize: '0.83rem', margin: '0.5rem 0 0', lineHeight: 1.6 }}>
+        <span style={{ color: 'var(--sienna)', fontWeight: 700 }}>✕ </span>{labels.evalScopeNo}
+      </p>
+      <p style={{ fontSize: '0.8rem', margin: '0.5rem 0 0', color: 'var(--warm-gray)' }}>
+        {labels.evalScopeNote}
+      </p>
+    </div>
+  );
+}
+
 function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, lastGeneratedScript, currentUser, isRtl, onOpenSettings }) {
   const [sharedAudioUrl, setSharedAudioUrl] = useState(null);
   const [lastTranscript, setLastTranscript] = useState(null);
@@ -2707,6 +2956,9 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
         </span>
         <button type="button" className="sign-out-btn" onClick={onLogout}>{labels.signOut}</button>
       </div>
+
+      {/* Always-visible AI disclaimer (ETIB feedback 21 Aug 2026). */}
+      <AiDisclaimer labels={labels} />
 
       {!hasKey && (
         <div style={{
@@ -2982,6 +3234,34 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   const [result, setResult] = useState(null);
   const [showLibrary, setShowLibrary] = useState(false);
   const isLoading = status === 'loading';
+
+  // "Use my own text" (ETIB feedback 21 Aug 2026, Lina: "est-il possible
+  // d'ajouter une option qui permet aux étudiants d'ajouter un texte tel quel
+  // sans avoir à passer par l'IA, c'est-à-dire pour générer l'audio seulement ?").
+  // The text is taken VERBATIM — no generation, no rewriting, no proofreading
+  // pass — so none of the LLM's text errors, biases or hallucinations can enter
+  // the exercise. Only the TTS step runs afterwards.
+  const [ownTextMode, setOwnTextMode] = useState(false);
+  const [ownText, setOwnText] = useState('');
+
+  function handleUseOwnText() {
+    const text = ownText.trim();
+    if (!text) { setError(labels.ownTextEmpty); setStatus('error'); return; }
+    if (form.language === form.target_language) { setError(labels.sameLangError); setStatus('error'); return; }
+    const words = text.split(/\s+/).filter(Boolean);
+    const generated = {
+      script:          text,
+      language:        form.language,
+      target_language: form.target_language,
+      domain:          form.domain,
+      topic:           words.slice(0, 8).join(' '),
+      word_count:      words.length,
+      summary: '', mcqs: [], glossary: [],
+      ai_generated: false,
+      mode: 'own_text',
+    };
+    setError(''); setResult(generated); onGenerated(generated); setStatus('success');
+  }
 
   function updateField(event) {
     const { name, value, type, checked } = event.target;
@@ -3314,10 +3594,43 @@ const [showAdvanced, setShowAdvanced] = useState(true);
           </div>
         )}
 
+        {/* ── Own text, no AI: paste a real text and only have it read aloud ── */}
+        {ownTextMode && (
+          <div className="advanced-panel" style={{ marginTop: '0.75rem' }}>
+            <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>{labels.ownTextTitle}</p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--warm-gray)', margin: '0.35rem 0 0.6rem', lineHeight: 1.55 }}>
+              {labels.ownTextHint}
+            </p>
+            <textarea
+              value={ownText}
+              onChange={e => setOwnText(e.target.value)}
+              rows={8}
+              placeholder={labels.ownTextPlaceholder}
+              className={form.language === 'ar' ? 'arabic' : ''}
+              dir={form.language === 'ar' ? 'rtl' : 'ltr'}
+              style={{ width: '100%', resize: 'vertical', padding: '0.6rem', borderRadius: 8,
+                       border: '1px solid var(--border, #ddd)', fontFamily: 'inherit', fontSize: '0.9rem' }}
+            />
+            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button type="button" className="btn-primary" onClick={handleUseOwnText}>
+                {labels.ownTextUse}
+              </button>
+              <span style={{ fontSize: '0.78rem', color: 'var(--warm-gray)' }}>
+                {ownText.trim().split(/\s+/).filter(Boolean).length} {labels.wordsUnit}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* ── Action buttons ── */}
         <div className="action-row">
           <button type="button" className="btn-un-library" onClick={() => setShowLibrary(true)} disabled={isLoading}>
             📚 {labels.addSource || 'Add source'}
+          </button>
+          {/* Bring your own text — audio only, the AI never rewrites it. */}
+          <button type="button" className={ownTextMode ? 'btn-primary' : 'btn-secondary'}
+            onClick={() => setOwnTextMode(v => !v)} disabled={isLoading}>
+            {labels.ownTextBtn}
           </button>
           {/* Upload a real speech (audio/video) to interpret from (Mariam
               feedback) — it is transcribed and used as the source. */}
@@ -3437,7 +3750,17 @@ function SpeechResult({ data, labels }) {
         {data.topic && <span>{data.topic}</span>}
         {visibleDomain && <span>{visibleDomain}</span>}
         <span>{String(data.language || '').toUpperCase()} → {String(data.target_language || '').toUpperCase()}</span>
+        {data.ai_generated === false && (
+          <span style={{ color: 'var(--sage)', fontWeight: 600 }}>✍️ {labels.ownTextBadge}</span>
+        )}
       </div>
+      {/* The text came from automatic transcription of an uploaded file — say
+          how reliable that is instead of presenting it as a clean source
+          (ETIB question 21 Aug 2026: "dans quelle mesure la retranscription
+          est-elle fiable ?"). */}
+      {data.source_upload && (
+        <div className="info-tip" style={{ marginBottom: '0.6rem' }}>ℹ️ {labels.mediaAsrWarning}</div>
+      )}
       {data.mode === 'un_library_grounded' && data.source_speech && (
         <p className="grounded-source-note">
           {labels.groundedSourceLabel}{' '}
@@ -3573,7 +3896,7 @@ function McqQuiz({ mcqs, labels, isArabic }) {
 // Continuous vertical scroll at a words/min pace with a live dashboard
 // (elapsed / remaining), like the University of Bologna Scroller tool.
 
-function SightScroller({ script, isArabic, labels, isRecording, onToggleRecord, recordTime }) {
+function SightScroller({ script, isArabic, labels, isRecording, isStarting = false, onToggleRecord, recordTime }) {
   const [playing, setPlaying] = useState(false);
   const [wpm, setWpm] = useState(120);
   const [fontSize, setFontSize] = useState(1.15);   // rem
@@ -3690,8 +4013,11 @@ function SightScroller({ script, isArabic, labels, isRecording, onToggleRecord, 
           {/* Recording at the same level as scrolling (16 July feedback) — no
               page scroll needed between starting the text and starting to speak */}
           {onToggleRecord && (
-            <button type="button" className={`btn-record ${isRecording ? 'recording-active' : ''}`} onClick={onToggleRecord}>
-              {isRecording ? <><span className="rec-dot" /> {labels.stopBtn} — {recordTime}</> : labels.recordBtn}
+            <button type="button" className={`btn-record ${isRecording ? 'recording-active' : ''}`}
+              onClick={onToggleRecord} disabled={isStarting}>
+              {isStarting ? labels.micWarmingUp
+                : isRecording ? <><span className="rec-dot" /> {labels.stopBtn} — {recordTime}</>
+                : labels.recordBtn}
             </button>
           )}
         </div>
@@ -3763,6 +4089,14 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
   const [glossaryMemoryCount, setGlossaryMemoryCount] = useState(() => glossaryMemorySize());
   const [materialsStatus, setMaterialsStatus] = useState('idle');
   const glossaryFileRef = useRef(null);
+  // Edit the AI text BEFORE the TTS step (ETIB feedback 21 Aug 2026: "est-il
+  // possible d'ajouter une option qui permet d'éditer le texte généré par IA
+  // avant la phase TTS ?"). A generated speech can carry hallucinated figures,
+  // bias, or badly-formed Arabic numbers; the student fixes it here and the
+  // corrected text is what gets read aloud, interpreted, and used as the
+  // reference by the evaluation.
+  const [editingScript, setEditingScript] = useState(false);
+  const [scriptDraft, setScriptDraft] = useState('');
 
   // Recovery path: if a speech came back with its script but no MCQ/glossary
   // (rare — a long generation whose materials call was rate-limited even after
@@ -3873,6 +4207,8 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
     setAudioStatus('idle');
     setAudioError('');
     setAudioWpm(null);
+    // A different speech invalidates any in-progress text edit.
+    setEditingScript(false);
   }, [speechId]);
 
   if (!lastGeneratedScript) {
@@ -3887,6 +4223,32 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
   const summary  = lastGeneratedScript.summary  || '';
   const mcqs     = lastGeneratedScript.mcqs     || [];
   const glossary = lastGeneratedScript.glossary || [];
+
+  function startEditingScript() {
+    setScriptDraft(lastGeneratedScript?.script || '');
+    setEditingScript(true);
+  }
+
+  function saveScriptEdit() {
+    const text = scriptDraft.trim();
+    if (text && text !== lastGeneratedScript.script) {
+      onScriptUpdate?.({
+        ...lastGeneratedScript,
+        script: text,
+        // Keep the very first version so the edit is reversible.
+        script_original: lastGeneratedScript.script_original ?? lastGeneratedScript.script,
+        script_edited: true,
+      });
+      // The existing audio no longer matches the text — drop it so the student
+      // cannot interpret an audio that says something else.
+      setAudioUrl(null); setAudioStatus('idle'); setAudioWpm(null);
+    }
+    setEditingScript(false);
+  }
+
+  function restoreOriginalScript() {
+    if (lastGeneratedScript?.script_original) setScriptDraft(lastGeneratedScript.script_original);
+  }
 
   async function handleGenerateAudio() {
     setAudioStatus('loading'); setAudioError('');
@@ -3919,12 +4281,62 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
       {/* Materials recovery: script present but MCQ/glossary missing. */}
       {lastGeneratedScript.script && (mcqs.length === 0 || glossary.length === 0) && (
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', background: '#fff7e6', border: '1px solid #f0d9a8' }}>
-          <span style={{ flex: 1, fontSize: '0.9rem' }}>⚠️ {labels.materialsMissing}</span>
+          <span style={{ flex: 1, fontSize: '0.9rem' }}>
+            {lastGeneratedScript.ai_generated === false
+              ? <>ℹ️ {labels.ownTextMaterialsHint}</>
+              : <>⚠️ {labels.materialsMissing}</>}
+          </span>
           <button className="btn-primary" onClick={handleRegenerateMaterials} disabled={materialsStatus === 'loading'} style={{ whiteSpace: 'nowrap' }}>
             {materialsStatus === 'loading' ? labels.materialsGenerating : labels.generateMaterials}
           </button>
         </div>
       )}
+
+      {/* ── Speech text — editable BEFORE the audio is generated ── */}
+      <div className="card">
+        <div className="b-section-header">
+          <h2 className="b-section-title">📄 {labels.scriptTitle}</h2>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {editingScript && lastGeneratedScript.script_original && (
+              <button className="btn-secondary btn-sm" onClick={restoreOriginalScript}>
+                {labels.scriptRestore}
+              </button>
+            )}
+            <button className="btn-secondary btn-sm"
+              onClick={() => (editingScript ? saveScriptEdit() : startEditingScript())}>
+              {editingScript ? labels.editScriptDone : labels.editScriptBtn}
+            </button>
+          </div>
+        </div>
+        <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.6rem' }}>
+          💡 {labels.editScriptHint}
+        </p>
+        {/* Transcribed from an uploaded audio/video file — be explicit about how
+            reliable that transcription is (ETIB question 21 Aug 2026). */}
+        {lastGeneratedScript.source_upload && (
+          <div className="info-tip" style={{ marginBottom: '0.6rem' }}>ℹ️ {labels.mediaAsrWarning}</div>
+        )}
+        {lastGeneratedScript.ai_generated === false && (
+          <div className="info-tip" style={{ marginBottom: '0.6rem' }}>✍️ {labels.ownTextBadge}</div>
+        )}
+        {editingScript ? (
+          <textarea
+            value={scriptDraft}
+            onChange={e => setScriptDraft(e.target.value)}
+            rows={14}
+            className={isArabic ? 'arabic' : ''}
+            dir={isArabic ? 'rtl' : 'ltr'}
+            style={{ width: '100%', resize: 'vertical', padding: '0.7rem', borderRadius: 8,
+                     border: '1px solid var(--border, #ddd)', fontFamily: 'inherit',
+                     fontSize: '0.95rem', lineHeight: 1.7 }}
+          />
+        ) : (
+          <div className={`speech-text ${isArabic ? 'arabic' : ''}`}
+            style={{ maxHeight: 340, overflowY: 'auto' }}>
+            {lastGeneratedScript.script}
+          </div>
+        )}
+      </div>
 
       {/* ── Audio ── */}
       <div className="card">
@@ -4003,6 +4415,26 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
           <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>
             💡 {labels.glossaryEditHint}
           </p>
+          {/* Official terminology bases (ETIB feedback 21 Aug 2026). The prompt
+              already treats them as the authority order; these links let the
+              student verify each entry in the real base before recording. */}
+          <details style={{ marginBottom: '0.75rem' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem', color: 'var(--primary)' }}>
+              📑 {labels.termBasesTitle}
+            </summary>
+            <p style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', margin: '0.5rem 0', lineHeight: 1.55 }}>
+              {labels.termBasesHint}
+            </p>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {TERMINOLOGY_BASES.map(base => (
+                <a key={base.id} href={base.url('')} target="_blank" rel="noopener noreferrer"
+                  className="btn-secondary btn-sm" title={base.title}
+                  style={{ textDecoration: 'none' }}>
+                  {base.label}
+                </a>
+              ))}
+            </div>
+          </details>
           {glossaryMemoryCount > 0 && (
             <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.75rem',
                         display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -4022,6 +4454,7 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
                   <th>{labels.glossaryFrenchHeader || 'French'}</th>
                   <th>{labels.glossaryEnglishHeader || 'English'}</th>
                   <th>{labels.glossaryDefinitionHeader || 'Definition'}</th>
+                  <th>{labels.termCheckLabel}</th>
                   {editingGlossary && <th aria-label="delete"></th>}
                 </tr>
               </thead>
@@ -4035,6 +4468,7 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
                         <td><input className="glossary-edit-input" value={glossaryEditValue(item, 'french', ['French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])} onChange={e => updateGlossaryCell(i, 'french', e.target.value)} /></td>
                         <td><input className="glossary-edit-input" value={glossaryEditValue(item, 'english', ['English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])} onChange={e => updateGlossaryCell(i, 'english', e.target.value)} /></td>
                         <td><input className="glossary-edit-input" value={item.definition || ''} onChange={e => updateGlossaryCell(i, 'definition', e.target.value)} /></td>
+                        <td><TermCheckLinks item={item} labels={labels} /></td>
                         <td><button type="button" className="file-chip-remove" onClick={() => removeGlossaryTerm(i)} title={labels.removeSource}>×</button></td>
                       </>
                     ) : (
@@ -4044,6 +4478,7 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
                         <td>{glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])}</td>
                         <td>{glossaryValue(item, ['english', 'English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])}</td>
                         <td className="gloss-def">{item.definition || ''}</td>
+                        <td><TermCheckLinks item={item} labels={labels} /></td>
                       </>
                     )}
                   </tr>
@@ -4264,10 +4699,22 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
+  // The microphone/encoder needs a moment before it actually captures audio.
+  // Until it does we must NOT tell the student to speak and must NOT start the
+  // source in simultaneous mode — two testers lost the beginning of their
+  // performance that way (ETIB feedback 21 Aug 2026).
+  const [isStarting, setIsStarting] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [recordedUrl, setRecordedUrl] = useState(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [autoTranscribe, setAutoTranscribe] = useState(true);
+  // Correct the ASR output BEFORE the evaluation (ETIB feedback 21 Aug 2026:
+  // "est-il possible d'éditer [le texte] après la retranscription (STT) avant
+  // l'évaluation ?"). A recognition error must never be scored as an
+  // interpreting error. Only the TEXT is corrected — pauses, hesitations and
+  // speech rate keep being measured from the real recording server-side.
+  const [editingTranscript, setEditingTranscript] = useState(false);
+  const [transcriptDraft, setTranscriptDraft] = useState('');
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -4329,6 +4776,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
         return;
       }
       setResult(data);
+      setEditingTranscript(false);
       // interpMode travels with the transcript so Module D can evaluate with
       // mode-aware criteria (décalage tolerance for simultaneous, etc.) —
       // professor feedback: pauses from normal EVS should not be penalized.
@@ -4395,7 +4843,13 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
       setResult(null);
       setError('');
 
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      // The first chunk only arrives once the encoder is really capturing.
+      // Resolving on it is what lets us gate the "you may speak" signal.
+      let firstChunkSeen;
+      const firstChunk = new Promise(resolve => { firstChunkSeen = resolve; });
+      mr.ondataavailable = e => {
+        if (e.data.size > 0) { chunksRef.current.push(e.data); firstChunkSeen(); }
+      };
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType });
         stream.getTracks().forEach(t => t.stop());
@@ -4407,11 +4861,20 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
         if (autoTranscribeRef.current) runTranscription(blob);
       };
 
+      setIsStarting(true);
       mr.start(250);
+      // Wait for audio to be genuinely captured before switching the UI to
+      // "Recording" (and, in simultaneous mode, before the source starts).
+      // Bounded so a slow or non-conforming browser can never hang the button.
+      await Promise.race([firstChunk, new Promise(resolve => setTimeout(resolve, 1500))]);
+      // Small extra margin so the very first syllable is inside the file.
+      await new Promise(resolve => setTimeout(resolve, 250));
+      setIsStarting(false);
       setIsRecording(true);
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
       return true;
     } catch (err) {
+      setIsStarting(false);
       setError(labels.micDenied);
       return false;
     }
@@ -4420,12 +4883,38 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
   function stopRecording() {
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
+    setIsStarting(false);
     clearInterval(timerRef.current);
+  }
+
+  function startEditingTranscript() {
+    setTranscriptDraft(result?.full_text || '');
+    setEditingTranscript(true);
+  }
+
+  function saveTranscriptEdit() {
+    const text = transcriptDraft.trim();
+    if (text && result && text !== result.full_text) {
+      const corrected = {
+        ...result,
+        full_text: text,
+        asr_full_text: result.asr_full_text ?? result.full_text,
+        edited_by_student: true,
+        // The vocalised (tashkeel) hypothesis was derived from the ASR text and
+        // no longer matches the corrected one — drop it rather than display a
+        // version that contradicts what the student just wrote.
+        vocalized_text: '',
+      };
+      setResult(corrected);
+      onTranscriptComplete?.({ ...corrected, language, sourceScript: sourceScript || '', mode: interpMode });
+    }
+    setEditingTranscript(false);
   }
 
   function clearTranscript() {
     setResult(null);
     setError('');
+    setEditingTranscript(false);
   }
 
   function clearAudio() {
@@ -4457,6 +4946,10 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
             <option value="en">English</option>
           </SelectField>
         </div>
+
+        {/* What the automatic report will and will not judge — stated before
+            the student performs, not only after (ETIB feedback 21 Aug 2026). */}
+        <EvalScopePanel labels={labels} style={{ marginBottom: '1.25rem' }} />
 
         {/* ── Practice mode selector: simultaneous | consecutive | sight ── */}
         <div style={{ marginBottom: '1.25rem' }}>
@@ -4537,8 +5030,8 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
             )}
             {referenceAudioUrl && (
               !simultaneousActive ? (
-                <button className="btn-primary" onClick={startSimultaneous} disabled={isRecording}>
-                  {labels.simulStart}
+                <button className="btn-primary" onClick={startSimultaneous} disabled={isRecording || isStarting}>
+                  {isStarting ? labels.micWarmingUp : labels.simulStart}
                 </button>
               ) : (
                 <>
@@ -4560,6 +5053,7 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
             {sourceScript ? (
               <SightScroller key={sourceScript.slice(0, 50)} script={sourceScript} isArabic={sourceIsArabic} labels={labels}
                 isRecording={isRecording}
+                isStarting={isStarting}
                 recordTime={formatTime(recordingTime)}
                 onToggleRecord={() => (isRecording ? stopRecording() : startRecording())} />
             ) : (
@@ -4591,8 +5085,8 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
                 recording" here confused testers (professor feedback 20 July). */}
             {interpMode === 'consecutive' ? (
               !isRecording ? (
-                <button className="btn-record" onClick={startRecording}>
-                  {labels.recordBtn}
+                <button className="btn-record" onClick={startRecording} disabled={isStarting}>
+                  {isStarting ? labels.micWarmingUp : labels.recordBtn}
                 </button>
               ) : (
                 <button className="btn-record recording-active" onClick={stopRecording}>
@@ -4616,6 +5110,10 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
               {labels.autoTranscribe}
             </label>
           </div>
+          {/* Never let the student start speaking before the encoder is live. */}
+          <p style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginTop: '0.4rem' }}>
+            🎤 {labels.micReadyHint}
+          </p>
 
           {/* Recorded audio playback */}
           {recordedUrl && !isRecording && (
@@ -4711,13 +5209,43 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
                 </div>
               )}
 
-              <TranscriptBubble
-                text={result.full_text}
-                vocalizedText={result.vocalized_text}
-                isArabic={isArabic}
-                onRetranscribe={recordedBlob ? () => runTranscription(recordedBlob) : null}
-                onDelete={clearTranscript}
-              />
+              {/* Correct the recognizer's text BEFORE the evaluation runs, so an
+                  ASR mistake is never scored as an interpreting mistake
+                  (ETIB feedback 21 Aug 2026). */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <button className="btn-secondary btn-sm"
+                  onClick={() => (editingTranscript ? saveTranscriptEdit() : startEditingTranscript())}>
+                  {editingTranscript ? labels.editTranscriptDone : labels.editTranscriptBtn}
+                </button>
+                {result.edited_by_student && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--sage)', fontWeight: 600 }}>
+                    ✎ {labels.transcriptEditedBadge}
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', marginBottom: '0.6rem', lineHeight: 1.55 }}>
+                💡 {labels.editTranscriptHint}
+              </p>
+              {editingTranscript ? (
+                <textarea
+                  value={transcriptDraft}
+                  onChange={e => setTranscriptDraft(e.target.value)}
+                  rows={10}
+                  className={isArabic ? 'arabic' : ''}
+                  dir={isArabic ? 'rtl' : 'ltr'}
+                  style={{ width: '100%', resize: 'vertical', padding: '0.7rem', borderRadius: 8,
+                           border: '1px solid var(--border, #ddd)', fontFamily: 'inherit',
+                           fontSize: '0.95rem', lineHeight: 1.7 }}
+                />
+              ) : (
+                <TranscriptBubble
+                  text={result.full_text}
+                  vocalizedText={result.vocalized_text}
+                  isArabic={isArabic}
+                  onRetranscribe={recordedBlob ? () => runTranscription(recordedBlob) : null}
+                  onDelete={clearTranscript}
+                />
+              )}
             </div>
           )}
         </div>
@@ -4975,7 +5503,11 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           lastGeneratedScript?.language || language,
           lastGeneratedScript?.domain || '',
           lastGeneratedScript?.glossary || [],   // student-reviewed glossary → terminology check
-          interpMode
+          interpMode,
+          // Transcript the student corrected in Module C. The backend evaluates
+          // this text instead of the raw ASR output, while pauses, hesitations
+          // and speech rate stay measured from the real audio.
+          lastTranscript?.edited_by_student ? (lastTranscript.full_text || '') : ''
         );
       } else {
         // Fallback: use stored Groq transcript (less accurate for hesitations)
@@ -5026,6 +5558,11 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
 
   const algo = report?.algorithmic || {};
   const fluency = report?.fluency || null;
+  // ETIB decision (21 Aug 2026): the automatic meaning/content verdict is not
+  // shown at all — the backend drops it (EVALUATION_REPORT_MEANING=false) and
+  // the report must not render an empty shell for it either. Set the env var to
+  // true to bring the meaning sections back as informational feedback.
+  const showMeaning = report?.report_meaning !== false;
   const isAr = (lastTranscript.language || lastTranscript.language_detected) === 'ar';
   const llmNumberErrors = (report?.number_accuracy || [])
     .filter(item => item && item.correct === false)
@@ -5039,7 +5576,9 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
         <div className="info-tip" style={{ marginBottom: '1rem' }}>
           📄 {labels.transcriptReady} ({lastTranscript.duration_seconds ?? 0}s · {(lastTranscript.language_detected || '').toUpperCase()})
           {lastGeneratedScript && <> · {labels.source}: {lastGeneratedScript.domain}</>}
+          {lastTranscript.edited_by_student && <> · ✎ {labels.transcriptEditedBadge}</>}
         </div>
+        <EvalScopePanel labels={labels} style={{ marginBottom: '1rem' }} />
         <button className="btn-primary" onClick={handleEvaluate} disabled={status === 'loading'}>
           {status === 'loading' ? labels.runningEvaluation : labels.runEvaluation}
         </button>
@@ -5087,9 +5626,14 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                 <p dir="auto" style={{ textAlign: 'start' }}>{report.summary}</p>
               </div>
             )}
-            {report.score_on_meaning === false && (
+            {report.score_on_meaning === false && showMeaning && (
               <div className="info-tip" style={{ marginTop: '0.75rem', fontSize: '0.8rem' }}>
                 ℹ️ {labels.scoreScopeNote}
+              </div>
+            )}
+            {report.transcript_edited && (
+              <div className="info-tip" style={{ marginTop: '0.75rem', fontSize: '0.8rem' }}>
+                ✎ {labels.transcriptEditedBadge}
               </div>
             )}
           </div>
@@ -5242,7 +5786,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               word wasn't being surfaced). Re-added after being removed 16 July;
               does NOT affect the score (score_on_meaning stays off), and valid
               paraphrases are never listed. */}
-          {(report.translation_errors || []).length > 0 && (
+          {showMeaning && (report.translation_errors || []).length > 0 && (
             <div className="card">
               <h3 className="report-section-title">🧭 {labels.meaningCheckTitle}</h3>
               <p className="info-tip" style={{ fontSize: '0.8rem', marginBottom: '0.6rem' }}>ℹ️ {labels.meaningCheckNote}</p>
@@ -5392,7 +5936,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           )}
 
           {/* Coverage score */}
-          {report.coverage_score != null && (
+          {showMeaning && report.coverage_score != null && (
             <div className="card">
               <h3 className="report-section-title">📊 {labels.coverageTitle}</h3>
               <ScoreBar score={report.coverage_score ?? 0} labels={labels} />
@@ -5438,7 +5982,7 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           )}
 
           {/* Missing content */}
-          {(report.missing_content || []).length > 0 && (
+          {showMeaning && (report.missing_content || []).length > 0 && (
             <div className="card">
               <h3 className="report-section-title">📉 {labels.missingContent}</h3>
               {(report.missing_content || []).map((item, i) => (

@@ -300,7 +300,7 @@ export async function deleteSavedSpeech(un_id) {
   return parseJsonResponse(res);
 }
 
-export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain, glossary, mode) {
+export async function evaluateWithAudio(audioFile, sourceScript, language, sourceLanguage, domain, glossary, mode, transcriptOverride) {
   const form = new FormData();
   form.append('audio', audioFile, audioFile.name || 'recording.webm');
   form.append('source_script', sourceScript || '');
@@ -315,6 +315,12 @@ export async function evaluateWithAudio(audioFile, sourceScript, language, sourc
   // Student-reviewed glossary → terminology errors are judged against it
   if (Array.isArray(glossary) && glossary.length > 0) {
     form.append('glossary', JSON.stringify(glossary));
+  }
+  // Transcript the student corrected in Module C (ETIB feedback 21 Aug 2026):
+  // the text is evaluated as corrected, while pauses/hesitations/rate keep
+  // being measured from the real audio.
+  if (transcriptOverride && transcriptOverride.trim()) {
+    form.append('transcript_override', transcriptOverride.trim());
   }
   const res = await safeFetch(`${BASE}/module-d/full-evaluation`, { method: 'POST', body: form });
   return parseJsonResponse(res);

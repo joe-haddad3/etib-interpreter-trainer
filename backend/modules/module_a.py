@@ -405,6 +405,8 @@ FACTUAL ACCURACY RULES (no source document available):
 - Do not invent treaty names, resolutions, or dates of agreements.
 - Prefer widely-known named entities (existing organisations, real summits, actual conventions).
 - When in doubt, use ranges rather than precise invented numbers.
+- NEVER attribute a fabricated figure, report title, resolution number or quotation to a real
+  organisation or person. A trainee interpreter will treat this text as factual material.
 """
 
     scenario_style = SCENARIO_STYLES.get(scenario, f'Style and register appropriate to: {scenario}.')
@@ -576,6 +578,10 @@ Return ONLY valid compact JSON. No markdown, no code fences, no explanation outs
 }}
 """
 
+    # Institutional terminology bases the glossary equivalents must follow
+    # (ETIB feedback 21 Aug 2026).
+    prompt += TERMINOLOGY_AUTHORITY_BLOCK
+
     if language == 'ar':
         prompt += """
 ═══════════════════════════════════════════════
@@ -599,12 +605,74 @@ ARABIC LANGUAGE REQUIREMENTS — STRICTLY ENFORCED
   morphological, or spelling error so the final text reads as polished, publishable Modern Standard Arabic.
 - NUMBERS: Write ALL numbers using Eastern Arabic-Indic numerals: ٠١٢٣٤٥٦٧٨٩
   Example: write ٧٠٠ مليون شخص — NOT 700 مليون شخص
-  Example: write ٨،٢٪ — NOT 8.2%
+  Example: write ٨٫٢٪ — NOT 8.2%
   Example: write عام ٢٠٢٠ — NOT عام 2020
+- العدد وأحكامه — THE ARABIC NUMBER-AGREEMENT RULES ARE MANDATORY whenever a number is
+  followed by its counted noun (تمييز) or written out in words. Apply them exactly:
+  • ١ و٢ : العدد يأتي بعد المعدود ويطابقه — "كتابٌ واحد"، "دولتان اثنتان".
+  • ٣–١٠ : المخالفة — العدد يخالف المعدود في التذكير والتأنيث، والتمييز جمع مجرور:
+      ثلاثُ دولٍ (دولة مؤنث → العدد مذكر) — NOT "ثلاثة دول"
+      ثلاثةُ تقاريرَ (تقرير مذكر → العدد مؤنث) — NOT "ثلاث تقارير"
+      خمسُ سنواتٍ / خمسةُ ملايينَ / عشرُ نساءٍ / عشرةُ رجالٍ
+  • ١١ و١٢ : الجزآن يطابقان المعدود، والتمييز مفرد منصوب — "أحد عشر تقريراً"، "إحدى عشرة دولةً".
+  • ١٣–١٩ : الجزء الأول يخالف والجزء الثاني (عشر/عشرة) يطابق، والتمييز مفرد منصوب —
+      "خمس عشرة دولةً"، "خمسة عشر تقريراً".
+  • ألفاظ العقود (٢٠–٩٠) : بلفظ واحد للمذكر والمؤنث، والتمييز مفرد منصوب —
+      "عشرون دولةً"، "ثلاثون تقريراً".
+  • المئة والألف والمليون والمليار : التمييز مفرد مجرور —
+      "مئةُ دولةٍ"، "ألفُ لاجئٍ"، "ثلاثةُ ملايينِ طفلٍ".
+  • النسبة المئوية تُقرأ "في المائة" — write ٪ after the figure (٨٫٢٪) or spell "في المائة".
+  • Dates/years: "عام ٢٠٢٥" (يُقرأ: ألفين وخمسة وعشرين). Never mix Latin digits into a date.
+  SELF-CHECK: before returning, re-read every number in the script together with the word that
+  follows it and verify the gender agreement above. A wrong عدد/معدود agreement is a critical error
+  because trainee interpreters learn the numbers from this text.
+- FACTUAL HONESTY — NO HALLUCINATED FIGURES OR SOURCES: never attribute an invented statistic,
+  report title, resolution number or quotation to a real organisation. If you are not certain of a
+  figure, use an explicit approximation ("نحو"، "قرابة"، "وفق تقديرات الأمم المتحدة") or a range,
+  and never cite a specific report/resolution/date you are not sure exists.
 """
 
     return prompt
 
+
+
+# ── Reference terminology bases (ETIB feedback, Lina — 21 Aug 2026) ──────────
+# "Pour optimiser la qualité du glossaire généré, est-il possible d'ajouter comme
+#  référence des bases terminologiques existantes ?"
+# We cannot query these bases live (UNTERM/IATE/EurLex sit behind WAFs and have
+# no free public API, and FranceTerme/OQJF are HTML-only). What we CAN do —
+# and what actually changes the output — is two things:
+#   1. name them in the prompt as the AUTHORITY ORDER the model must follow,
+#      so the equivalents it produces are the attested institutional forms
+#      rather than improvised translations;
+#   2. give the student a one-click verification link per term in the glossary
+#      UI (Frontend: TERMINOLOGY_BASES), so every entry can be checked against
+#      the real base before it is used in the evaluation.
+TERMINOLOGY_AUTHORITY_BLOCK = """
+REFERENCE TERMINOLOGY BASES — AUTHORITY ORDER (MANDATORY):
+Every equivalent you produce must be the form ATTESTED in these institutional bases,
+never an improvised or literal translation. Follow this order of authority:
+  1. UNTERM (United Nations terminology database, unterm.un.org) — the authority for
+     UN bodies, programmes, conventions, mandates and UN-system usage, in AR/FR/EN.
+  2. IATE (iate.europa.eu) and EuroVoc (eur-lex.europa.eu/browse/eurovoc.html) —
+     the authority for EU institutional, legal, economic and policy terminology (FR/EN).
+  3. FranceTerme (culture.fr/franceterme) — the authority for officially recommended
+     FRENCH terms (Commission d'enrichissement de la langue française), especially for
+     technology, economics and neologisms; prefer the recommended French term over an
+     anglicism.
+  4. Vitrine linguistique / Grand dictionnaire terminologique of the Office québécois de
+     la langue française — the authority for French technical usage when FranceTerme has
+     no entry.
+  5. ETIB-CERTTAL terminology base (etib-certtal-terminologie.usj.edu.lb) — the ETIB/USJ
+     in-house Arabic base; prefer its Arabic equivalents for Lebanon/region-specific and
+     academic usage when they differ from a generic rendering.
+If two bases disagree, prefer the one that owns the domain (UNTERM for UN matters,
+IATE/EuroVoc for EU matters, FranceTerme/OQLF for general French usage).
+If you are NOT confident an equivalent is the attested institutional form, still give your
+best equivalent, but keep the "definition" field precise enough that the student can verify
+it — never invent an official-sounding name for a body, treaty or programme that you are
+not sure exists.
+"""
 
 _WESTERN_TO_ARABIC_INDIC = str.maketrans('0123456789', '٠١٢٣٤٥٦٧٨٩')
 
@@ -810,7 +878,10 @@ Do NOT number the section or write "Section X". Write flowing spoken prose that 
         prompt += (
             '\n\nARABIC RULES: Write ENTIRELY in Modern Standard Arabic (فصحى), no dialect. No Latin/CJK '
             'characters. Transliterate all foreign names into Arabic. Use Arabic punctuation (، ؛ ؟). '
-            'Write ALL numbers in Eastern Arabic-Indic numerals (٠١٢٣٤٥٦٧٨٩).'
+            'Write ALL numbers in Eastern Arabic-Indic numerals (٠١٢٣٤٥٦٧٨٩). '
+            'Respect العدد وأحكامه: ٣–١٠ يخالف المعدود والتمييز جمع مجرور (ثلاثُ دولٍ / ثلاثةُ تقاريرَ)؛ '
+            '١١–١٩ التمييز مفرد منصوب؛ المئة والألف والمليون التمييز مفرد مجرور. '
+            'Never attribute an invented statistic, report or resolution to a real organisation.'
         )
     return prompt
 
@@ -1633,7 +1704,11 @@ def _proofread_arabic_script(script: str) -> str:
                     'wrong verb choice (تعنيها البلاد → تعانيها البلاد), gender/number agreement '
                     '(تتعين على الأمم المتحدة → يتعين على الأمم المتحدة), missing prepositions '
                     '(فيما يتعلق توفير → فيما يتعلق بتوفير), broken or truncated words, and '
-                    'relative-pronoun agreement. Preserve the content, style, rhetoric, statistics '
+                    'relative-pronoun agreement, and العدد وأحكامه (number/counted-noun agreement: '
+                    '٣–١٠ take the OPPOSITE gender with a plural genitive تمييز — ثلاثُ دولٍ not ثلاثة دول؛ '
+                    '١١–١٩ take a singular accusative تمييز؛ مئة/ألف/مليون take a singular genitive تمييز). '
+                    'Do NOT change any FIGURE itself — only the agreement of the word around it. '
+                    'Preserve the content, style, rhetoric, statistics '
                     '(keep Eastern Arabic-Indic digits), proper nouns, and length EXACTLY. '
                     'Return ONLY the corrected speech text — no commentary, no JSON.'
                 )},
@@ -2053,7 +2128,8 @@ Return ONLY valid compact JSON — no markdown, no code fences, no text outside 
 Rules:
 - mcqs: write 5 questions that test SPECIFIC content from the speech; every question MUST be answerable from the speech alone; the 3 wrong options must be plausible but clearly contradicted by the speech.
 - glossary: 12-18 key domain-specific terms, each with correct Arabic, French, English and a brief definition. Use official UN/UNTERM institutional terminology (e.g. UNHCR → "مفوضية الأمم المتحدة السامية لشؤون اللاجئين" / "Haut-Commissariat des Nations Unies pour les réfugiés (HCR)").
-- summary: 3-5 complete-sentence points capturing the main content."""
+- summary: 3-5 complete-sentence points capturing the main content.
+{terminology_authority}"""
 
 
 def _generate_materials_for_script(script: str, language: str, domain: str) -> dict:
@@ -2069,6 +2145,7 @@ def _generate_materials_for_script(script: str, language: str, domain: str) -> d
         lang_name=lang_names.get(language, 'English'),
         domain=domain,
         script=script[:8000],   # cap very long scripts to protect the token budget
+        terminology_authority=TERMINOLOGY_AUTHORITY_BLOCK,
     )
     # Generous fixed budget — a 12-18 term glossary with definitions plus
     # 5 MCQs and a summary needs room and must not truncate.

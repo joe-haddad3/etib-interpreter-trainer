@@ -33,7 +33,8 @@ import json
 import uuid
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
-from config import PRIMARY_LLM_MODEL, UPLOAD_FOLDER, EVALUATION_SCORE_ON_MEANING, groq_extra_params
+from config import (PRIMARY_LLM_MODEL, UPLOAD_FOLDER, EVALUATION_SCORE_ON_MEANING,
+                    EVALUATION_REPORT_MEANING, groq_extra_params)
 
 def _current_user_id() -> str:
     """Extract user id from auth token in request args, form, or JSON body."""
@@ -115,7 +116,10 @@ def _save_session(user_id: str, data: dict):
         'domain':          data.get('domain', ''),
         'overall_score':   data.get('overall_score') or 0,
         'fluency_score':   data.get('fluency_score') or 0,
-        'coverage_score':  data.get('coverage_score') or 0,
+        # None when meaning/coverage is out of scope (EVALUATION_REPORT_MEANING
+        # off) — stored as None, never as 0, so the Progress page can hide it
+        # instead of showing a fake zero.
+        'coverage_score':  data.get('coverage_score'),
         'error_counts': {
             'long_silences':     len(algo.get('long_silences') or []),
             'repetitions':       len(algo.get('repetitions') or []),
@@ -175,7 +179,9 @@ def _compute_adaptive_params(sessions: list) -> dict:
     def avg(key, sub=None):
         vals = []
         for s in recent:
-            v = s.get('error_counts', {}).get(key, 0) if sub == 'error' else s.get(key, 0)
+            v = s.get('error_counts', {}).get(key, 0) if sub == 'error' else s.get(key)
+            if v is None:
+                continue          # metric not produced for that session — skip it
             vals.append(v or 0)
         return sum(vals) / len(vals) if vals else 0
 
@@ -666,6 +672,15 @@ _EVAL_SCOPE_FORM_FOCUS = (
     'correction is worse than a missed one.'
 )
 
+_EVAL_SCOPE_NO_MEANING_TAIL = (
+    '\nMEANING IS OUT OF SCOPE FOR THIS REPORT (ETIB decision, Aug 2026): do NOT produce meaning or\n'
+    'content judgements at all. Return "translation_errors": [], "missing_content": [] and\n'
+    '"coverage_score": null. Say nothing about fidelity, sense, omitted ideas or completeness in\n'
+    '"summary", "strengths" or "recommendations" — comment ONLY on terminology, numbers/dates,\n'
+    'proper names, target-language correctness, and delivery (pauses, hesitations, repetitions).\n'
+    'A student must be able to know exactly which categories the machine judged.'
+)
+
 _EVAL_SCOPE_FULL = (
     'EVALUATION SCOPE: grade the full interpretation, including terminology, linguistic\n'
     'correctness, delivery, numbers/names, AND the fidelity of meaning/sense restitution.'
@@ -699,7 +714,54 @@ _SCORING_POLICY_FULL = ''
 
 
 def build_evaluation_scope() -> str:
-    return _EVAL_SCOPE_FULL if EVALUATION_SCORE_ON_MEANING else _EVAL_SCOPE_FORM_FOCUS
+    if EVALUATION_SCORE_ON_MEANING:
+        return _EVAL_SCOPE_FULL
+    scope = _EVAL_SCOPE_FORM_FOCUS
+    if not EVALUATION_REPORT_MEANING:
+        scope += _EVAL_SCOPE_NO_MEANING_TAIL
+    return scope
+
+
+# Categories the automatic evaluation actually judges. Returned with every
+# report so the UI can tell the student, before and after recording, exactly
+# what the machine looked at and what it deliberately did not (ETIB feedback
+# 21 Aug 2026). Keep in sync with the EVALUATION SCOPE prompt blocks above.
+EVALUATED_CATEGORIES = [
+    'numbers_dates',
+    'proper_names',
+    'terminology',
+    'target_language_correctness',
+    'pauses_silences',
+    'hesitations',
+    'repetitions',
+    'speech_rate',
+    'pronunciation_clarity',
+]
+NOT_EVALUATED_CATEGORIES = [
+    'meaning_fidelity',
+    'content_coverage',
+    'omitted_ideas',
+    'style_and_register',
+]
+
+
+def strip_meaning_from_report(result: dict) -> dict:
+    """Remove every meaning/content judgement from the report.
+
+    ETIB asked (21 Aug 2026) that the platform never show an automatic
+    meaning/content verdict, because the LLM's sense judgement is the least
+    reliable part and misleads trainees. Scoring already ignored meaning
+    (EVALUATION_SCORE_ON_MEANING); this drops it from what is displayed and
+    stored too. Controlled by EVALUATION_REPORT_MEANING.
+    """
+    if EVALUATION_REPORT_MEANING or not isinstance(result, dict):
+        return result
+    result['translation_errors'] = []
+    result['missing_content'] = []
+    result['coverage_score'] = None
+    result.pop('meaning_score', None)
+    result.pop('accuracy_score', None)
+    return result
 
 
 def build_translation_task_note() -> str:
@@ -2951,7 +3013,11 @@ def generate_feedback():
         llm_result = reconcile_coverage_with_missing_content(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, transcript_text)
         llm_result = reconcile_overall_with_evidence(llm_result)
+        llm_result = strip_meaning_from_report(llm_result)
         llm_result['score_on_meaning'] = EVALUATION_SCORE_ON_MEANING
+        llm_result['report_meaning'] = EVALUATION_REPORT_MEANING
+        llm_result['evaluated_categories'] = EVALUATED_CATEGORIES
+        llm_result['not_evaluated_categories'] = NOT_EVALUATED_CATEGORIES
         if asr_artifacts:
             llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = {
@@ -2995,6 +3061,10 @@ def full_evaluation():
     language         = request.form.get('language', 'ar')
     mode             = request.form.get('mode', 'consecutive')
     glossary_block   = build_glossary_block(request.form.get('glossary', ''))
+    # Student-corrected transcript (ETIB feedback 21 Aug 2026): the ASR output can
+    # be edited in Module C before the evaluation runs, so a recognition error is
+    # never scored as an interpreting error. Empty = use the ASR text as-is.
+    transcript_override = (request.form.get('transcript_override', '') or '').strip()
     _raw_src_lang    = request.form.get('source_language', '')
     # Avoid telling the LLM source==target (monolingual confusion) when not explicitly set
     source_language  = _raw_src_lang if _raw_src_lang and _raw_src_lang != language else 'unknown'
@@ -3097,8 +3167,18 @@ def full_evaluation():
         full_text = re.sub(r'\.{2,}', '', full_text).strip()
         full_text = re.sub(r'…', '', full_text).strip()
         full_text = re.sub(r'\s{2,}', ' ', full_text).strip()
+        # A manually corrected transcript replaces the ASR TEXT only. The word
+        # timestamps and the audio itself are untouched, so pauses, hesitations,
+        # repetitions and speech rate are still measured from the real recording
+        # (editing the text must not let a student erase their own silences).
+        asr_full_text = full_text
+        transcript_was_edited = bool(transcript_override) and transcript_override != asr_full_text
+        if transcript_override:
+            full_text = transcript_override
         transcript = {
             'full_text':           full_text,
+            'asr_full_text':       asr_full_text,
+            'edited_by_student':   transcript_was_edited,
             'segment_text':        segment_text,
             'word_timestamp_text': word_timestamp_text,
             'segments':            all_segments,
@@ -3220,12 +3300,17 @@ def full_evaluation():
         llm_result = reconcile_coverage_with_missing_content(llm_result)
         llm_result = apply_coverage_guardrail(llm_result, source_script, full_text)
         llm_result = reconcile_overall_with_evidence(llm_result)
+        llm_result = strip_meaning_from_report(llm_result)
         llm_result['score_on_meaning'] = EVALUATION_SCORE_ON_MEANING
+        llm_result['report_meaning'] = EVALUATION_REPORT_MEANING
+        llm_result['evaluated_categories'] = EVALUATED_CATEGORIES
+        llm_result['not_evaluated_categories'] = NOT_EVALUATED_CATEGORIES
         if asr_artifacts:
             llm_result['unclear_audio_tokens'] = asr_artifacts
         llm_result['algorithmic'] = _algo_payload
         llm_result['fluency'] = fluency
         llm_result['asr_method'] = asr_method
+        llm_result['transcript_edited'] = transcript_was_edited
 
         # Step 4: Pronunciation report (whisper confidence + language-specific patterns)
         pronun_report = build_pronunciation_report(all_word_scores, language=language)
