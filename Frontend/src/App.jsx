@@ -24,11 +24,8 @@ import {
   deleteSavedSpeech,
   getSessionHistory,
   getAdaptiveParams,
-  getStoredGroqKey,
   pingServer,
-  saveGroqKey,
   setCurrentUserId,
-  validateGroqKey,
   saveAuthToken,
   sendChatMessage,
   fetchWebPage,
@@ -277,10 +274,10 @@ const UI = {
     correctTranslation: 'Correct',
     missingContent: 'Missing content',
     scoreScopeNote: 'This score reflects terminology, target-language accuracy, numbers/names, and delivery (pauses, décalage, fluency). Meaning/coverage below is shown for your information and does not affect the score at this stage.',
-    aiDisclaimerTitle: '\u26a0\ufe0f AI disclaimer \u2014 read this before you rely on any output',
-    aiDisclaimerShort: 'This platform uses AI to write the speeches, read them aloud, transcribe your interpretation and comment on it. AI output can be wrong \u2014 check it before you learn from it.',
-    aiDisclaimerMore: 'Read the full disclaimer',
-    aiDisclaimerLess: 'Hide the disclaimer',
+    aiDisclaimerTitle: '⚠️ AI disclaimer',
+    aiDisclaimerShort: 'AI can be wrong — check the generated text, audio, transcript and scores before you rely on them.',
+    aiDisclaimerMore: 'Details',
+    aiDisclaimerLess: 'Close',
     aiDisclaimerGen: 'Generated speeches: the text is produced by a large language model. It can contain invented figures, non-existent report or resolution names, factual mistakes, and cultural or political bias. Never treat it as a source of facts \u2014 it is training material. In Arabic, number agreement (\u0627\u0644\u0639\u062f\u062f \u0648\u0623\u062d\u0643\u0627\u0645\u0647) and dates are the most error-prone parts.',
     aiDisclaimerTts: 'Synthetic audio (TTS): the voice can mispronounce names, acronyms, dates and figures \u2014 especially in Arabic. What you hear does not always match the written text. Edit the text before generating the audio if a passage sounds wrong.',
     aiDisclaimerStt: 'Transcription (STT): your recording is transcribed automatically. The transcript is an estimate, not a certain record of what you said. Arabic, code-switching and background noise lower its accuracy noticeably. Correct the transcript before running the evaluation.',
@@ -291,9 +288,6 @@ const UI = {
     evalScopeYes: 'Evaluated automatically: terminology (against your approved glossary), numbers and dates, proper names, target-language correctness (grammar and morphology), silences and pauses, hesitations, repetitions, speech rate, pronunciation clarity \u2014 plus Arabic case endings (\u0627\u0644\u0625\u0639\u0631\u0627\u0628) when the Arabic acoustic module is enabled.',
     evalScopeNo: 'NOT evaluated: fidelity of meaning, coverage and completeness, omitted ideas, style and register. These need a human interpreter trainer, so the platform deliberately does not judge them.',
     evalScopeNote: 'Your score is built only from the categories in the first list.',
-    termBasesTitle: 'Reference terminology bases',
-    termBasesHint: 'Equivalents follow the official bases below. Use the 🔍 link on a row to check that term in each base before you record \u2014 the corrected entry is what the evaluation checks your terminology against.',
-    termCheckLabel: 'Check',
     ownTextBtn: '\u270d\ufe0f Use my own text (no AI)',
     ownTextTitle: '\u270d\ufe0f My own text \u2014 audio only, no AI generation',
     ownTextHint: 'Paste a text you already have. It is used EXACTLY as written: no AI rewriting, no AI generation. Then go to \u201cAudio & materials\u201d to have it read aloud, and interpret it as usual.',
@@ -442,7 +436,8 @@ const UI = {
     glossaryEdit: '✏️ Edit glossary',
     glossaryAddTerm: 'Add term',
     glossaryEditDone: '✓ Done editing',
-    glossaryEditHint: 'Review and correct the equivalents BEFORE recording your interpretation — the evaluation will then check your terminology against this approved glossary.',
+    glossaryEditHint: 'Equivalents are looked up in the official bases (UNBIS Thesaurus, IATE, FranceTerme) — a ✓ marks a term confirmed there. Review and correct them BEFORE recording: the evaluation checks your terminology against this glossary.',
+    termVerifiedTitle: 'Confirmed in',
     glossaryMemoryNote: 'corrections remembered — they are re-applied automatically to future glossaries.',
     glossaryMemoryClear: 'Forget saved corrections',
     webPageTab: 'Web page',
@@ -538,7 +533,7 @@ const UI = {
     llmFailedWarning: 'AI language analysis could not complete — showing automatic detections only. Scores may be incomplete.',
     llmQuotaError: 'The AI service hit its per-minute limit — this can happen with long speeches or several requests in a row. The platform already retried automatically; just wait about a minute and try again. The shared limit resets on its own — nothing to configure.',
     keyRequired: 'A personal (free) Groq API key is required — create yours at console.groq.com (2 minutes, no credit card) and add it in Settings.',
-    keyInvalid: 'Your Groq API key was rejected (invalid or expired). Open Settings, delete it, and paste a fresh key from console.groq.com.',
+    keyInvalid: 'The AI service rejected the request (the platform\'s server key is invalid or expired). This is not something you can fix — please tell your instructor or the platform administrator.',
     sameLangError: 'The source and interpretation languages must be different — interpretation is always between two languages.',
     simulSourceEnded: 'The source speech has ended — finish your interpretation, then press stop. Recording stops automatically after one minute.',
     simulWithText: 'Show source text on screen (SIMUL with text)',
@@ -788,10 +783,10 @@ const UI = {
     correctTranslation: 'الترجمة الصحيحة',
     missingContent: 'محتوى مفقود',
     scoreScopeNote: 'تعكس هذه الدرجة الالتزام بالمصطلحات، وصحّة اللغة الهدف، والأرقام والأسماء، والأداء (التوقّفات، إدارة الفارق الزمني، السلاسة). أمّا المعنى/التغطية المعروضان أدناه فهما للاطّلاع فقط ولا يؤثّران في الدرجة في هذه المرحلة.',
-    aiDisclaimerTitle: '\u26a0\ufe0f \u062a\u0646\u0628\u064a\u0647 \u0628\u0634\u0623\u0646 \u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a \u2014 \u0627\u0642\u0631\u0623\u0647 \u0642\u0628\u0644 \u0627\u0644\u0627\u0639\u062a\u0645\u0627\u062f \u0639\u0644\u0649 \u0623\u064a \u0645\u062e\u0631\u062c\u0627\u062a',
-    aiDisclaimerShort: '\u062a\u0633\u062a\u062e\u062f\u0645 \u0647\u0630\u0647 \u0627\u0644\u0645\u0646\u0635\u0651\u0629 \u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a \u0644\u0643\u062a\u0627\u0628\u0629 \u0627\u0644\u062e\u0637\u0627\u0628\u0627\u062a \u0648\u0642\u0631\u0627\u0621\u062a\u0647\u0627 \u0635\u0648\u062a\u064a\u0627\u064b \u0648\u062a\u0641\u0631\u064a\u063a \u0623\u062f\u0627\u0626\u0643 \u0648\u0627\u0644\u062a\u0639\u0644\u064a\u0642 \u0639\u0644\u064a\u0647. \u0642\u062f \u062a\u0643\u0648\u0646 \u0627\u0644\u0645\u062e\u0631\u062c\u0627\u062a \u062e\u0627\u0637\u0626\u0629: \u062a\u062d\u0642\u0651\u0642 \u0645\u0646\u0647\u0627 \u0642\u0628\u0644 \u0623\u0646 \u062a\u062a\u0639\u0644\u0651\u0645 \u0645\u0646\u0647\u0627.',
-    aiDisclaimerMore: '\u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u062a\u0646\u0628\u064a\u0647 \u0643\u0627\u0645\u0644\u0627\u064b',
-    aiDisclaimerLess: '\u0625\u062e\u0641\u0627\u0621 \u0627\u0644\u062a\u0646\u0628\u064a\u0647',
+    aiDisclaimerTitle: '⚠️ تنبيه بشأن الذكاء الاصطناعي',
+    aiDisclaimerShort: 'قد يخطئ الذكاء الاصطناعي — تحقّق من النص والصوت والتفريغ والدرجات قبل الاعتماد عليها.',
+    aiDisclaimerMore: 'التفاصيل',
+    aiDisclaimerLess: 'إغلاق',
     aiDisclaimerGen: '\u0627\u0644\u062e\u0637\u0627\u0628\u0627\u062a \u0627\u0644\u0645\u0648\u0644\u0651\u064e\u062f\u0629: \u0627\u0644\u0646\u0635 \u0645\u0646 \u0625\u0646\u062a\u0627\u062c \u0646\u0645\u0648\u0630\u062c \u0644\u063a\u0648\u064a \u0643\u0628\u064a\u0631\u060c \u0648\u0642\u062f \u064a\u062a\u0636\u0645\u0651\u0646 \u0623\u0631\u0642\u0627\u0645\u0627\u064b \u0645\u062e\u062a\u0644\u064e\u0642\u0629 \u0648\u0623\u0633\u0645\u0627\u0621 \u062a\u0642\u0627\u0631\u064a\u0631 \u0623\u0648 \u0642\u0631\u0627\u0631\u0627\u062a \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f\u0629 \u0648\u0623\u062e\u0637\u0627\u0621 \u0648\u0642\u0627\u0626\u0639\u064a\u0629 \u0648\u0627\u0646\u062d\u064a\u0627\u0632\u0627\u062a \u062b\u0642\u0627\u0641\u064a\u0629 \u0623\u0648 \u0633\u064a\u0627\u0633\u064a\u0629. \u0644\u0627 \u062a\u0639\u062f\u0651\u0647 \u0645\u0635\u062f\u0631\u0627\u064b \u0644\u0644\u0645\u0639\u0644\u0648\u0645\u0627\u062a\u061b \u0625\u0646\u0651\u0645\u0627 \u0647\u0648 \u0645\u0627\u062f\u0629 \u062a\u062f\u0631\u064a\u0628\u064a\u0629. \u0648\u0641\u064a \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u062a\u064f\u0639\u062f\u0651 \u0623\u062d\u0643\u0627\u0645 \u0627\u0644\u0639\u062f\u062f \u0648\u0627\u0644\u062a\u0648\u0627\u0631\u064a\u062e \u0623\u0643\u062b\u0631 \u0627\u0644\u0645\u0648\u0627\u0636\u0639 \u0639\u0631\u0636\u0629\u064b \u0644\u0644\u062e\u0637\u0623.',
     aiDisclaimerTts: '\u0627\u0644\u0635\u0648\u062a \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a: \u0642\u062f \u064a\u064f\u0646\u0637\u064e\u0642 \u0627\u0644\u0623\u0633\u0645\u0627\u0621 \u0648\u0627\u0644\u0627\u062e\u062a\u0635\u0627\u0631\u0627\u062a \u0648\u0627\u0644\u062a\u0648\u0627\u0631\u064a\u062e \u0648\u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0646\u0637\u0642\u0627\u064b \u062e\u0627\u0637\u0626\u0627\u064b\u060c \u062e\u0635\u0648\u0635\u0627\u064b \u0641\u064a \u0627\u0644\u0639\u0631\u0628\u064a\u0629. \u0645\u0627 \u062a\u0633\u0645\u0639\u0647 \u0644\u0627 \u064a\u0637\u0627\u0628\u0642 \u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0643\u062a\u0648\u0628 \u062f\u0627\u0626\u0645\u0627\u064b. \u0635\u062d\u0651\u062d \u0627\u0644\u0646\u0635 \u0642\u0628\u0644 \u062a\u0648\u0644\u064a\u062f \u0627\u0644\u0635\u0648\u062a \u0625\u0646 \u0628\u062f\u0627 \u0645\u0642\u0637\u0639 \u0645\u0627 \u063a\u064a\u0631 \u0633\u0644\u064a\u0645.',
     aiDisclaimerStt: '\u0627\u0644\u062a\u0641\u0631\u064a\u063a \u0627\u0644\u0635\u0648\u062a\u064a: \u064a\u064f\u0641\u0631\u0651\u064e\u063a \u062a\u0633\u062c\u064a\u0644\u0643 \u0622\u0644\u064a\u0627\u064b\u060c \u0648\u0627\u0644\u0646\u0635 \u0627\u0644\u0646\u0627\u062a\u062c \u062a\u0642\u062f\u064a\u0631 \u0644\u0627 \u064a\u0642\u064a\u0646. \u062a\u0646\u062e\u0641\u0636 \u062f\u0642\u0651\u062a\u0647 \u0641\u064a \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u0648\u0645\u0639 \u0627\u0644\u062a\u0646\u0627\u0648\u0628 \u0627\u0644\u0644\u063a\u0648\u064a \u0648\u0627\u0644\u0636\u062c\u064a\u062c. \u0635\u062d\u0651\u062d \u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0641\u0631\u0651\u064e\u063a \u0642\u0628\u0644 \u062a\u0634\u063a\u064a\u0644 \u0627\u0644\u062a\u0642\u064a\u064a\u0645.',
@@ -802,9 +797,6 @@ const UI = {
     evalScopeYes: '\u0645\u0627 \u064a\u064f\u0642\u064a\u0651\u0645 \u0622\u0644\u064a\u0627\u064b: \u0627\u0644\u0645\u0635\u0637\u0644\u062d\u0627\u062a (\u0642\u064a\u0627\u0633\u0627\u064b \u0625\u0644\u0649 \u0645\u0633\u0631\u062f\u0643 \u0627\u0644\u0645\u0639\u062a\u0645\u062f)\u060c \u0648\u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0648\u0627\u0644\u062a\u0648\u0627\u0631\u064a\u062e\u060c \u0648\u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u0623\u0639\u0644\u0627\u0645\u060c \u0648\u0633\u0644\u0627\u0645\u0629 \u0627\u0644\u0644\u063a\u0629 \u0627\u0644\u0647\u062f\u0641 (\u0627\u0644\u0646\u062d\u0648 \u0648\u0627\u0644\u0635\u0631\u0641)\u060c \u0648\u0627\u0644\u0635\u0645\u062a \u0648\u0627\u0644\u062a\u0648\u0642\u0651\u0641\u0627\u062a\u060c \u0648\u0627\u0644\u062a\u0631\u062f\u0651\u062f\u060c \u0648\u0627\u0644\u062a\u0643\u0631\u0627\u0631\u060c \u0648\u0633\u0631\u0639\u0629 \u0627\u0644\u0625\u0644\u0642\u0627\u0621\u060c \u0648\u0648\u0636\u0648\u062d \u0627\u0644\u0646\u0637\u0642 \u2014 \u0625\u0636\u0627\u0641\u0629\u064b \u0625\u0644\u0649 \u0623\u0648\u0627\u062e\u0631 \u0627\u0644\u0643\u0644\u0645 (\u0627\u0644\u0625\u0639\u0631\u0627\u0628) \u0639\u0646\u062f \u062a\u0641\u0639\u064a\u0644 \u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0635\u0648\u062a\u064a\u0629 \u0627\u0644\u0639\u0631\u0628\u064a\u0629.',
     evalScopeNo: '\u0645\u0627 \u0644\u0627 \u064a\u064f\u0642\u064a\u0651\u0645: \u0623\u0645\u0627\u0646\u0629 \u0646\u0642\u0644 \u0627\u0644\u0645\u0639\u0646\u0649\u060c \u0648\u0627\u0644\u062a\u063a\u0637\u064a\u0629 \u0648\u0627\u0644\u0627\u0643\u062a\u0645\u0627\u0644\u060c \u0648\u0627\u0644\u0623\u0641\u0643\u0627\u0631 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0629\u060c \u0648\u0627\u0644\u0623\u0633\u0644\u0648\u0628 \u0648\u0627\u0644\u0645\u0633\u062a\u0648\u0649 \u0627\u0644\u0644\u063a\u0648\u064a. \u0647\u0630\u0647 \u0645\u0646 \u0627\u062e\u062a\u0635\u0627\u0635 \u0627\u0644\u0645\u062f\u0631\u0651\u0628 \u0627\u0644\u0628\u0634\u0631\u064a\u060c \u0648\u0644\u0630\u0644\u0643 \u062a\u0645\u062a\u0646\u0639 \u0627\u0644\u0645\u0646\u0635\u0651\u0629 \u0639\u0646 \u0627\u0644\u062d\u0643\u0645 \u0641\u064a\u0647\u0627 \u0639\u0645\u062f\u0627\u064b.',
     evalScopeNote: '\u062a\u064f\u0628\u0646\u0649 \u062f\u0631\u062c\u062a\u0643 \u0645\u0646 \u0641\u0626\u0627\u062a \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0623\u0648\u0644\u0649 \u0648\u062d\u062f\u0647\u0627.',
-    termBasesTitle: '\u0642\u0648\u0627\u0639\u062f \u0627\u0644\u0645\u0635\u0637\u0644\u062d\u0627\u062a \u0627\u0644\u0645\u0631\u062c\u0639\u064a\u0629',
-    termBasesHint: '\u062a\u062a\u0628\u0639 \u0627\u0644\u0645\u0642\u0627\u0628\u0644\u0627\u062a \u0627\u0644\u0642\u0648\u0627\u0639\u062f \u0627\u0644\u0631\u0633\u0645\u064a\u0629 \u0623\u062f\u0646\u0627\u0647. \u0627\u0633\u062a\u062e\u062f\u0645 \u0631\u0627\u0628\u0637 🔍 \u0641\u064a \u0643\u0644 \u0633\u0637\u0631 \u0644\u0644\u062a\u062d\u0642\u0651\u0642 \u0645\u0646 \u0627\u0644\u0645\u0635\u0637\u0644\u062d \u0641\u064a \u0643\u0644 \u0642\u0627\u0639\u062f\u0629 \u0642\u0628\u0644 \u0627\u0644\u062a\u0633\u062c\u064a\u0644 \u2014 \u0641\u0627\u0644\u0645\u062f\u062e\u0644 \u0627\u0644\u0645\u0635\u062d\u0651\u064e\u062d \u0647\u0648 \u0645\u0627 \u064a\u0642\u064a\u0633 \u0639\u0644\u064a\u0647 \u0627\u0644\u062a\u0642\u064a\u064a\u0645 \u0645\u0635\u0637\u0644\u062d\u0627\u062a\u0643.',
-    termCheckLabel: '\u062a\u062d\u0642\u0651\u0642',
     ownTextBtn: '\u270d\ufe0f \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0646\u0635\u0651\u064a \u0627\u0644\u062e\u0627\u0635 (\u0628\u0644\u0627 \u0630\u0643\u0627\u0621 \u0627\u0635\u0637\u0646\u0627\u0639\u064a)',
     ownTextTitle: '\u270d\ufe0f \u0646\u0635\u0651\u064a \u0627\u0644\u062e\u0627\u0635 \u2014 \u0635\u0648\u062a \u0641\u0642\u0637 \u0628\u0644\u0627 \u062a\u0648\u0644\u064a\u062f',
     ownTextHint: '\u0627\u0644\u0635\u0642 \u0646\u0635\u0651\u0627\u064b \u0644\u062f\u064a\u0643 \u0645\u0633\u0628\u0642\u0627\u064b. \u0633\u064a\u064f\u0633\u062a\u062e\u062f\u0645 \u0643\u0645\u0627 \u0647\u0648 \u062a\u0645\u0627\u0645\u0627\u064b: \u0628\u0644\u0627 \u0625\u0639\u0627\u062f\u0629 \u0635\u064a\u0627\u063a\u0629 \u0648\u0644\u0627 \u062a\u0648\u0644\u064a\u062f. \u062b\u0645\u0651 \u0627\u0646\u062a\u0642\u0644 \u0625\u0644\u0649 \u00ab\u0627\u0644\u0635\u0648\u062a \u0648\u0627\u0644\u0645\u0648\u0627\u062f\u00bb \u0644\u062a\u062d\u0648\u064a\u0644\u0647 \u0625\u0644\u0649 \u0635\u0648\u062a \u062b\u0645\u0651 \u062a\u0631\u062c\u0645\u0647 \u0643\u0627\u0644\u0645\u0639\u062a\u0627\u062f.',
@@ -953,7 +945,8 @@ const UI = {
     glossaryEdit: '✏️ تعديل المسرد',
     glossaryAddTerm: 'إضافة مصطلح',
     glossaryEditDone: '✓ إنهاء التعديل',
-    glossaryEditHint: 'راجع المقابلات وصحّحها قبل تسجيل ترجمتك — سيتحقق التقييم من مصطلحاتك وفق هذا المسرد المعتمد.',
+    glossaryEditHint: 'تُستمدّ المقابلات من القواعد الرسمية (مكنز الأمم المتحدة UNBIS ، IATE ، FranceTerme) — وتُشير علامة ✓ إلى مصطلح مؤكَّد فيها. راجعها وصحّحها قبل التسجيل: يقيس التقييم مصطلحاتك على هذا المسرد.',
+    termVerifiedTitle: 'مؤكَّد في',
     glossaryMemoryNote: 'تصحيحات محفوظة — تُطبَّق تلقائياً على المسارد القادمة.',
     glossaryMemoryClear: 'حذف التصحيحات المحفوظة',
     webPageTab: 'صفحة ويب',
@@ -1049,7 +1042,7 @@ const UI = {
     llmFailedWarning: 'لم يتمكن التحليل اللغوي بالذكاء الاصطناعي من الاكتمال — يُعرض الرصد التلقائي فقط. قد تكون الدرجات غير مكتملة.',
     llmQuotaError: 'بلغت خدمة الذكاء الاصطناعي حدّها في الدقيقة — قد يحدث ذلك مع الخطابات الطويلة أو عند إرسال عدة طلبات متتالية. أعادت المنصة المحاولة تلقائياً؛ انتظر نحو دقيقة ثم أعد المحاولة. يُعاد ضبط الحدّ المشترك تلقائياً — لا حاجة لأي إعداد.',
     keyRequired: 'مفتاح Groq API شخصي (مجاني) مطلوب — أنشئ مفتاحك على console.groq.com (دقيقتان، بدون بطاقة ائتمان) وأضفه في الإعدادات.',
-    keyInvalid: 'تم رفض مفتاح Groq API الخاص بك (غير صالح أو منتهي). افتح الإعدادات واحذفه والصق مفتاحاً جديداً من console.groq.com.',
+    keyInvalid: 'رفضت خدمة الذكاء الاصطناعي الطلب (مفتاح الخادم غير صالح أو منتهٍ). ليس بإمكانك إصلاح ذلك — أبلغ أستاذك أو مسؤول المنصّة.',
     sameLangError: 'يجب أن تختلف لغة المصدر عن لغة الترجمة الشفوية — فالترجمة الفورية تكون دائماً بين لغتين مختلفتين.',
     simulSourceEnded: 'انتهى الخطاب المصدر — أكمل ترجمتك ثم اضغط إيقاف. يتوقف التسجيل تلقائياً بعد دقيقة واحدة.',
     simulWithText: 'إظهار نص المصدر على الشاشة (فورية مع النص)',
@@ -1299,10 +1292,10 @@ const UI = {
     correctTranslation: 'Traduction correcte',
     missingContent: 'Contenu manquant',
     scoreScopeNote: 'Ce score reflète la conformité terminologique, la correction de la langue cible, les chiffres/noms et la restitution technique (pauses, gestion du décalage, fluidité). Le sens/la couverture ci-dessous sont affichés à titre informatif et n\'influencent pas le score à ce stade.',
-    aiDisclaimerTitle: '\u26a0\ufe0f Avertissement IA \u2014 \u00e0 lire avant de vous fier \u00e0 un r\u00e9sultat',
-    aiDisclaimerShort: 'Cette plateforme utilise l\'IA pour r\u00e9diger les discours, les lire \u00e0 voix haute, transcrire votre prestation et la commenter. Les sorties IA peuvent \u00eatre erron\u00e9es : v\u00e9rifiez-les avant d\'apprendre dessus.',
-    aiDisclaimerMore: 'Lire l\'avertissement complet',
-    aiDisclaimerLess: 'Masquer l\'avertissement',
+    aiDisclaimerTitle: '⚠️ Avertissement IA',
+    aiDisclaimerShort: 'L\'IA peut se tromper — vérifiez le texte, l\'audio, la transcription et les scores avant de vous y fier.',
+    aiDisclaimerMore: 'Détails',
+    aiDisclaimerLess: 'Fermer',
     aiDisclaimerGen: 'Discours g\u00e9n\u00e9r\u00e9s : le texte est produit par un grand mod\u00e8le de langue. Il peut contenir des chiffres invent\u00e9s, des noms de rapports ou de r\u00e9solutions inexistants, des erreurs factuelles et des biais culturels ou politiques. Ne le consid\u00e9rez jamais comme une source de faits : c\'est un support d\'entra\u00eenement. En arabe, l\'accord du nombre (\u0627\u0644\u0639\u062f\u062f \u0648\u0623\u062d\u0643\u0627\u0645\u0647) et les dates sont les points les plus fragiles.',
     aiDisclaimerTts: 'Audio synth\u00e9tique (TTS) : la voix peut mal prononcer les noms, sigles, dates et chiffres \u2014 surtout en arabe. Ce que vous entendez ne correspond pas toujours au texte \u00e9crit. Corrigez le texte avant de g\u00e9n\u00e9rer l\'audio si un passage sonne mal.',
     aiDisclaimerStt: 'Transcription (STT) : votre enregistrement est transcrit automatiquement. La transcription est une estimation, pas ce que vous avez certainement dit. L\'arabe, l\'alternance codique et le bruit de fond en d\u00e9gradent nettement la pr\u00e9cision. Corrigez la transcription avant de lancer l\'\u00e9valuation.',
@@ -1313,9 +1306,6 @@ const UI = {
     evalScopeYes: '\u00c9valu\u00e9 automatiquement : terminologie (par rapport \u00e0 votre glossaire valid\u00e9), chiffres et dates, noms propres, correction de la langue cible (grammaire et morphologie), silences et pauses, h\u00e9sitations, r\u00e9p\u00e9titions, d\u00e9bit, clart\u00e9 de prononciation \u2014 ainsi que les finales casuelles arabes (\u0627\u0644\u0625\u0639\u0631\u0627\u0628) lorsque le module acoustique arabe est activ\u00e9.',
     evalScopeNo: 'NON \u00e9valu\u00e9 : la fid\u00e9lit\u00e9 du sens, la couverture et la compl\u00e9tude, les id\u00e9es omises, le style et le registre. Cela rel\u00e8ve d\'un formateur humain : la plateforme ne les juge d\u00e9lib\u00e9r\u00e9ment pas.',
     evalScopeNote: 'Votre score est construit uniquement \u00e0 partir des cat\u00e9gories de la premi\u00e8re liste.',
-    termBasesTitle: 'Bases terminologiques de r\u00e9f\u00e9rence',
-    termBasesHint: 'Les \u00e9quivalents suivent les bases officielles ci-dessous. Utilisez le lien 🔍 d\'une ligne pour v\u00e9rifier le terme dans chaque base avant d\'enregistrer \u2014 c\'est la fiche corrig\u00e9e qui sert de r\u00e9f\u00e9rence \u00e0 l\'\u00e9valuation terminologique.',
-    termCheckLabel: 'V\u00e9rifier',
     ownTextBtn: '\u270d\ufe0f Utiliser mon propre texte (sans IA)',
     ownTextTitle: '\u270d\ufe0f Mon propre texte \u2014 audio seulement, sans g\u00e9n\u00e9ration IA',
     ownTextHint: 'Collez un texte que vous avez d\u00e9j\u00e0. Il est utilis\u00e9 EXACTEMENT tel quel : aucune r\u00e9\u00e9criture, aucune g\u00e9n\u00e9ration par l\'IA. Passez ensuite \u00e0 \u00ab Audio & supports \u00bb pour le faire lire, puis interpr\u00e9tez-le normalement.',
@@ -1464,7 +1454,8 @@ const UI = {
     glossaryEdit: '✏️ Modifier le glossaire',
     glossaryAddTerm: 'Ajouter un terme',
     glossaryEditDone: '✓ Terminer la modification',
-    glossaryEditHint: 'Relisez et corrigez les équivalents AVANT d\'enregistrer votre prestation — l\'évaluation vérifiera ensuite votre terminologie par rapport à ce glossaire validé.',
+    glossaryEditHint: 'Les équivalents sont recherchés dans les bases officielles (Thesaurus UNBIS, IATE, FranceTerme) — un ✓ signale un terme qui y est confirmé. Relisez-les et corrigez-les AVANT d\'enregistrer : l\'évaluation contrôle votre terminologie par rapport à ce glossaire.',
+    termVerifiedTitle: 'Confirmé dans',
     glossaryMemoryNote: 'corrections mémorisées — elles sont réappliquées automatiquement aux prochains glossaires.',
     glossaryMemoryClear: 'Oublier les corrections enregistrées',
     webPageTab: 'Page web',
@@ -1560,7 +1551,7 @@ const UI = {
     llmFailedWarning: "L'analyse linguistique IA n'a pas pu se terminer — seules les détections automatiques sont affichées. Les scores peuvent être incomplets.",
     llmQuotaError: "Le service d'IA a atteint sa limite par minute — cela peut arriver avec de longs discours ou plusieurs requêtes d'affilée. La plateforme a déjà réessayé automatiquement ; attendez environ une minute puis réessayez. La limite partagée se réinitialise d'elle-même — rien à configurer.",
     keyRequired: "Une clé Groq API personnelle (gratuite) est requise — créez la vôtre sur console.groq.com (2 minutes, sans carte bancaire) et ajoutez-la dans les Paramètres.",
-    keyInvalid: "Votre clé Groq API a été refusée (invalide ou expirée). Ouvrez les Paramètres, supprimez-la et collez une nouvelle clé depuis console.groq.com.",
+    keyInvalid: 'Le service d\'IA a rejeté la requête (la clé serveur de la plateforme est invalide ou expirée). Vous ne pouvez pas corriger cela — signalez-le à votre enseignant ou à l\'administrateur de la plateforme.',
     sameLangError: "La langue source et la langue d'interprétation doivent être différentes — l'interprétation se fait toujours entre deux langues.",
     simulSourceEnded: "Le discours source est terminé — achevez votre interprétation puis appuyez sur stop. L'enregistrement s'arrête automatiquement après une minute.",
     simulWithText: 'Afficher le texte source à l\'écran (SIMUL avec texte)',
@@ -1751,57 +1742,12 @@ function clearLocalGlossaryMemory() {
 }
 
 // ── SVG icons ────────────────────────────────────────────────────────────────
-// ── Reference terminology bases (ETIB feedback, Lina — 21 Aug 2026) ─────────
-// "Est-il possible d'ajouter comme référence des bases terminologiques
-//  existantes ?"  None of these bases exposes a free public API (UNTERM, IATE
-// and EUR-Lex sit behind WAFs; FranceTerme and the Vitrine linguistique are
-// HTML-only), so the platform cannot query them server-side. It does the two
-// things that actually change the result instead:
-//   1. the generation prompt names them as the AUTHORITY ORDER every equivalent
-//      must follow (backend module_a.TERMINOLOGY_AUTHORITY_BLOCK);
-//   2. every glossary row carries a one-click search into each base, so a term
-//      is verified against the real source before the student records — and the
-//      corrected row is what Module D checks the terminology against.
-// Search URL patterns verified against the live sites on 21 Aug 2026.
-const TERMINOLOGY_BASES = [
-  { id: 'unterm',      label: 'UNTERM',       title: 'UNTERM — United Nations terminology (AR/FR/EN)',
-    url: t => `https://unterm.un.org/unterm2/en/search?q=${encodeURIComponent(t)}` },
-  { id: 'iate',        label: 'IATE',         title: 'IATE — EU interinstitutional terminology',
-    url: t => `https://iate.europa.eu/search/result?query=${encodeURIComponent(t)}` },
-  { id: 'eurovoc',     label: 'EuroVoc',      title: 'EuroVoc / EUR-Lex — EU multilingual thesaurus',
-    url: t => `https://eur-lex.europa.eu/search.html?scope=EURLEX&text=${encodeURIComponent(t)}&type=quick` },
-  { id: 'franceterme', label: 'FranceTerme',  title: 'FranceTerme — termes officiels recommandés (FR)',
-    url: t => `https://www.culture.fr/franceterme/Resultats-de-recherche?q=${encodeURIComponent(t)}` },
-  { id: 'oqlf',        label: 'OQLF',         title: 'Vitrine linguistique — Office québécois de la langue française',
-    url: t => `https://vitrinelinguistique.oqlf.gouv.qc.ca/resultats-de-recherche?tx_solr%5Bq%5D=${encodeURIComponent(t)}` },
-  { id: 'certtal',     label: 'ETIB-CERTTAL', title: 'Base terminologique ETIB–CERTTAL (USJ)',
-    url: t => `https://etib-certtal-terminologie.usj.edu.lb/?s=${encodeURIComponent(t)}&post_type=product` },
-];
-
-// One row of "check this term in <base>" links. Uses the term itself, falling
-// back to whichever equivalent exists, so an empty "term" cell still searches.
-function TermCheckLinks({ item, labels }) {
-  const query = String(
-    item.term || glossaryArabicValue(item) ||
-    glossaryValue(item, ['french', 'French', 'fr', 'FR']) ||
-    glossaryValue(item, ['english', 'English', 'en', 'EN']) || ''
-  ).trim();
-  if (!query) return null;
-  return (
-    <span style={{ display: 'inline-flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
-      <span style={{ fontSize: '0.75rem', color: 'var(--warm-gray)' }} aria-hidden="true">🔎</span>
-      {TERMINOLOGY_BASES.map(base => (
-        <a key={base.id} href={base.url(query)} target="_blank" rel="noopener noreferrer"
-          title={`${labels.termCheckLabel}: ${base.title}`}
-          style={{ fontSize: '0.7rem', color: 'var(--primary)', textDecoration: 'none',
-                   border: '1px solid var(--border, #ddd)', borderRadius: 5, padding: '0.05rem 0.3rem',
-                   whiteSpace: 'nowrap' }}>
-          {base.label}
-        </a>
-      ))}
-    </span>
-  );
-}
+// Terminology is grounded SERVER-SIDE now (backend/services/terminology.py):
+// each generated term is looked up in the UNBIS Thesaurus (UN, and the only
+// machine-readable Arabic source), IATE (EU) and FranceTerme (official French),
+// and an attested equivalent replaces the model's own. The old per-row 'check
+// this term in 6 websites' links are gone — the check already happened.
+// A row that a base confirmed carries `verified` + `verified_sources`.
 
 function glossaryValue(item, keys) {
   for (const key of keys) {
@@ -1964,9 +1910,6 @@ const initialSpeechForm = {
 
 // If the student pastes a full text instead of a short topic, treat the pasted
 // text as the SOURCE DOCUMENT (grounding) rather than as a topic string.
-// The platform now uses a central server-side key (Gemini), so students no
-// longer need a personal Groq key. Set this back to true to re-require one.
-const REQUIRE_PERSONAL_KEY = false;
 
 const TOPIC_AS_SOURCE_THRESHOLD = 300;
 
@@ -2320,7 +2263,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activePanel, setActivePanel] = useState('module-a');
   const [lastGeneratedScript, setLastGeneratedScript] = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [sessionRestored, setSessionRestored] = useState(false);
   const L = UI[uiLang];
 
@@ -2468,7 +2410,6 @@ export default function App() {
         onPanelChange={setActivePanel}
         uiLang={uiLang}
         onLanguageChange={setUiLang}
-        onOpenSettings={() => setShowSettings(true)}
       />
       <main>
         {isAuthenticated && !isGuest && sessionRestored && lastGeneratedScript?.script && (
@@ -2496,14 +2437,10 @@ export default function App() {
             lastGeneratedScript={lastGeneratedScript}
             currentUser={currentUser}
             isRtl={uiLang === 'ar'}
-            onOpenSettings={() => setShowSettings(true)}
           />
         )}
       </main>
       <AppFooter labels={L} />
-      {showSettings && (
-        <SettingsModal labels={L} onClose={() => setShowSettings(false)} />
-      )}
       {isAuthenticated && <ChatWidget labels={L} />}
     </div>
   );
@@ -2618,100 +2555,7 @@ function ChatWidget({ labels }) {
   );
 }
 
-function SettingsModal({ labels, onClose }) {
-  const [keyInput, setKeyInput] = useState(getStoredGroqKey());
-  const [status, setStatus] = useState('');  // 'valid' | 'invalid' | 'saved' | ''
-  const [testing, setTesting] = useState(false);
-  const hasKey = Boolean(getStoredGroqKey());
-
-  async function handleTest() {
-    setTesting(true);
-    setStatus('');
-    try {
-      const res = await validateGroqKey(keyInput.trim());
-      setStatus(res.valid ? 'valid' : 'invalid');
-    } catch {
-      setStatus('invalid');
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  function handleSave() {
-    saveGroqKey(keyInput.trim());
-    setStatus('saved');
-  }
-
-  function handleClear() {
-    saveGroqKey('');
-    setKeyInput('');
-    setStatus('');
-  }
-
-  return (
-    <div className="settings-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="settings-modal">
-        <div className="settings-modal-header">
-          <h2>{labels.settingsTitle}</h2>
-          <button type="button" className="settings-close-btn" onClick={onClose}>{labels.settingsClose}</button>
-        </div>
-        <div className="settings-section">
-          <h3>{labels.settingsGroqTitle}</h3>
-          <p className="settings-desc">{labels.settingsGroqDesc}</p>
-          <a
-            href="https://console.groq.com/keys"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="settings-link"
-          >
-            {labels.settingsGroqGetKey}
-          </a>
-          <div className="settings-key-row">
-            <input
-              type="password"
-              className="settings-key-input"
-              placeholder={labels.settingsGroqPlaceholder}
-              value={keyInput}
-              onChange={e => { setKeyInput(e.target.value); setStatus(''); }}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={handleTest}
-              disabled={testing || !keyInput.trim()}
-            >
-              {testing ? labels.settingsGroqTesting : labels.settingsGroqTest}
-            </button>
-          </div>
-          {status === 'valid'   && <p className="settings-status ok">{labels.settingsGroqValid}</p>}
-          {status === 'invalid' && <p className="settings-status err">{labels.settingsGroqInvalid}</p>}
-          {status === 'saved'   && <p className="settings-status ok">{labels.settingsGroqSaved}</p>}
-          {!status && !hasKey   && <p className="settings-status warn">{labels.settingsGroqNotSet}</p>}
-          <div className="settings-btn-row">
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={handleSave}
-              disabled={!keyInput.trim()}
-            >
-              {labels.settingsGroqSave}
-            </button>
-            {hasKey && (
-              <button type="button" className="btn-danger" onClick={handleClear}>
-                {labels.settingsGroqClear}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Header({ isAuthenticated, isGuest, activePanel, labels, onPanelChange, uiLang, onLanguageChange, onOpenSettings }) {
-  const hasKey = Boolean(getStoredGroqKey());
+function Header({ isAuthenticated, isGuest, activePanel, labels, onPanelChange, uiLang, onLanguageChange }) {
   // Progress (module-e) is hidden from the UI for now (user request 11 Aug 2026):
   // the ModuleProgress component, its panel, and the backend history/adaptive
   // logic are all kept — to re-enable, restore the guest-only filter:
@@ -2738,14 +2582,6 @@ function Header({ isAuthenticated, isGuest, activePanel, labels, onPanelChange, 
               {labels[item.labelKey]}
             </button>
           ))}
-          <button
-            type="button"
-            className="nav-btn settings-btn"
-            onClick={onOpenSettings}
-            title={labels.navSettings}
-          >
-            ⚙ {!hasKey && <span className="key-missing-dot" title={labels.bannerNoKey} />}
-          </button>
         </nav>
       )}
       <label className="lang-picker">
@@ -2869,52 +2705,69 @@ function LoginScreen({ labels, onLogin, onSignup, onGuest }) {
 // collapsible, and it stays open once opened for the session.
 const AI_DISCLAIMER_ACK_KEY = 'etib_ai_disclaimer_ack_v1';
 
-function AiDisclaimer({ labels, compact = false }) {
-  // Opens itself until the student has read it once, so the full text is seen
-  // at least one time; after that the one-line warning stays but the detail is
-  // collapsed. The warning line itself is never dismissible.
+// ── AI disclaimer ─────────────────────────────────────────────
+// Kept to ONE slim line in the workspace — the full text lives in a modal that
+// opens itself once, on first use, and closes for good on "I understand".
+// A permanent wall of text at the top of the page is not a usable disclaimer.
+function AiDisclaimer({ labels }) {
   const [acked, setAcked] = useState(() => {
     try { return localStorage.getItem(AI_DISCLAIMER_ACK_KEY) === '1'; } catch { return false; }
   });
-  const [open, setOpen] = useState(!acked);
+  const [open, setOpen] = useState(false);
+
+  // First visit: show the full text once, then never again unless asked for.
+  useEffect(() => { if (!acked) setOpen(true); }, [acked]);
 
   function acknowledge() {
     try { localStorage.setItem(AI_DISCLAIMER_ACK_KEY, '1'); } catch { /* private mode */ }
     setAcked(true);
     setOpen(false);
   }
+
   return (
-    <div className="card" style={{
-      background: '#fff8e6', border: '1px solid #f0d9a8', borderRadius: 10,
-      padding: compact ? '0.7rem 0.9rem' : '0.9rem 1.2rem', marginBottom: '1rem',
-    }}>
-      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 320px', minWidth: 0 }}>
-          <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>{labels.aiDisclaimerTitle}</p>
-          <p style={{ fontSize: '0.85rem', margin: '0.35rem 0 0', lineHeight: 1.55 }}>{labels.aiDisclaimerShort}</p>
-        </div>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setOpen(v => !v)}
-          style={{ whiteSpace: 'nowrap' }}>
-          {open ? labels.aiDisclaimerLess : labels.aiDisclaimerMore}
-        </button>
+    <>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap',
+        background: '#fdf6e7', border: '1px solid #f0e0be', borderRadius: 8,
+        padding: '0.35rem 0.7rem', margin: '0 0 0.75rem 0', fontSize: '0.78rem',
+        color: 'var(--warm-gray)', lineHeight: 1.4,
+      }}>
+        <span style={{ flex: 1, minWidth: 0 }}>⚠️ {labels.aiDisclaimerShort}</span>
+        <button type="button" onClick={() => setOpen(true)} style={{
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          color: 'var(--primary)', fontSize: '0.78rem', fontWeight: 600,
+          textDecoration: 'underline', whiteSpace: 'nowrap',
+        }}>{labels.aiDisclaimerMore}</button>
       </div>
+
       {open && (
-        <ul style={{ margin: '0.85rem 0 0', paddingInlineStart: '1.1rem', fontSize: '0.83rem', lineHeight: 1.65 }}>
-          <li>{labels.aiDisclaimerGen}</li>
-          <li>{labels.aiDisclaimerTts}</li>
-          <li>{labels.aiDisclaimerStt}</li>
-          <li>{labels.aiDisclaimerEval}</li>
-          <li><strong>{labels.aiDisclaimerAdvice}</strong></li>
-          <li>{labels.aboutEvalStorage}</li>
-        </ul>
+        <div onClick={() => acked && setOpen(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--cream, #fff)', borderRadius: 12, maxWidth: 680,
+            width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: '1.4rem 1.6rem',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+          }}>
+            <h2 style={{ fontSize: '1.05rem', margin: '0 0 0.75rem' }}>{labels.aiDisclaimerTitle}</h2>
+            <ul style={{ margin: 0, paddingInlineStart: '1.1rem', fontSize: '0.85rem', lineHeight: 1.65 }}>
+              <li>{labels.aiDisclaimerGen}</li>
+              <li>{labels.aiDisclaimerTts}</li>
+              <li>{labels.aiDisclaimerStt}</li>
+              <li>{labels.aiDisclaimerEval}</li>
+              <li><strong>{labels.aiDisclaimerAdvice}</strong></li>
+              <li>{labels.aboutEvalStorage}</li>
+            </ul>
+            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.1rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn-primary" onClick={acknowledge}>
+                {acked ? labels.aiDisclaimerLess : labels.aiDisclaimerAck}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-      {open && !acked && (
-        <button type="button" className="btn-primary btn-sm" onClick={acknowledge}
-          style={{ marginTop: '0.75rem' }}>
-          {labels.aiDisclaimerAck}
-        </button>
-      )}
-    </div>
+    </>
   );
 }
 
@@ -2940,13 +2793,12 @@ function EvalScopePanel({ labels, style }) {
   );
 }
 
-function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, lastGeneratedScript, currentUser, isRtl, onOpenSettings }) {
+function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, lastGeneratedScript, currentUser, isRtl }) {
   const [sharedAudioUrl, setSharedAudioUrl] = useState(null);
   const [lastTranscript, setLastTranscript] = useState(null);
   const [lastRecordingBlob, setLastRecordingBlob] = useState(null);
   const [progressRefresh, setProgressRefresh] = useState(0);
   const [adaptiveParams, setAdaptiveParams] = useState(null);
-  const hasKey = Boolean(getStoredGroqKey());
 
   return (
     <section>
@@ -2960,26 +2812,6 @@ function Workspace({ labels, activePanel, onPanelChange, onLogout, onGenerated, 
       {/* Always-visible AI disclaimer (ETIB feedback 21 Aug 2026). */}
       <AiDisclaimer labels={labels} />
 
-      {!hasKey && (
-        <div style={{
-          background: '#eaf2fb', border: '1px solid #b6d4f5', borderRadius: 10,
-          padding: '0.85rem 1.2rem', margin: '0 0 1rem 0',
-          display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap'
-        }}>
-          <span style={{ flex: 1, fontSize: '0.92rem' }}>
-            ℹ️ {labels.demoKeyBanner}
-          </span>
-          <button
-            onClick={() => { onOpenSettings(); }}
-            style={{
-              background: '#1a3a5c', color: '#fff', border: 'none', borderRadius: 7,
-              padding: '0.45rem 1rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem', whiteSpace: 'nowrap'
-            }}
-          >
-            ⚙ {labels.demoKeyBtn}
-          </button>
-        </div>
-      )}
 
       {/* Keep all panels mounted — state persists when switching tabs */}
       <div style={{ display: activePanel === 'module-a' ? 'block' : 'none' }}>
@@ -3243,6 +3075,7 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   // the exercise. Only the TTS step runs afterwards.
   const [ownTextMode, setOwnTextMode] = useState(false);
   const [ownText, setOwnText] = useState('');
+  const [editStatus, setEditStatus] = useState('idle');
 
   function handleUseOwnText() {
     const text = ownText.trim();
@@ -3279,11 +3112,6 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   async function handleSubmit(event) {
     event.preventDefault();
     // Personal Groq key is mandatory (16 July feedback) — no shared-quota use.
-    if (REQUIRE_PERSONAL_KEY && !getStoredGroqKey()) {
-      setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
-      setStatus('error');
-      return;
-    }
     // Interpretation is cross-language: source and target must differ.
     if (form.language === form.target_language) {
       setError(labels.sameLangError); setStatus('error'); return;
@@ -3319,11 +3147,6 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   // transcribe it → becomes the source script, and its audio plays in Module C.
   async function handleSourceMediaUpload(file) {
     if (!file) return;
-    if (REQUIRE_PERSONAL_KEY && !getStoredGroqKey()) {
-      setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
-      setStatus('error');
-      return;
-    }
     setSourceMediaStatus('loading'); setError(''); setResult(null); onGenerated(null);
     try {
       // Reuse the ASR endpoint (it now normalizes audio so the FULL media is
@@ -3375,6 +3198,55 @@ const [showAdvanced, setShowAdvanced] = useState(true);
     }
   }
 
+  // Saving an edited speech re-derives the pedagogical materials from the NEW
+  // text: a changed figure, a reworded passage or a half-rewritten speech would
+  // otherwise leave the summary, MCQs and glossary describing the old version.
+  // The glossary the student had already corrected is preserved by term.
+  async function handleSaveScriptEdit(newText) {
+    const text = String(newText || '').trim();
+    const current = result || lastGeneratedScript;
+    if (!text || !current || text === current.script) return;
+
+    const base = {
+      ...current,
+      script: text,
+      script_original: current.script_original ?? current.script,
+      script_edited: true,
+      word_count: text.split(/\s+/).filter(Boolean).length,
+    };
+    setResult(base); onGenerated(base);
+
+    // An edited text no longer matches its materials — rebuild them.
+    setEditStatus('loading');
+    try {
+      const mats = await generateMaterialsFromScript({
+        script: text,
+        language: base.language,
+        domain: base.domain || 'general',
+      });
+      const previous = current.glossary || [];
+      const keepEdits = new Map(
+        previous.filter(g => g && g.term).map(g => [String(g.term).trim().toLowerCase(), g])
+      );
+      const merged = (mats.glossary || []).map(row => {
+        const kept = keepEdits.get(String(row.term || '').trim().toLowerCase());
+        return kept ? { ...row, ...kept } : row;
+      });
+      const updated = applyGlossaryMemory({
+        ...base,
+        summary:  mats.summary || base.summary || '',
+        mcqs:     (mats.mcqs || []).length ? mats.mcqs : base.mcqs,
+        glossary: merged.length ? merged : base.glossary,
+      });
+      setResult(updated); onGenerated(updated);
+      setEditStatus('idle');
+    } catch (err) {
+      // The edited text is already saved; only the refresh failed.
+      setEditStatus('error');
+      setError(`${labels.errorPrefix}: ${friendlyLlmError(err.message, labels)}`);
+    }
+  }
+
   function buildAllSourceFiles() {
     const libFiles = librarySources.map(src => {
       const blob = new Blob([src.text], { type: 'text/plain' });
@@ -3386,11 +3258,6 @@ const [showAdvanced, setShowAdvanced] = useState(true);
   const hasSources = documentFiles.length > 0 || librarySources.length > 0;
 
   async function handleDocumentGenerate() {
-    if (REQUIRE_PERSONAL_KEY && !getStoredGroqKey()) {
-      setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
-      setStatus('error');
-      return;
-    }
     if (form.language === form.target_language) {
       setError(labels.sameLangError); setStatus('error'); return;
     }
@@ -3670,7 +3537,8 @@ const [showAdvanced, setShowAdvanced] = useState(true);
           SPEECH TEXT stayed blank — the most important part. Fall back to the
           restored script (user report 12 Aug 2026). */}
       {(result || lastGeneratedScript?.script) &&
-        <SpeechResult data={result || lastGeneratedScript} labels={labels} />}
+        <SpeechResult data={result || lastGeneratedScript} labels={labels}
+          onSaveEdit={handleSaveScriptEdit} editStatus={editStatus} />}
 
       {showLibrary && (
         <SourcesPanel
@@ -3720,7 +3588,9 @@ function SummaryBlock({ text, isArabic }) {
   );
 }
 
-function SpeechResult({ data, labels }) {
+function SpeechResult({ data, labels, onSaveEdit, editStatus }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
   const duration = useMemo(() => {
     const seconds = Number(data.estimated_duration_seconds || 0);
     if (!seconds) return null;
@@ -3775,9 +3645,56 @@ function SpeechResult({ data, labels }) {
           {data.source_speech.date ? ` (${data.source_speech.date})` : ''}
         </p>
       )}
-      <div className={`speech-text ${isArabic ? 'arabic' : ''}`}>
-        {data.script}
-      </div>
+      {/* The speech is corrected HERE, at the source (user request 21 Aug 2026).
+          Editing it re-derives the summary, MCQs and glossary from the edited
+          text, so changing a figure or half the speech no longer leaves the
+          materials describing the old version. */}
+      {onSaveEdit && (
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', margin: '0.25rem 0 0.6rem' }}>
+          {!editing ? (
+            <button type="button" className="btn-secondary btn-sm"
+              onClick={() => { setDraft(data.script || ''); setEditing(true); }}>
+              {labels.editScriptBtn}
+            </button>
+          ) : (
+            <>
+              <button type="button" className="btn-primary btn-sm"
+                onClick={() => { setEditing(false); onSaveEdit(draft); }}>
+                {labels.editScriptDone}
+              </button>
+              <button type="button" className="btn-secondary btn-sm" onClick={() => setEditing(false)}>
+                {labels.aiDisclaimerLess}
+              </button>
+              {data.script_original && (
+                <button type="button" className="btn-secondary btn-sm"
+                  onClick={() => setDraft(data.script_original)}>
+                  {labels.scriptRestore}
+                </button>
+              )}
+              <span style={{ fontSize: '0.76rem', color: 'var(--warm-gray)' }}>{labels.editScriptHint}</span>
+            </>
+          )}
+          {editStatus === 'loading' && (
+            <span style={{ fontSize: '0.78rem', color: 'var(--warm-gray)' }}>⏳ {labels.materialsGenerating}</span>
+          )}
+        </div>
+      )}
+      {editing ? (
+        <textarea
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          rows={16}
+          className={isArabic ? 'arabic' : ''}
+          dir={isArabic ? 'rtl' : 'ltr'}
+          style={{ width: '100%', resize: 'vertical', padding: '0.7rem', borderRadius: 8,
+                   border: '1px solid var(--border, #ddd)', fontFamily: 'inherit',
+                   fontSize: '0.95rem', lineHeight: 1.7 }}
+        />
+      ) : (
+        <div className={`speech-text ${isArabic ? 'arabic' : ''}`}>
+          {data.script}
+        </div>
+      )}
       <p className="speech-next-hint">{labels.nextHintPre} <strong>{labels.navB}</strong> {labels.nextHintPost}</p>
     </div>
   );
@@ -4089,14 +4006,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
   const [glossaryMemoryCount, setGlossaryMemoryCount] = useState(() => glossaryMemorySize());
   const [materialsStatus, setMaterialsStatus] = useState('idle');
   const glossaryFileRef = useRef(null);
-  // Edit the AI text BEFORE the TTS step (ETIB feedback 21 Aug 2026: "est-il
-  // possible d'ajouter une option qui permet d'éditer le texte généré par IA
-  // avant la phase TTS ?"). A generated speech can carry hallucinated figures,
-  // bias, or badly-formed Arabic numbers; the student fixes it here and the
-  // corrected text is what gets read aloud, interpreted, and used as the
-  // reference by the evaluation.
-  const [editingScript, setEditingScript] = useState(false);
-  const [scriptDraft, setScriptDraft] = useState('');
 
   // Recovery path: if a speech came back with its script but no MCQ/glossary
   // (rare — a long generation whose materials call was rate-limited even after
@@ -4207,8 +4116,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
     setAudioStatus('idle');
     setAudioError('');
     setAudioWpm(null);
-    // A different speech invalidates any in-progress text edit.
-    setEditingScript(false);
   }, [speechId]);
 
   if (!lastGeneratedScript) {
@@ -4223,32 +4130,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
   const summary  = lastGeneratedScript.summary  || '';
   const mcqs     = lastGeneratedScript.mcqs     || [];
   const glossary = lastGeneratedScript.glossary || [];
-
-  function startEditingScript() {
-    setScriptDraft(lastGeneratedScript?.script || '');
-    setEditingScript(true);
-  }
-
-  function saveScriptEdit() {
-    const text = scriptDraft.trim();
-    if (text && text !== lastGeneratedScript.script) {
-      onScriptUpdate?.({
-        ...lastGeneratedScript,
-        script: text,
-        // Keep the very first version so the edit is reversible.
-        script_original: lastGeneratedScript.script_original ?? lastGeneratedScript.script,
-        script_edited: true,
-      });
-      // The existing audio no longer matches the text — drop it so the student
-      // cannot interpret an audio that says something else.
-      setAudioUrl(null); setAudioStatus('idle'); setAudioWpm(null);
-    }
-    setEditingScript(false);
-  }
-
-  function restoreOriginalScript() {
-    if (lastGeneratedScript?.script_original) setScriptDraft(lastGeneratedScript.script_original);
-  }
 
   async function handleGenerateAudio() {
     setAudioStatus('loading'); setAudioError('');
@@ -4291,52 +4172,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
           </button>
         </div>
       )}
-
-      {/* ── Speech text — editable BEFORE the audio is generated ── */}
-      <div className="card">
-        <div className="b-section-header">
-          <h2 className="b-section-title">📄 {labels.scriptTitle}</h2>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {editingScript && lastGeneratedScript.script_original && (
-              <button className="btn-secondary btn-sm" onClick={restoreOriginalScript}>
-                {labels.scriptRestore}
-              </button>
-            )}
-            <button className="btn-secondary btn-sm"
-              onClick={() => (editingScript ? saveScriptEdit() : startEditingScript())}>
-              {editingScript ? labels.editScriptDone : labels.editScriptBtn}
-            </button>
-          </div>
-        </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.6rem' }}>
-          💡 {labels.editScriptHint}
-        </p>
-        {/* Transcribed from an uploaded audio/video file — be explicit about how
-            reliable that transcription is (ETIB question 21 Aug 2026). */}
-        {lastGeneratedScript.source_upload && (
-          <div className="info-tip" style={{ marginBottom: '0.6rem' }}>ℹ️ {labels.mediaAsrWarning}</div>
-        )}
-        {lastGeneratedScript.ai_generated === false && (
-          <div className="info-tip" style={{ marginBottom: '0.6rem' }}>✍️ {labels.ownTextBadge}</div>
-        )}
-        {editingScript ? (
-          <textarea
-            value={scriptDraft}
-            onChange={e => setScriptDraft(e.target.value)}
-            rows={14}
-            className={isArabic ? 'arabic' : ''}
-            dir={isArabic ? 'rtl' : 'ltr'}
-            style={{ width: '100%', resize: 'vertical', padding: '0.7rem', borderRadius: 8,
-                     border: '1px solid var(--border, #ddd)', fontFamily: 'inherit',
-                     fontSize: '0.95rem', lineHeight: 1.7 }}
-          />
-        ) : (
-          <div className={`speech-text ${isArabic ? 'arabic' : ''}`}
-            style={{ maxHeight: 340, overflowY: 'auto' }}>
-            {lastGeneratedScript.script}
-          </div>
-        )}
-      </div>
 
       {/* ── Audio ── */}
       <div className="card">
@@ -4415,26 +4250,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
           <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.75rem' }}>
             💡 {labels.glossaryEditHint}
           </p>
-          {/* Official terminology bases (ETIB feedback 21 Aug 2026). The prompt
-              already treats them as the authority order; these links let the
-              student verify each entry in the real base before recording. */}
-          <details style={{ marginBottom: '0.75rem' }}>
-            <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem', color: 'var(--primary)' }}>
-              📑 {labels.termBasesTitle}
-            </summary>
-            <p style={{ fontSize: '0.78rem', color: 'var(--warm-gray)', margin: '0.5rem 0', lineHeight: 1.55 }}>
-              {labels.termBasesHint}
-            </p>
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {TERMINOLOGY_BASES.map(base => (
-                <a key={base.id} href={base.url('')} target="_blank" rel="noopener noreferrer"
-                  className="btn-secondary btn-sm" title={base.title}
-                  style={{ textDecoration: 'none' }}>
-                  {base.label}
-                </a>
-              ))}
-            </div>
-          </details>
           {glossaryMemoryCount > 0 && (
             <p style={{ fontSize: '0.8rem', color: 'var(--warm-gray)', marginBottom: '0.75rem',
                         display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -4454,7 +4269,6 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
                   <th>{labels.glossaryFrenchHeader || 'French'}</th>
                   <th>{labels.glossaryEnglishHeader || 'English'}</th>
                   <th>{labels.glossaryDefinitionHeader || 'Definition'}</th>
-                  <th>{labels.termCheckLabel}</th>
                   {editingGlossary && <th aria-label="delete"></th>}
                 </tr>
               </thead>
@@ -4468,17 +4282,23 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
                         <td><input className="glossary-edit-input" value={glossaryEditValue(item, 'french', ['French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])} onChange={e => updateGlossaryCell(i, 'french', e.target.value)} /></td>
                         <td><input className="glossary-edit-input" value={glossaryEditValue(item, 'english', ['English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])} onChange={e => updateGlossaryCell(i, 'english', e.target.value)} /></td>
                         <td><input className="glossary-edit-input" value={item.definition || ''} onChange={e => updateGlossaryCell(i, 'definition', e.target.value)} /></td>
-                        <td><TermCheckLinks item={item} labels={labels} /></td>
                         <td><button type="button" className="file-chip-remove" onClick={() => removeGlossaryTerm(i)} title={labels.removeSource}>×</button></td>
                       </>
                     ) : (
                       <>
-                        <td><strong>{item.term}</strong></td>
+                        <td>
+                          <strong>{item.term}</strong>
+                          {item.verified && (
+                            <span title={`${labels.termVerifiedTitle}: ${(item.verified_sources || []).join(', ')}`}
+                              style={{ marginInlineStart: '0.35rem', color: 'var(--sage)', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+                              ✓ {(item.verified_sources || [])[0] || ''}
+                            </span>
+                          )}
+                        </td>
                         <td className="arabic" dir="rtl">{glossaryArabicValue(item)}</td>
                         <td>{glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])}</td>
                         <td>{glossaryValue(item, ['english', 'English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'])}</td>
                         <td className="gloss-def">{item.definition || ''}</td>
-                        <td><TermCheckLinks item={item} labels={labels} /></td>
                       </>
                     )}
                   </tr>
@@ -5482,11 +5302,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
   const interpMode = lastTranscript?.mode || 'consecutive';
 
   async function handleEvaluate() {
-    if (REQUIRE_PERSONAL_KEY && !getStoredGroqKey()) {
-      setError(labels.keyRequired || 'A personal (free) Groq API key is required — add yours in Settings.');
-      setStatus('error');
-      return;
-    }
     setStatus('loading');
     setError('');
     setReport(null);
@@ -5725,31 +5540,10 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
             )}
           </div>
 
-          {/* Pause & flow analysis */}
-          {report.pause_analysis && (
-            <div className="card">
-              <h3 className="report-section-title">⏸️ {labels.pauseAnalysisTitle}</h3>
-              {report.pause_analysis.comment && (
-                <p className={isAr ? 'arabic' : ''} style={{ fontSize: '0.85rem', color: 'var(--ink)' }}>{report.pause_analysis.comment}</p>
-              )}
-              {(report.pause_analysis.problem_pauses || []).map((p, i) => {
-                const detectedPause = (algo.long_silences || [])[i] || {};
-                const duration = detectedPause.duration_seconds ?? p.duration_seconds;
-                const atSeconds = detectedPause.at_seconds ?? p.at_seconds;
-                return (
-                  <div key={i} className="eval-item" style={{ borderInlineStart: '3px solid var(--sienna)', paddingInlineStart: '0.75rem', marginTop: '0.5rem' }}>
-                    <strong style={{ fontSize: '0.84rem' }}>
-                      {duration ?? 0}s {labels.longSilences.toLowerCase()}
-                      {Number.isFinite(Number(atSeconds)) && (
-                        Number(atSeconds) === 0 ? ' — at start' : ` — at ${atSeconds}s`
-                      )}
-                    </strong>
-                    {p.impact && <div className="eval-explanation" dir="auto">{p.impact}</div>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* Pause & flow card REMOVED (user request 21 Aug 2026): its LLM
+              comment kept drifting into meaning/coverage territory ("toute la
+              suite du discours non restituée"), which is out of scope now.
+              The factual silence list stays in the algorithmic block above. */}
 
           {/* Repetition analysis */}
           {report.repetition_analysis?.comment && (

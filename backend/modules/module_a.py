@@ -1763,6 +1763,19 @@ def _ensure_materials(generated: dict, params: dict) -> None:
         generated['glossary'] = mats.get('glossary', [])
 
 
+def _ground_glossary_safe(glossary, language: str):
+    """Check the glossary against the real terminology bases, never fatally.
+
+    Grounding is a network call to third-party services; a slow or unreachable
+    base must cost the student nothing more than an unverified glossary row.
+    """
+    try:
+        from services.terminology import ground_glossary
+        return ground_glossary(glossary or [], language)
+    except Exception:
+        return glossary
+
+
 def build_generation_response(generated: dict, params: dict, mode: str = 'generated',
                               extra: dict | None = None, reflow: bool = True) -> dict:
     script = generated['script']
@@ -1781,6 +1794,11 @@ def build_generation_response(generated: dict, params: dict, mode: str = 'genera
     # Safety net: fill MCQ/glossary/summary if they came back empty (long
     # single-call truncation, or a failed long-form materials call).
     _ensure_materials(generated, params)
+    # Replace the model's own equivalents with the ones actually attested in the
+    # institutional bases (UNBIS / IATE / FranceTerme). ETIB feedback 21 Aug 2026:
+    # the glossary must come from the real terminology sources, not from the LLM.
+    generated['glossary'] = _ground_glossary_safe(
+        generated.get('glossary'), params.get('language', 'ar'))
     word_count = len(script.split())
     wpm = params.get('wpm', DEFAULT_WPM)
     word_count_range = {
@@ -2163,7 +2181,9 @@ def _generate_materials_for_script(script: str, language: str, domain: str) -> d
     return {
         'summary':  parsed.get('summary', ''),
         'mcqs':     parsed.get('mcqs', []),
-        'glossary': parsed.get('glossary', []),
+        # Same institutional grounding as the main generation path, so a glossary
+        # rebuilt from an uploaded speech or an edited text is just as attested.
+        'glossary': _ground_glossary_safe(parsed.get('glossary', []), language),
         '_raw_head': str(raw_output or '')[:160].replace('\n', ' '),
     }
 

@@ -137,3 +137,16 @@ EVALUATION_SCORE_ON_MEANING = os.getenv('EVALUATION_SCORE_ON_MEANING', 'false').
 # (that is what Kevin asked for on 12 Aug 2026 — the two requests conflict, so
 # the behaviour is a single switch instead of a hard-coded choice).
 EVALUATION_REPORT_MEANING = os.getenv('EVALUATION_REPORT_MEANING', 'false').lower() == 'true'
+
+# ── Terminology grounding (ETIB feedback, Lina — 21 Aug 2026) ───────────────
+# The generated glossary is checked against the institutional bases that expose a
+# public API (see services/terminology.py): UNBIS Thesaurus for UN terminology
+# in AR/FR/EN, IATE for EU terminology in FR/EN, FranceTerme for officially
+# recommended French terms. Entirely fail-open — set the flag to false to skip
+# the lookups altogether.
+TERMINOLOGY_GROUNDING_ENABLED = os.getenv('TERMINOLOGY_GROUNDING_ENABLED', 'true').lower() != 'false'
+TERMINOLOGY_TIMEOUT = int(os.getenv('TERMINOLOGY_TIMEOUT', '6'))      # seconds per HTTP call
+TERMINOLOGY_MAX_TERMS = int(os.getenv('TERMINOLOGY_MAX_TERMS', '20')) # terms grounded per glossary
+# FranceTerme is a ~9 MB open-data XML export, downloaded lazily on first use and
+# then held in memory. Set to false on a very memory-tight deployment.
+FRANCETERME_ENABLED = os.getenv('FRANCETERME_ENABLED', 'true').lower() != 'false'

@@ -18,25 +18,18 @@ export function saveAuthToken(token) {
   else localStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
-// ── Groq API key (stored per-user in localStorage) ───────────────────────────
+// The platform runs on CENTRAL server-side keys — Gemini for text generation and
+// evaluation, Groq for Whisper ASR. Students no longer supply a key of their own
+// (21 Aug 2026), so nothing key-related is stored in the browser or sent from it.
 let _currentUserId = null;
-function groqKeyName() { return `etib_groq_api_key_${_currentUserId || 'anon'}`; }
 export function setCurrentUserId(id) { _currentUserId = id || null; }
-export function getStoredGroqKey() { return localStorage.getItem(groqKeyName()) || ''; }
-export function saveGroqKey(key) {
-  if (key) localStorage.setItem(groqKeyName(), key.trim());
-  else localStorage.removeItem(groqKeyName());
-}
 
 // ── Body helpers (no custom headers — works with HF Spaces CORS proxy) ───────
 function authBody(extra = {}) {
   const token = getAuthToken();
   return token ? { auth_token: token, ...extra } : { ...extra };
 }
-function groqBody(extra = {}) {
-  const key = getStoredGroqKey();
-  return key ? authBody({ groq_api_key: key, ...extra }) : authBody(extra);
-}
+const groqBody = authBody;
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
@@ -96,15 +89,6 @@ export async function logoutUser() {
   return parseJsonResponse(res);
 }
 
-export async function validateGroqKey(apiKey) {
-  const res = await safeFetch(`${BASE}/auth/validate-groq-key`, {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ api_key: apiKey }),
-  });
-  return parseJsonResponse(res);
-}
-
 export async function generateSpeech(params) {
   const res = await safeFetch(`${BASE}/module-a/generate`, {
     method: 'POST',
@@ -128,7 +112,6 @@ export async function generateSpeechFromDocument(files, params) {
   const fileList = Array.isArray(files) ? files : [files];
   fileList.forEach(f => form.append('documents', f));
   form.append('auth_token', getAuthToken());
-  form.append('groq_api_key', getStoredGroqKey());
   Object.entries(params).forEach(([key, value]) => form.append(key, String(value)));
   const res = await safeFetch(`${BASE}/module-a/from-document`, { method: 'POST', body: form });
   return parseJsonResponse(res);
@@ -139,7 +122,6 @@ export async function retrieveDocumentContext(files, params) {
   const fileList = Array.isArray(files) ? files : [files];
   fileList.forEach(f => form.append('documents', f));
   form.append('auth_token', getAuthToken());
-  form.append('groq_api_key', getStoredGroqKey());
   Object.entries(params).forEach(([key, value]) => form.append(key, String(value)));
   const res = await safeFetch(`${BASE}/module-a/retrieve-document-context`, { method: 'POST', body: form });
   return parseJsonResponse(res);
@@ -159,7 +141,6 @@ export async function transcribeAudio(audioFile, language = 'ar', sourceText = '
   form.append('audio', audioFile, audioFile.name || 'recording.webm');
   form.append('language', language);
   form.append('auth_token', getAuthToken());
-  form.append('groq_api_key', getStoredGroqKey());
   if (sourceText) form.append('source_text', sourceText);
   const res = await safeFetch(`${BASE}/module-c/transcribe`, { method: 'POST', body: form });
   return parseJsonResponse(res);
@@ -240,7 +221,6 @@ export async function alignPronunciation(audioFile, segments, sourceText, langua
   form.append('source_text', sourceText || '');
   form.append('language', language || 'ar');
   form.append('auth_token', getAuthToken());
-  form.append('groq_api_key', getStoredGroqKey());
   const res = await safeFetch(`${BASE}/module-c/align`, { method: 'POST', body: form });
   return parseJsonResponse(res);
 }
@@ -307,7 +287,6 @@ export async function evaluateWithAudio(audioFile, sourceScript, language, sourc
   form.append('language', language || 'ar');
   form.append('source_language', sourceLanguage || language || 'ar');
   form.append('auth_token', getAuthToken());
-  form.append('groq_api_key', getStoredGroqKey());
   if (domain) form.append('domain', domain);
   // Interpretation mode — lets the evaluator apply mode-aware pause tolerance
   // (e.g. Ear-Voice Span lag in simultaneous is not a fluency error).
