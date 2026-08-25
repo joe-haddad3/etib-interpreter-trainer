@@ -150,3 +150,10 @@ TERMINOLOGY_MAX_TERMS = int(os.getenv('TERMINOLOGY_MAX_TERMS', '20')) # terms gr
 # FranceTerme is a ~9 MB open-data XML export, downloaded lazily on first use and
 # then held in memory. Set to false on a very memory-tight deployment.
 FRANCETERME_ENABLED = os.getenv('FRANCETERME_ENABLED', 'true').lower() != 'false'
+
+# Domain lock (user request, 25 Aug 2026). The selected domain is stated as a hard
+# constraint in the generation prompt, and the finished speech is checked once; a
+# speech that drifted is revised back inside its domain. The check costs one small
+# LLM call per generation (the revision only runs when the speech actually
+# drifted), so it can be switched off if quota is tight.
+DOMAIN_ENFORCEMENT_ENABLED = os.getenv('DOMAIN_ENFORCEMENT_ENABLED', 'true').lower() != 'false'

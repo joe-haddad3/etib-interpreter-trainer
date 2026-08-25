@@ -12,7 +12,7 @@ import re
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
-from config import DEFAULT_WORD_COUNT, DEFAULT_WPM
+from config import DEFAULT_WORD_COUNT, DEFAULT_WPM, DOMAIN_ENFORCEMENT_ENABLED
 from services.llm_service import generate_text
 from utils.document_grounding import (
     DEFAULT_CHUNK_CHARACTERS,
@@ -578,6 +578,9 @@ Return ONLY valid compact JSON. No markdown, no code fences, no explanation outs
 }}
 """
 
+    # The selected domain is binding, not a hint (user request 25 Aug 2026).
+    prompt += build_domain_lock(domain)
+
     # Institutional terminology bases the glossary equivalents must follow
     # (ETIB feedback 21 Aug 2026).
     prompt += TERMINOLOGY_AUTHORITY_BLOCK
@@ -673,6 +676,208 @@ best equivalent, but keep the "definition" field precise enough that the student
 it — never invent an official-sounding name for a body, treaty or programme that you are
 not sure exists.
 """
+
+
+# ── Domain lock (user request, 25 Aug 2026) ────────────────────────────
+# "If the user selects Health, Economy, Diplomacy, Climate, etc., the generated
+#  text must stay clearly inside that domain and not drift into unrelated topics."
+# Naming the domain in the parameter list was too weak: the model would open on
+# the chosen domain and then wander (a health speech drifting into trade policy).
+# Two changes: the prompt now states what IS and is NOT inside the domain, and a
+# check after generation revises a speech that drifted anyway.
+DOMAIN_SCOPE = {
+    'politics': (
+        'governance, elections, political institutions, legislation, party politics, state reform, '
+        'political declarations and multilateral political processes'),
+    'economics': (
+        'macroeconomics, trade, finance, debt, investment, employment, inflation, growth, '
+        'development economics, budgets and economic policy'),
+    'climate': (
+        'climate change, emissions, energy transition, biodiversity, pollution, adaptation and '
+        'mitigation, environmental protection and climate finance'),
+    'health': (
+        'public health, disease and epidemics, health systems, access to care, medicines and '
+        'vaccines, mental health, nutrition as a health issue, and health policy'),
+    'education': (
+        'schooling, curricula, teacher training, literacy, higher education, vocational training, '
+        'access to and financing of education'),
+    'technology': (
+        'artificial intelligence, digital infrastructure, cybersecurity, data governance, '
+        'connectivity, innovation policy and the social impact of technology'),
+    'disarmament': (
+        'nuclear and conventional weapons, arms control, non-proliferation, disarmament treaties, '
+        'verification regimes and military expenditure'),
+    'diplomacy': (
+        'bilateral and multilateral relations, negotiation, peace processes, mediation, treaties, '
+        'sanctions, and the work of diplomatic and security bodies'),
+    'human rights': (
+        'civil, political, economic and social rights, humanitarian law, protection of civilians, '
+        'discrimination, justice and accountability'),
+    'migration': (
+        'migration flows, refugees and asylum, displacement, integration, border management and '
+        'the protection of migrants'),
+    'women': (
+        'gender equality, women\'s rights and empowerment, gender-based violence, women\'s '
+        'participation in economic and political life'),
+    'food': (
+        'food security, hunger, malnutrition, agriculture, food systems, supply chains and famine response'),
+    'legal': (
+        'international law, treaties and conventions, courts and tribunals, legal procedure, '
+        'jurisdiction and compliance'),
+    'medical': (
+        'clinical medicine, diagnosis and treatment, patient care, hospitals, medical ethics '
+        'and healthcare delivery'),
+}
+
+
+def build_domain_lock(domain: str) -> str:
+    """The block that makes the selected domain binding for the whole speech."""
+    domain = str(domain or '').strip()
+    if not domain:
+        return ''
+    scope = DOMAIN_SCOPE.get(domain.lower())
+    lines = [
+        '',
+        'DOMAIN LOCK — THIS IS A HARD CONSTRAINT:',
+        f'The ENTIRE speech must stay inside the "{domain}" domain, from the opening line to the '
+        'closing call to action.',
+    ]
+    if scope:
+        lines.append(f'In scope for "{domain}": {scope}.')
+    lines += [
+        f'Any other field may be mentioned ONLY as a brief, explicit consequence of a "{domain}" point '
+        f'(one clause, immediately tied back to {domain}) — never as a section, never as the subject of '
+        'a paragraph, and never as the theme of the conclusion.',
+        f'Do NOT drift into an adjacent field because it is easier to write about. If the requested '
+        f'topic could belong to several fields, treat it strictly through the "{domain}" lens.',
+        f'Every statistic, institution, example and recommendation must be a {domain} one.',
+        f'BEFORE returning, re-read the script and check every paragraph is recognisably about {domain}; '
+        'rewrite any paragraph that is not.',
+    ]
+    return '\n'.join(lines) + '\n'
+
+
+_DOMAIN_CHECK_PROMPT = """You are checking whether a speech respects the domain it was ordered in.
+
+REQUIRED DOMAIN: {domain}
+IN SCOPE: {scope}
+
+SPEECH (first part):
+{excerpt}
+
+Answer ONLY with compact JSON, no other text:
+{{"in_domain": true or false, "drift": "one short sentence naming the off-domain content, or empty"}}
+
+Rules for your judgement:
+- true  = the speech is recognisably about {domain} throughout; other fields appear only as brief
+          consequences tied back to {domain}.
+- false = a paragraph, a section, or the conclusion is really about another field, or the subject
+          matter is only marginally related to {domain}.
+- Judge the SUBJECT MATTER, not the vocabulary or the speaking style."""
+
+
+_DOMAIN_REFOCUS_PROMPT = """The speech below was ordered in the "{domain}" domain but drifted out of it.
+
+Problem found: {drift}
+IN SCOPE for "{domain}": {scope}
+
+Rewrite the speech so that EVERY paragraph is clearly about {domain}.
+Keep the same language, the same speaker voice, the same structure, the same rhetorical style and
+approximately the same length ({word_count} words). Keep the parts that are already on-domain almost
+word for word; rewrite only what drifted, replacing off-domain content with equivalent {domain}
+content (same role in the argument, {domain} facts and institutions).
+Return ONLY the rewritten speech text — no commentary, no JSON, no headings.
+
+SPEECH:
+{script}"""
+
+
+def check_script_domain(script: str, domain: str) -> tuple[bool, str]:
+    """Does the script actually stay inside the requested domain?
+
+    Returns (in_domain, drift_description). Fails OPEN: if the judge cannot be
+    reached or returns nonsense we assume the speech is fine, because blocking a
+    generation on a failed side-check would be far worse than a drifting speech.
+    """
+    domain = str(domain or '').strip()
+    if not domain or not str(script or '').strip():
+        return True, ''
+    try:
+        raw = generate_text(
+            messages=[
+                {'role': 'system', 'content': 'You return only valid compact JSON.'},
+                {'role': 'user', 'content': _DOMAIN_CHECK_PROMPT.format(
+                    domain=domain,
+                    scope=DOMAIN_SCOPE.get(domain.lower(), domain),
+                    excerpt=script[:3500],
+                )},
+            ],
+            max_tokens=200,
+            temperature=0.0,
+        )
+        parsed = parse_json_like_object(clean_model_json_text(str(raw or '')))
+        if not isinstance(parsed, dict) or 'in_domain' not in parsed:
+            return True, ''
+        return bool(parsed.get('in_domain')), str(parsed.get('drift') or '').strip()
+    except Exception:
+        return True, ''
+
+
+def refocus_script_to_domain(script: str, domain: str, drift: str) -> str:
+    """Rewrite a drifting speech back inside its domain.
+
+    The original is kept if the rewrite fails or comes back materially shorter:
+    an on-topic speech that lost a third of its length is a worse outcome than a
+    slightly drifting one of the right length.
+    """
+    words = len(str(script or '').split())
+    if not words:
+        return script
+    try:
+        rewritten = generate_text(
+            messages=[
+                {'role': 'system', 'content': (
+                    'You are an expert conference-speech editor. You return only the rewritten '
+                    'speech text.')},
+                {'role': 'user', 'content': _DOMAIN_REFOCUS_PROMPT.format(
+                    domain=domain,
+                    drift=drift or 'the speech leaves the requested domain',
+                    scope=DOMAIN_SCOPE.get(str(domain).lower(), domain),
+                    word_count=words,
+                    script=script,
+                )},
+            ],
+            max_tokens=min(8000, max(1200, words * 3 + 400)),
+            temperature=0.3,
+        )
+        rewritten = str(rewritten or '').strip()
+        if rewritten and abs(len(rewritten.split()) - words) / words <= 0.25:
+            return rewritten
+    except Exception:
+        pass
+    return script
+
+
+def enforce_domain(script: str, domain: str, allow_rewrite: bool = True) -> tuple[str, dict]:
+    """Check the domain and revise once if the speech drifted.
+
+    One revision only — a second pass costs another full generation and, in
+    testing, rarely changes the verdict.
+    """
+    in_domain, drift = check_script_domain(script, domain)
+    report = {'checked': True, 'in_domain': in_domain, 'drift': drift, 'revised': False}
+    if in_domain or not allow_rewrite:
+        return script, report
+    revised = refocus_script_to_domain(script, domain, drift)
+    if revised and revised != script:
+        report['revised'] = True
+        # Re-check so the response tells the truth about what the student got.
+        still_in, still_drift = check_script_domain(revised, domain)
+        report['in_domain'] = still_in
+        report['drift'] = '' if still_in else still_drift
+        return revised, report
+    return script, report
+
 
 _WESTERN_TO_ARABIC_INDIC = str.maketrans('0123456789', '٠١٢٣٤٥٦٧٨٩')
 
@@ -872,7 +1077,8 @@ This is {position}. {role_instruction}
 {continuity}{grounding_block}
 Write approximately {section['words']} words for THIS section only.
 Return ONLY the section's speech text — no JSON, no headings, no labels, no commentary, no markdown.
-Do NOT number the section or write "Section X". Write flowing spoken prose that connects to the rest of the speech."""
+Do NOT number the section or write "Section X". Write flowing spoken prose that connects to the rest of the speech.
+{build_domain_lock(domain)}"""
 
     if language == 'ar':
         prompt += (
@@ -1790,6 +1996,15 @@ def build_generation_response(generated: dict, params: dict, mode: str = 'genera
         script = _trim_script_to_word_count(script, target_word_count, params.get('language', 'ar'))
         if params.get('language', 'ar') == 'ar':
             script = _proofread_arabic_script(script)
+    # Domain check (user request 25 Aug 2026): a speech that drifted out of the
+    # selected domain is revised once, BEFORE the materials are derived from it,
+    # so the summary/MCQ/glossary describe the corrected speech.
+    # A long-form script is checked but not rewritten: a single rewrite call
+    # cannot hold 1500-3600 words and would truncate the speech.
+    domain_report = {'checked': False}
+    if params.get('domain') and DOMAIN_ENFORCEMENT_ENABLED:
+        script, domain_report = enforce_domain(
+            script, params['domain'], allow_rewrite=bool(reflow))
     generated['script'] = script
     # Safety net: fill MCQ/glossary/summary if they came back empty (long
     # single-call truncation, or a failed long-form materials call).
@@ -1811,6 +2026,7 @@ def build_generation_response(generated: dict, params: dict, mode: str = 'genera
         'summary': generated['summary'],
         'mcqs': generated['mcqs'],
         'glossary': generated['glossary'],
+        'domain_check': domain_report,
         'metadata': {
             **generated['metadata'],
             'topic': params.get('topic', '').strip(),

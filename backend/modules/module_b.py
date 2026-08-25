@@ -811,6 +811,11 @@ _glossary_mem: dict = {}   # { user_id: { term_norm: {term, arabic, french, engl
 _GLOSSARY_MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://127.0.0.1:27017')
 _GLOSSARY_MONGODB_DB = os.getenv('MONGODB_DB', 'etib_interpreter_trainer')
 _GLOSSARY_FIELDS = ('arabic', 'french', 'english', 'definition')
+# Context stored alongside a correction so it can be reused knowingly: which
+# language pair it was corrected for, and in which domain. A correction is
+# always keyed on the TERM (that is what makes it reusable across generations),
+# these fields describe where it came from.
+_GLOSSARY_CONTEXT_FIELDS = ('source_language', 'target_language', 'domain')
 
 
 def _glossary_user_id() -> str:
@@ -894,6 +899,13 @@ def save_glossary_corrections():
                 record[field] = value.strip()
         if not any(field in record for field in _GLOSSARY_FIELDS):
             continue   # nothing worth storing (blank correction)
+        for field in _GLOSSARY_CONTEXT_FIELDS:
+            value = item.get(field)
+            if isinstance(value, str) and value.strip():
+                record[field] = value.strip()
+        # Everything arriving here was typed by a human: that is what gives it
+        # priority over the generated and the base-attested equivalents.
+        record['manually_edited'] = bool(item.get('manually_edited', True))
         if col is not None:
             col.update_one(
                 {'user_id': user_id, 'term_norm': term_norm},

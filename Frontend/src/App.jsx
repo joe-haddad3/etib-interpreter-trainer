@@ -268,10 +268,6 @@ const UI = {
     aiDisclaimerEval: 'Evaluation: the report is an automatic training aid \u2014 not a grade, and not a substitute for your instructor. It judges only the categories listed below; anything else it says is indicative.',
     aiDisclaimerAdvice: 'What we ask of you: verify terminology in the official bases, check figures and names against the source, correct the transcript, and report anything that looks wrong to your instructor.',
     aiDisclaimerAck: 'I understand',
-    evalScopeTitle: '🎯 What the AI evaluates \u2014 and what it does not',
-    evalScopeYes: 'Evaluated automatically: terminology (against your approved glossary), numbers and dates, proper names, target-language correctness (grammar and morphology), silences and pauses, hesitations, repetitions, speech rate, pronunciation clarity \u2014 plus Arabic case endings (\u0627\u0644\u0625\u0639\u0631\u0627\u0628) when the Arabic acoustic module is enabled.',
-    evalScopeNo: 'NOT evaluated: fidelity of meaning, coverage and completeness, omitted ideas, style and register. These need a human interpreter trainer, so the platform deliberately does not judge them.',
-    evalScopeNote: 'Your score is built only from the categories in the first list.',
     ownTextBtn: '\u270d\ufe0f Use my own text (no AI)',
     ownTextTitle: '\u270d\ufe0f My own text \u2014 audio only, no AI generation',
     ownTextHint: 'Paste a text you already have. It is used EXACTLY as written: no AI rewriting, no AI generation. Then go to \u201cAudio & materials\u201d to have it read aloud, and interpret it as usual.',
@@ -420,6 +416,7 @@ const UI = {
     glossaryEditDone: '✓ Done editing',
     glossaryEditHint: 'Equivalents are looked up in the official bases (UNBIS Thesaurus, IATE, FranceTerme) — a ✓ marks a term confirmed there. Review and correct them BEFORE recording: the evaluation checks your terminology against this glossary.',
     termVerifiedTitle: 'Confirmed in',
+    termEditedTitle: 'your correction',
     glossaryMemoryNote: 'corrections remembered — they are re-applied automatically to future glossaries.',
     glossaryMemoryClear: 'Forget saved corrections',
     webPageTab: 'Web page',
@@ -758,10 +755,6 @@ const UI = {
     aiDisclaimerEval: '\u0627\u0644\u062a\u0642\u064a\u064a\u0645: \u0627\u0644\u062a\u0642\u0631\u064a\u0631 \u0623\u062f\u0627\u0629 \u062a\u062f\u0631\u064a\u0628 \u0622\u0644\u064a\u0629\u060c \u0648\u0644\u064a\u0633 \u0639\u0644\u0627\u0645\u0629 \u0648\u0644\u0627 \u0628\u062f\u064a\u0644\u0627\u064b \u0639\u0646 \u0623\u0633\u062a\u0627\u0630\u0643. \u0648\u0647\u0648 \u0644\u0627 \u064a\u062d\u0643\u0645 \u0625\u0644\u0627\u0651 \u0641\u064a \u0627\u0644\u0641\u0626\u0627\u062a \u0627\u0644\u0645\u0630\u0643\u0648\u0631\u0629 \u0623\u062f\u0646\u0627\u0647\u060c \u0648\u0645\u0627 \u0639\u062f\u0627\u0647\u0627 \u0625\u0634\u0627\u0631\u064a \u0641\u0642\u0637.',
     aiDisclaimerAdvice: '\u0645\u0627 \u0646\u0637\u0644\u0628\u0647 \u0645\u0646\u0643: \u062a\u062d\u0642\u0651\u0642 \u0645\u0646 \u0627\u0644\u0645\u0635\u0637\u0644\u062d\u0627\u062a \u0641\u064a \u0627\u0644\u0642\u0648\u0627\u0639\u062f \u0627\u0644\u0631\u0633\u0645\u064a\u0629\u060c \u0648\u0642\u0627\u0631\u0646 \u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0648\u0627\u0644\u0623\u0633\u0645\u0627\u0621 \u0628\u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0635\u062f\u0631\u060c \u0648\u0635\u062d\u0651\u062d \u0627\u0644\u0646\u0635 \u0627\u0644\u0645\u0641\u0631\u0651\u064e\u063a\u060c \u0648\u0623\u0628\u0644\u063a \u0623\u0633\u062a\u0627\u0630\u0643 \u0628\u0623\u064a \u0646\u062a\u064a\u062c\u0629 \u062a\u0628\u062f\u0648 \u062e\u0627\u0637\u0626\u0629.',
     aiDisclaimerAck: '\u0641\u0647\u0645\u062a',
-    evalScopeTitle: '🎯 \u0645\u0627 \u064a\u064f\u0642\u064a\u0651\u0645\u0647 \u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a \u2014 \u0648\u0645\u0627 \u0644\u0627 \u064a\u064f\u0642\u064a\u0651\u0645\u0647',
-    evalScopeYes: '\u0645\u0627 \u064a\u064f\u0642\u064a\u0651\u0645 \u0622\u0644\u064a\u0627\u064b: \u0627\u0644\u0645\u0635\u0637\u0644\u062d\u0627\u062a (\u0642\u064a\u0627\u0633\u0627\u064b \u0625\u0644\u0649 \u0645\u0633\u0631\u062f\u0643 \u0627\u0644\u0645\u0639\u062a\u0645\u062f)\u060c \u0648\u0627\u0644\u0623\u0631\u0642\u0627\u0645 \u0648\u0627\u0644\u062a\u0648\u0627\u0631\u064a\u062e\u060c \u0648\u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u0623\u0639\u0644\u0627\u0645\u060c \u0648\u0633\u0644\u0627\u0645\u0629 \u0627\u0644\u0644\u063a\u0629 \u0627\u0644\u0647\u062f\u0641 (\u0627\u0644\u0646\u062d\u0648 \u0648\u0627\u0644\u0635\u0631\u0641)\u060c \u0648\u0627\u0644\u0635\u0645\u062a \u0648\u0627\u0644\u062a\u0648\u0642\u0651\u0641\u0627\u062a\u060c \u0648\u0627\u0644\u062a\u0631\u062f\u0651\u062f\u060c \u0648\u0627\u0644\u062a\u0643\u0631\u0627\u0631\u060c \u0648\u0633\u0631\u0639\u0629 \u0627\u0644\u0625\u0644\u0642\u0627\u0621\u060c \u0648\u0648\u0636\u0648\u062d \u0627\u0644\u0646\u0637\u0642 \u2014 \u0625\u0636\u0627\u0641\u0629\u064b \u0625\u0644\u0649 \u0623\u0648\u0627\u062e\u0631 \u0627\u0644\u0643\u0644\u0645 (\u0627\u0644\u0625\u0639\u0631\u0627\u0628) \u0639\u0646\u062f \u062a\u0641\u0639\u064a\u0644 \u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0635\u0648\u062a\u064a\u0629 \u0627\u0644\u0639\u0631\u0628\u064a\u0629.',
-    evalScopeNo: '\u0645\u0627 \u0644\u0627 \u064a\u064f\u0642\u064a\u0651\u0645: \u0623\u0645\u0627\u0646\u0629 \u0646\u0642\u0644 \u0627\u0644\u0645\u0639\u0646\u0649\u060c \u0648\u0627\u0644\u062a\u063a\u0637\u064a\u0629 \u0648\u0627\u0644\u0627\u0643\u062a\u0645\u0627\u0644\u060c \u0648\u0627\u0644\u0623\u0641\u0643\u0627\u0631 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0629\u060c \u0648\u0627\u0644\u0623\u0633\u0644\u0648\u0628 \u0648\u0627\u0644\u0645\u0633\u062a\u0648\u0649 \u0627\u0644\u0644\u063a\u0648\u064a. \u0647\u0630\u0647 \u0645\u0646 \u0627\u062e\u062a\u0635\u0627\u0635 \u0627\u0644\u0645\u062f\u0631\u0651\u0628 \u0627\u0644\u0628\u0634\u0631\u064a\u060c \u0648\u0644\u0630\u0644\u0643 \u062a\u0645\u062a\u0646\u0639 \u0627\u0644\u0645\u0646\u0635\u0651\u0629 \u0639\u0646 \u0627\u0644\u062d\u0643\u0645 \u0641\u064a\u0647\u0627 \u0639\u0645\u062f\u0627\u064b.',
-    evalScopeNote: '\u062a\u064f\u0628\u0646\u0649 \u062f\u0631\u062c\u062a\u0643 \u0645\u0646 \u0641\u0626\u0627\u062a \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0623\u0648\u0644\u0649 \u0648\u062d\u062f\u0647\u0627.',
     ownTextBtn: '\u270d\ufe0f \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0646\u0635\u0651\u064a \u0627\u0644\u062e\u0627\u0635 (\u0628\u0644\u0627 \u0630\u0643\u0627\u0621 \u0627\u0635\u0637\u0646\u0627\u0639\u064a)',
     ownTextTitle: '\u270d\ufe0f \u0646\u0635\u0651\u064a \u0627\u0644\u062e\u0627\u0635 \u2014 \u0635\u0648\u062a \u0641\u0642\u0637 \u0628\u0644\u0627 \u062a\u0648\u0644\u064a\u062f',
     ownTextHint: '\u0627\u0644\u0635\u0642 \u0646\u0635\u0651\u0627\u064b \u0644\u062f\u064a\u0643 \u0645\u0633\u0628\u0642\u0627\u064b. \u0633\u064a\u064f\u0633\u062a\u062e\u062f\u0645 \u0643\u0645\u0627 \u0647\u0648 \u062a\u0645\u0627\u0645\u0627\u064b: \u0628\u0644\u0627 \u0625\u0639\u0627\u062f\u0629 \u0635\u064a\u0627\u063a\u0629 \u0648\u0644\u0627 \u062a\u0648\u0644\u064a\u062f. \u062b\u0645\u0651 \u0627\u0646\u062a\u0642\u0644 \u0625\u0644\u0649 \u00ab\u0627\u0644\u0635\u0648\u062a \u0648\u0627\u0644\u0645\u0648\u0627\u062f\u00bb \u0644\u062a\u062d\u0648\u064a\u0644\u0647 \u0625\u0644\u0649 \u0635\u0648\u062a \u062b\u0645\u0651 \u062a\u0631\u062c\u0645\u0647 \u0643\u0627\u0644\u0645\u0639\u062a\u0627\u062f.',
@@ -910,6 +903,7 @@ const UI = {
     glossaryEditDone: '✓ إنهاء التعديل',
     glossaryEditHint: 'تُستمدّ المقابلات من القواعد الرسمية (مكنز الأمم المتحدة UNBIS ، IATE ، FranceTerme) — وتُشير علامة ✓ إلى مصطلح مؤكَّد فيها. راجعها وصحّحها قبل التسجيل: يقيس التقييم مصطلحاتك على هذا المسرد.',
     termVerifiedTitle: 'مؤكَّد في',
+    termEditedTitle: 'تصحيحك',
     glossaryMemoryNote: 'تصحيحات محفوظة — تُطبَّق تلقائياً على المسارد القادمة.',
     glossaryMemoryClear: 'حذف التصحيحات المحفوظة',
     webPageTab: 'صفحة ويب',
@@ -1248,10 +1242,6 @@ const UI = {
     aiDisclaimerEval: '\u00c9valuation : le rapport est une aide \u00e0 l\'entra\u00eenement automatique, ni une note ni un substitut \u00e0 votre enseignant. Il ne juge que les cat\u00e9gories list\u00e9es ci-dessous ; tout le reste est indicatif.',
     aiDisclaimerAdvice: 'Ce que nous vous demandons : v\u00e9rifier la terminologie dans les bases officielles, contr\u00f4ler chiffres et noms par rapport \u00e0 la source, corriger la transcription, et signaler \u00e0 votre enseignant tout r\u00e9sultat douteux.',
     aiDisclaimerAck: 'J\'ai compris',
-    evalScopeTitle: '🎯 Ce que l\'IA \u00e9value \u2014 et ce qu\'elle n\'\u00e9value pas',
-    evalScopeYes: '\u00c9valu\u00e9 automatiquement : terminologie (par rapport \u00e0 votre glossaire valid\u00e9), chiffres et dates, noms propres, correction de la langue cible (grammaire et morphologie), silences et pauses, h\u00e9sitations, r\u00e9p\u00e9titions, d\u00e9bit, clart\u00e9 de prononciation \u2014 ainsi que les finales casuelles arabes (\u0627\u0644\u0625\u0639\u0631\u0627\u0628) lorsque le module acoustique arabe est activ\u00e9.',
-    evalScopeNo: 'NON \u00e9valu\u00e9 : la fid\u00e9lit\u00e9 du sens, la couverture et la compl\u00e9tude, les id\u00e9es omises, le style et le registre. Cela rel\u00e8ve d\'un formateur humain : la plateforme ne les juge d\u00e9lib\u00e9r\u00e9ment pas.',
-    evalScopeNote: 'Votre score est construit uniquement \u00e0 partir des cat\u00e9gories de la premi\u00e8re liste.',
     ownTextBtn: '\u270d\ufe0f Utiliser mon propre texte (sans IA)',
     ownTextTitle: '\u270d\ufe0f Mon propre texte \u2014 audio seulement, sans g\u00e9n\u00e9ration IA',
     ownTextHint: 'Collez un texte que vous avez d\u00e9j\u00e0. Il est utilis\u00e9 EXACTEMENT tel quel : aucune r\u00e9\u00e9criture, aucune g\u00e9n\u00e9ration par l\'IA. Passez ensuite \u00e0 \u00ab Audio & supports \u00bb pour le faire lire, puis interpr\u00e9tez-le normalement.',
@@ -1400,6 +1390,7 @@ const UI = {
     glossaryEditDone: '✓ Terminer la modification',
     glossaryEditHint: 'Les équivalents sont recherchés dans les bases officielles (Thesaurus UNBIS, IATE, FranceTerme) — un ✓ signale un terme qui y est confirmé. Relisez-les et corrigez-les AVANT d\'enregistrer : l\'évaluation contrôle votre terminologie par rapport à ce glossaire.',
     termVerifiedTitle: 'Confirmé dans',
+    termEditedTitle: 'votre correction',
     glossaryMemoryNote: 'corrections mémorisées — elles sont réappliquées automatiquement aux prochains glossaires.',
     glossaryMemoryClear: 'Oublier les corrections enregistrées',
     webPageTab: 'Page web',
@@ -1618,16 +1609,30 @@ function loadGlossaryMemory() {
   } catch { return {}; }
 }
 
-// Save one corrected field for a term. Empty values are ignored (a cleared cell
-// should not be remembered as a correction, and must not resurrect later).
-function rememberGlossaryCorrection(term, field, value) {
+// Save one corrected field for a term, together with the context it was
+// corrected in: the language pair, the domain, and the fact that a human typed
+// it. Re-editing the same term simply overwrites the stored value.
+// Empty values are ignored — a cleared cell is not a correction and must never
+// resurrect later.
+function rememberGlossaryCorrection(term, field, value, context = {}) {
   const key = normalizeGlossaryTerm(term);
   if (!key || !GLOSSARY_MEMORY_FIELDS.includes(field)) return;
   const val = String(value ?? '').trim();
   if (!val) return;
   try {
     const memory = loadGlossaryMemory();
-    memory[key] = { ...(memory[key] || {}), [field]: val, term: String(term).trim() };
+    memory[key] = {
+      ...(memory[key] || {}),
+      [field]: val,
+      term: String(term).trim(),
+      // Context of the correction. Kept per term (not per field) because the
+      // student corrects a term while working on one speech, in one pair.
+      source_language: context.source_language || memory[key]?.source_language || '',
+      target_language: context.target_language || memory[key]?.target_language || '',
+      domain:          context.domain          || memory[key]?.domain          || '',
+      manually_edited: true,
+      updated_at: new Date().toISOString(),
+    };
     localStorage.setItem(GLOSSARY_MEMORY_KEY, JSON.stringify(memory));
   } catch { /* storage full / disabled — corrections just won't persist */ }
 }
@@ -1637,8 +1642,13 @@ function glossaryMemorySize() {
   return Object.keys(loadGlossaryMemory()).length;
 }
 
-// Apply remembered corrections onto a fresh glossary list (non-destructive:
-// only overrides a field when we actually remember a correction for that term).
+// Apply remembered corrections onto a fresh glossary list.
+//
+// A human correction is the HIGHEST authority: it overrides the model's own
+// equivalent AND the one the institutional bases returned during server-side
+// grounding. So a row patched from memory drops the `verified` marker coming
+// from a base and is flagged `manually_edited` instead — the student must see
+// whose value they are reading.
 function applyGlossaryMemoryToList(glossary) {
   if (!Array.isArray(glossary) || !glossary.length) return glossary;
   const memory = loadGlossaryMemory();
@@ -1647,12 +1657,33 @@ function applyGlossaryMemoryToList(glossary) {
     const remembered = memory[normalizeGlossaryTerm(item?.term)];
     if (!remembered) return item;
     const patched = { ...item };
+    let touched = false;
     for (const field of GLOSSARY_MEMORY_FIELDS) {
-      if (remembered[field]) patched[field] = remembered[field];
+      if (remembered[field]) {
+        patched[field] = remembered[field];
+        // Kill the alias keys the display getters fall back through, or a stale
+        // AI/base value could resurface over the student's own.
+        for (const alias of (GLOSSARY_ALIASES[field] || [])) delete patched[alias];
+        touched = true;
+      }
+    }
+    if (touched) {
+      patched.manually_edited = true;
+      delete patched.verified;
+      delete patched.verified_sources;
     }
     return patched;
   });
 }
+
+// Alias keys the LLM may use for the same field (kept in one place so the edit
+// path and the memory path strip exactly the same set).
+const GLOSSARY_ALIASES = {
+  arabic:  ['Arabic', 'ar', 'AR', 'arabic_term', 'term_ar', 'arabic_translation', 'translation_ar', '\u0627\u0644\u0639\u0631\u0628\u064a\u0629', '\u0639\u0631\u0628\u064a'],
+  french:  ['French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'fran\u00e7ais', 'francais'],
+  english: ['English', 'en', 'EN', 'english_term', 'term_en', 'english_translation', 'translation_en'],
+  definition: [],
+};
 
 // Apply remembered corrections to a whole generated-script object's glossary.
 function applyGlossaryMemory(script) {
@@ -1670,8 +1701,11 @@ function mergeServerGlossaryCorrections(corrections) {
     for (const c of corrections) {
       const key = normalizeGlossaryTerm(c?.term);
       if (!key) continue;
-      const patch = { term: c.term };
+      const patch = { term: c.term, manually_edited: true };
       for (const f of GLOSSARY_MEMORY_FIELDS) if (c[f]) patch[f] = c[f];
+      for (const f of ['source_language', 'target_language', 'domain', 'updated_at']) {
+        if (c[f]) patch[f] = c[f];
+      }
       memory[key] = { ...(memory[key] || {}), ...patch };
     }
     localStorage.setItem(GLOSSARY_MEMORY_KEY, JSON.stringify(memory));
@@ -2711,28 +2745,6 @@ function AiDisclaimer({ labels }) {
         </div>
       )}
     </>
-  );
-}
-
-// ── What the automatic evaluation judges — and what it deliberately does not ──
-// ETIB (21 Aug 2026): "Les étudiants doivent savoir exactement ce qui peut être
-// évalué par IA (terminologie, nombres/dates, silences, hésitations,
-// éventuellement les fautes de langue)." Shown before recording (Module C) and
-// on top of the report (Module D) so the scope is never a surprise.
-function EvalScopePanel({ labels, style }) {
-  return (
-    <div className="card" style={{ background: '#f2f7f2', border: '1px solid #cfe0cf', ...style }}>
-      <p style={{ fontWeight: 700, fontSize: '0.88rem', margin: 0 }}>{labels.evalScopeTitle}</p>
-      <p style={{ fontSize: '0.83rem', margin: '0.5rem 0 0', lineHeight: 1.6 }}>
-        <span style={{ color: 'var(--sage)', fontWeight: 700 }}>✓ </span>{labels.evalScopeYes}
-      </p>
-      <p style={{ fontSize: '0.83rem', margin: '0.5rem 0 0', lineHeight: 1.6 }}>
-        <span style={{ color: 'var(--sienna)', fontWeight: 700 }}>✕ </span>{labels.evalScopeNo}
-      </p>
-      <p style={{ fontSize: '0.8rem', margin: '0.5rem 0 0', color: 'var(--warm-gray)' }}>
-        {labels.evalScopeNote}
-      </p>
-    </div>
   );
 }
 
@@ -4019,19 +4031,37 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
     }[key] || [];
     const updated = current.map((row, i) => {
       if (i !== index) return row;
-      const next = { ...row, [key]: value };
+      const next = { ...row, [key]: value, manually_edited: true };
       for (const alias of aliasKeys) delete next[alias];
+      // The student's value outranks whatever a terminology base returned, so
+      // the row must stop advertising itself as confirmed by that base.
+      if (GLOSSARY_MEMORY_FIELDS.includes(key)) {
+        delete next.verified;
+        delete next.verified_sources;
+      }
       return next;
     });
     // Remember this correction so future glossaries auto-apply it (Lina 6 Aug:
     // "can the platform retain corrections so entries improve over time?").
     // We key on the term, so an edited equivalent/definition is reused whenever
     // the same term reappears in a later generation.
-    rememberGlossaryCorrection(current[index]?.term, key, value);
+    // Context travels with the correction so it can be reused knowingly later:
+    // which pair it was corrected for, and in which domain.
+    const correctionContext = {
+      source_language: lastGeneratedScript?.language || '',
+      target_language: lastGeneratedScript?.target_language || '',
+      domain:          lastGeneratedScript?.domain || '',
+    };
+    rememberGlossaryCorrection(current[index]?.term, key, value, correctionContext);
     // Persist to the user's account (server) too, so it follows them across
     // sessions/devices. No-ops for guests (no token). Fire-and-forget.
     if (GLOSSARY_MEMORY_FIELDS.includes(key) && (current[index]?.term || '').trim() && String(value || '').trim()) {
-      saveGlossaryCorrection({ term: current[index].term, [key]: value }).catch(() => {});
+      saveGlossaryCorrection({
+        term: current[index].term,
+        [key]: value,
+        ...correctionContext,
+        manually_edited: true,
+      }).catch(() => {});
     }
     setGlossaryMemoryCount(glossaryMemorySize());
     // Propagate upward so Module D evaluates terminology against the
@@ -4231,12 +4261,17 @@ function ModuleB({ labels, lastGeneratedScript, onAudioGenerated, onScriptUpdate
                       <>
                         <td>
                           <strong>{item.term}</strong>
-                          {item.verified && (
+                          {item.manually_edited ? (
+                            <span title={labels.termEditedTitle}
+                              style={{ marginInlineStart: '0.35rem', color: 'var(--primary)', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+                              ✎ {labels.termEditedTitle}
+                            </span>
+                          ) : item.verified ? (
                             <span title={`${labels.termVerifiedTitle}: ${(item.verified_sources || []).join(', ')}`}
                               style={{ marginInlineStart: '0.35rem', color: 'var(--sage)', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
                               ✓ {(item.verified_sources || [])[0] || ''}
                             </span>
-                          )}
+                          ) : null}
                         </td>
                         <td className="arabic" dir="rtl">{glossaryArabicValue(item)}</td>
                         <td>{glossaryValue(item, ['french', 'French', 'fr', 'FR', 'french_term', 'term_fr', 'french_translation', 'translation_fr', 'français', 'francais'])}</td>
@@ -4709,10 +4744,6 @@ function ModuleC({ labels, referenceAudioUrl, sourceScript, targetLanguage, glos
             <option value="en">English</option>
           </SelectField>
         </div>
-
-        {/* What the automatic report will and will not judge — stated before
-            the student performs, not only after (ETIB feedback 21 Aug 2026). */}
-        <EvalScopePanel labels={labels} style={{ marginBottom: '1.25rem' }} />
 
         {/* ── Practice mode selector: simultaneous | consecutive | sight ── */}
         <div style={{ marginBottom: '1.25rem' }}>
@@ -5336,7 +5367,6 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
           {lastGeneratedScript && <> · {labels.source}: {lastGeneratedScript.domain}</>}
           {lastTranscript.edited_by_student && <> · ✎ {labels.transcriptEditedBadge}</>}
         </div>
-        <EvalScopePanel labels={labels} style={{ marginBottom: '1rem' }} />
         <button className="btn-primary" onClick={handleEvaluate} disabled={status === 'loading'}>
           {status === 'loading' ? labels.runningEvaluation : labels.runEvaluation}
         </button>
