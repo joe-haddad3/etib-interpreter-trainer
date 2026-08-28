@@ -503,8 +503,7 @@ def generate_materials():
     lang_names = {'ar': 'Arabic', 'fr': 'French', 'en': 'English'}
 
     try:
-        from utils.groq_client import get_groq_client
-        client = get_groq_client()
+        from services.llm_service import generate_text
 
         prompt = MATERIALS_PROMPT.format(
             lang_name=lang_names.get(language, 'English'),
@@ -512,8 +511,7 @@ def generate_materials():
             script=script
         )
 
-        response = client.chat.completions.create(
-            model=PRIMARY_LLM_MODEL,
+        content = generate_text(
             messages=[
                 {
                     'role': 'system',
@@ -525,10 +523,8 @@ def generate_materials():
                 {'role': 'user', 'content': prompt}
             ],
             max_tokens=2000,
-            temperature=0.3
+            temperature=0.3,
         )
-
-        content = response.choices[0].message.content
         materials = _extract_json(content)
         return jsonify(materials)
 

@@ -22,7 +22,7 @@ ARABIC_WRAPPER_URL = os.getenv('ARABIC_WRAPPER_URL', '').strip()
 ARABIC_WRAPPER_API_KEY = os.getenv('ARABIC_WRAPPER_API_KEY', '').strip()
 ARABIC_WRAPPER_TIMEOUT = int(os.getenv('ARABIC_WRAPPER_TIMEOUT', '180'))
 
-LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'groq')  # groq | local_aya | remote_aya
+LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'gemini')  # gemini | groq | local_aya | remote_aya
 PRIMARY_LLM_MODEL = 'openai/gpt-oss-120b'        # via Groq (free) — llama-3.3-70b
                                                  # was retired by Groq (17 Aug 2026).
 FALLBACK_LLM_MODEL = 'gemini-1.5-flash'          # via Google AI Studio (free)

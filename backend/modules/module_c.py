@@ -333,11 +333,7 @@ def _add_tashkeel(student_text: str, source_text: str = '') -> str:
     if not student_text.strip():
         return student_text
     try:
-        from utils.groq_client import get_groq_client, get_groq_key
-        from config import PRIMARY_LLM_MODEL
-        if not get_groq_key():
-            return student_text
-        client = get_groq_client()
+        from services.llm_service import generate_text
 
         if source_text.strip():
             user_prompt = f"""You are an Arabic phonetics expert for interpreter training at ETIB Beirut.
@@ -365,8 +361,7 @@ Rules:
 Student transcript:
 {student_text}"""
 
-        response = client.chat.completions.create(
-            model=PRIMARY_LLM_MODEL,
+        return generate_text(
             messages=[
                 {
                     'role': 'system',
@@ -379,9 +374,8 @@ Student transcript:
                 {'role': 'user', 'content': user_prompt}
             ],
             max_tokens=min(max(500, len(student_text) * 3), 6000),
-            temperature=0.1
-        )
-        return response.choices[0].message.content.strip()
+            temperature=0.1,
+        ).strip()
     except Exception as e:
         print(f'[Module C] Tashkeel failed: {e}')
         return student_text

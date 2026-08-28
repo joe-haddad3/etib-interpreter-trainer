@@ -147,11 +147,9 @@ def compare_against_source(
     overall   = round(sum(w['score'] for w in graded) / len(graded), 3)
 
     llm_analysis = []
-    from utils.groq_client import get_groq_key
-    active_key = groq_api_key or get_groq_key()
-    if uncertain and active_key and source_text and language == 'ar':
+    if uncertain and source_text and language == 'ar':
         llm_analysis = _llm_pronounce_analysis(
-            uncertain, source_text, active_key, llm_model
+            uncertain, source_text, groq_api_key, llm_model
         )
 
     return {
@@ -196,8 +194,7 @@ def _llm_pronounce_analysis(
 ) -> list:
     """Call LLM to interpret what specific tashkeel errors occurred."""
     try:
-        from groq import Groq
-        client  = Groq(api_key=groq_api_key)
+        from services.llm_service import generate_text
         words_str = ', '.join(f'"{w["word"]}" (confidence {w["score"]})' for w in uncertain_words)
 
         prompt = PRONOUNCE_PROMPT.format(
@@ -205,19 +202,15 @@ def _llm_pronounce_analysis(
             uncertain=words_str
         )
 
-        from config import groq_extra_params
-        response = client.chat.completions.create(
-            model=llm_model,
+        content = generate_text(
             messages=[
                 {'role': 'system', 'content':
                  'You are an Arabic linguistics expert. Return only valid JSON.'},
                 {'role': 'user', 'content': prompt}
             ],
             max_tokens=800,
-            **groq_extra_params(llm_model),
-            temperature=0.1
-        )
-        content = response.choices[0].message.content.strip()
+            temperature=0.1,
+        ).strip()
         # strip markdown fences
         fence = re.search(r'```(?:json)?\s*([\s\S]*?)```', content)
         if fence:
