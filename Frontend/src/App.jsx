@@ -3003,7 +3003,7 @@ function ModuleA({ labels, onGenerated, lastGeneratedScript, isRtl, adaptivePara
   useEffect(() => {
     if (!adaptiveParams) return;
     const wc = Number(adaptiveParams.word_count || 0);
-    const word_count_range = wc <= 180 ? 'short' : wc <= 320 ? 'medium' : wc <= 550 ? 'long' : 'extended';
+    const word_count_range = wc <= 180 ? 'short' : wc <= 320 ? 'medium' : 'long';
     setForm(current => ({
       ...current,
       difficulty: adaptiveParams.difficulty || current.difficulty,
@@ -3323,10 +3323,13 @@ const [showAdvanced, setShowAdvanced] = useState(true);
                 <option value="short">{labels.wordRangeShortFull || 'Short — 120–180 words (≈1–1.5 min)'}</option>
                 <option value="medium">{labels.wordRangeMediumFull || 'Medium — 220–320 words (≈2–2.5 min)'}</option>
                 <option value="long">{labels.wordRangeLongFull || 'Long — 400–550 words (≈3.5–4.5 min)'}</option>
-                <option value="extended">{labels.wordRangeExtendedFull || 'Extended — 650–800 words (≈4.5–6 min)'}</option>
-                <option value="very_long">{labels.wordRangeVeryLongFull || 'Very long — 1100–1400 words (≈8–11 min)'}</option>
-                <option value="extra_long">{labels.wordRangeExtraLongFull || 'Extra long — 1500–2200 words (≈12–18 min)'}</option>
-                <option value="marathon">{labels.wordRangeMarathonFull || 'Marathon — 2900–3600 words (≈24–30 min)'}</option>
+                {/* Lengths above "Long" removed from the dropdown (user request).
+                    ARCHIVED — the backend WORD_COUNT_RANGES presets and the label
+                    strings are kept, so restore by pasting the <option> back:
+                      <option value="extended">{labels.wordRangeExtendedFull}</option>
+                      <option value="very_long">{labels.wordRangeVeryLongFull}</option>
+                      <option value="extra_long">{labels.wordRangeExtraLongFull}</option>
+                      <option value="marathon">{labels.wordRangeMarathonFull}</option> */}
               </SelectField>
               {/* Domains removed from the dropdown (10 Aug 2026, user request).
                   ARCHIVED — backend DOMAIN_QUERIES entries and the labels are kept,
