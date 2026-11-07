@@ -5,6 +5,9 @@
 
 Working languages: **Arabic · French · English**
 
+> **Live demo: [etib-interpreter-trainer.vercel.app](https://etib-interpreter-trainer.vercel.app)**
+> Sign in or create an account. The backend runs on a free Hugging Face Space, so the first request after a period of inactivity can take 2–3 minutes while it wakes up.
+
 ---
 
 ## What it does
@@ -24,20 +27,20 @@ Students log in, generate a realistic conference speech (or upload a source docu
 ## Architecture
 
 ```
-Browser (React + Vite)
-  │  fetch() with X-Groq-Api-Key header
+Browser (React + Vite, hosted on Vercel)
+  │  fetch() — JSON bodies, auth token in the body
   ▼
-Flask backend  (Python 3.11)
-  ├── before_request  →  flask.g.groq_api_key
-  ├── /api/module-a   →  LLM speech generation   (llm_service.py → Groq)
-  ├── /api/module-b   →  TTS (edge-tts) + materials (Groq)
+Flask backend  (Python 3.11, Docker on Hugging Face Spaces)
+  ├── /api/module-a   →  LLM speech generation   (services/llm_service.py → Gemini)
+  ├── /api/module-b   →  TTS (edge-tts) + materials (Gemini)
   ├── /api/module-c   →  ASR transcription (Groq Whisper / faster-whisper)
-  ├── /api/module-d   →  Evaluation + feedback (Groq) + sessions (MongoDB)
+  ├── /api/module-d   →  Evaluation + feedback (Gemini) + sessions (MongoDB)
   ├── /api/library    →  UN Digital Library search + PDF download
-  └── /api/auth       →  Login / signup / validate-groq-key
+  ├── /api/chat       →  Chat endpoint
+  └── /api/auth       →  Login / signup
 ```
 
-**No server-side Groq key** — each student supplies their own free key via the Settings modal. The key lives only in their browser (`localStorage`) and is sent per-request.
+**Central server-side keys:** the backend holds the API keys (Gemini for text generation and evaluation, Groq for Whisper ASR). Students do not need an API key of their own, and no key is stored in or sent from the browser.
 
 ---
 
@@ -47,12 +50,13 @@ Flask backend  (Python 3.11)
 |-------|-----------|
 | Frontend | React 18, Vite, plain CSS (no framework) |
 | Backend | Flask 3, Python 3.11 |
-| LLM | Groq API — `llama-3.3-70b-versatile` (speech gen, evaluation, feedback) |
+| LLM | Google Gemini via REST API (default `gemini-3.5-flash-lite`); provider abstraction also supports Groq and local Aya models |
 | ASR | Groq hosted `whisper-large-v3` → local `faster-whisper` fallback |
 | TTS | `edge-tts` (Microsoft Azure Neural voices, free) |
 | Embeddings | `paraphrase-multilingual-MiniLM-L12-v2` (sentence-transformers) for RAG |
 | Database | MongoDB (local) with in-memory fallback for dev |
 | UN Library | UN Digital Library MARCXML API + curl PDF download |
+| Deployment | Vercel (frontend) · Hugging Face Spaces, Docker (backend) |
 
 ---
 
@@ -68,21 +72,24 @@ Flask backend  (Python 3.11)
 ### 1 — Clone and configure
 
 ```bash
-git clone https://github.com/chrisswhb/ETIB-Interpreter-Trainer.git
-cd ETIB-Interpreter-Trainer
-git checkout joe-main
+git clone https://github.com/joe-haddad3/etib-interpreter-trainer.git
+cd etib-interpreter-trainer
 ```
 
-Create `backend/.env`:
+Copy `backend/.env.example` to `backend/.env` and fill in at least:
 
 ```env
-LLM_PROVIDER=groq
+LLM_PROVIDER=gemini
+GOOGLE_AI_KEY=your_google_ai_key_here   # Gemini: text generation and evaluation
+GROQ_API_KEY=your_groq_api_key_here     # Groq: Whisper speech-to-text
 FLASK_SECRET_KEY=change-me-in-production
 FLASK_DEBUG=true
 UPLOAD_FOLDER=./uploads
 AUDIO_OUTPUT_FOLDER=./audio_outputs
-# GROQ_API_KEY is intentionally omitted — students supply their own key
+# MONGODB_URI is optional; without it, sessions are kept in memory
 ```
+
+Never commit `backend/.env`.
 
 ### 2 — Backend
 
@@ -112,49 +119,22 @@ Open `http://localhost:5173` in your browser.
 
 ---
 
-## API key model
+## API keys
 
-This project uses a **per-student key** model:
+The platform runs on **central server-side keys**, set as environment variables on the backend (`GOOGLE_AI_KEY` for Gemini, `GROQ_API_KEY` for Whisper ASR). They are never stored in the repository. Students sign in with an account; they never handle API keys.
 
-1. Every student gets a **free** Groq API key at [console.groq.com](https://console.groq.com)
-2. They paste it once in the **Settings** modal (gear icon ⚙ in the nav bar)
-3. The key is saved in their browser's `localStorage` — never on the server
-4. Every request sends `X-Groq-Api-Key: gsk_...` as an HTTP header
-5. Flask reads it in `before_request` → `flask.g.groq_api_key`
-6. `backend/utils/groq_client.py` uses only that key — no server fallback
-
-To restore the shared-key approach (one server key for all students), switch to the `api-key-commun` branch.
-
----
-
-## Groq free tier limits (as of 2026)
-
-| Model | Requests/min | Tokens/min | Tokens/day |
-|-------|-------------|------------|------------|
-| llama-3.3-70b-versatile | 30 | 12 000 | 100 000 |
-| whisper-large-v3 | 20 | — | 2 000 audio-sec |
-
-A typical session (generate + transcribe + evaluate) uses ~3 000–5 000 tokens. The free tier supports roughly **20–30 full sessions per day** per student key.
-
----
-
-## Branches
-
-| Branch | Purpose |
-|--------|---------|
-| `joe-main` | Main development branch — all features |
-| `api-key-commun` | Backup: shared server-key approach (no per-student key) |
-| `kevin-main` | Kevin's contributions (merged into joe-main) |
+Free-tier quotas of both providers change over time, so check the current limits on [Google AI Studio](https://ai.google.dev) and [console.groq.com](https://console.groq.com) before load testing.
 
 ---
 
 ## Project structure
 
 ```
-ETIB-Interpreter-Trainer/
+etib-interpreter-trainer/
 ├── backend/
-│   ├── app.py                  # Flask app, blueprints, CORS, before_request
+│   ├── app.py                  # Flask app, blueprints, CORS
 │   ├── config.py               # All env vars and constants
+│   ├── Dockerfile              # Hugging Face Spaces image (port 7860)
 │   ├── requirements.txt
 │   ├── modules/
 │   │   ├── module_a.py         # Speech generation (LLM + RAG + UN grounding)
@@ -163,21 +143,24 @@ ETIB-Interpreter-Trainer/
 │   │   ├── module_d.py         # Evaluation, feedback, sessions, adaptive params
 │   │   ├── module_library.py   # UN Digital Library search + fetch
 │   │   ├── alignment.py        # WhisperX forced alignment + LLM analysis
-│   │   └── auth.py             # Login, signup, validate-groq-key
+│   │   ├── chat.py             # Chat endpoint
+│   │   └── auth.py             # Login and signup
 │   ├── services/
-│   │   └── llm_service.py      # LLM provider abstraction (Groq / Gemini / local)
-│   └── utils/
-│       └── groq_client.py      # Per-request Groq client factory
+│   │   ├── llm_service.py      # LLM provider abstraction (Gemini / Groq / local Aya)
+│   │   └── terminology.py      # Terminology helpers
+│   ├── utils/                  # Groq client, RAG retrieval, UN documents, Arabic utils
+│   └── tests/                  # pytest tests (ASR, auth, TTS, Module A)
 ├── Frontend/
 │   ├── src/
 │   │   ├── App.jsx             # All React components + UI strings (EN/AR/FR)
-│   │   └── api.js              # All fetch helpers with groqHeaders()
+│   │   └── api.js              # All fetch helpers (auth token sent in the JSON body)
 │   ├── styles/
 │   │   ├── main.css
 │   │   └── rtl.css
 │   └── index.html
 └── docs/
     ├── USER_GUIDE.md           # Student + instructor guide
+    ├── technical_report.md     # Deployment and engineering notes
     └── ...
 ```
 
@@ -186,7 +169,7 @@ ETIB-Interpreter-Trainer/
 ## Module A — Speech generation (technical notes)
 
 - **RAG pipeline**: source document is chunked (1 800 chars, 250 overlap) → embedded with `paraphrase-multilingual-MiniLM-L12-v2` → top-4 chunks by cosine similarity injected into the LLM prompt
-- **UN grounding**: searches UN Digital Library MARCXML API → downloads PDF with browser User-Agent (WAF bypass) → extracts text → same RAG pipeline
+- **UN grounding**: searches UN Digital Library MARCXML API → downloads the document PDF → extracts text → same RAG pipeline
 - **Arabic numerals**: all digit sequences in AR speeches are converted to Eastern Arabic-Indic (٠١٢٣٤٥٦٧٨٩)
 - **Factual accuracy**: when no UN document is found, the prompt includes explicit rules against inventing statistics
 
@@ -200,8 +183,8 @@ ETIB-Interpreter-Trainer/
 
 ---
 
-## Supervisors
+## Project context
 
-Prof. Lina Sader Feghali · Prof. Wadad Wazen Gergy — ETIB, USJ Beirut
+Built during an 8-week summer internship (June–July 2026) at Université Saint-Joseph de Beyrouth (ESIB · ETIB · CINIA) by a team of six students from ESIB's AI option, with USJ's School of Translators and Interpreters (ETIB) as the client. The platform was refined after the internship based on ETIB feedback (August–September 2026).
 
-Final Year Project — ESIB, Université Saint-Joseph, 2025–2026
+**Supervisors (ETIB):** Prof. Lina Sader Feghali · Prof. Wadad Wazen Gergy

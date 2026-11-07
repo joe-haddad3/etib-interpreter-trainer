@@ -11,7 +11,7 @@ This guide explains how to use the ETIB Interpreter Self-Training Platform. No t
 ## Table of contents
 
 1. [Getting in — account or guest](#1-getting-in)
-2. [First-time setup — get your API key](#2-first-time-setup)
+2. [First-time setup — nothing to configure](#2-first-time-setup)
 3. [Module A — Generate a training speech](#3-module-a--generate-a-training-speech)
 4. [Module B — Listen to the speech and get study materials](#4-module-b--listen-and-study)
 5. [Module C — Record your interpretation](#5-module-c--record-your-interpretation)
@@ -41,27 +41,9 @@ You have two options — no instructor approval needed for either:
 
 ---
 
-## 2. First-time setup — get your API key
+## 2. First-time setup
 
-The platform uses **Groq** to generate speeches, transcribe audio, and evaluate your performance. Groq is free — every user needs their own personal key (the platform does not provide a shared one).
-
-### Step 1 — Create a free Groq account
-1. Go to **[console.groq.com](https://console.groq.com)**
-2. Sign up with your email (free, no credit card)
-3. Go to **API Keys** in the left menu
-4. Click **Create API key**, name it (e.g. "ETIB"), and copy it — it starts with `gsk_`
-
-> Keep your key private. If it leaks, delete it on console.groq.com and create a new one.
-
-### Step 2 — Add your key to the platform
-1. Click the **⚙** gear icon in the top navigation bar — opens Settings
-2. Paste your key (starts with `gsk_`)
-3. Click **Test key** — you should see "Key is valid"
-4. Click **Save key**
-
-Your key is saved in your browser only (localStorage) — no one else can see it, and it stays saved across visits unless you clear your browser data.
-
-> If you don't add a key, you'll see a yellow banner reminding you — speech generation, transcription, and evaluation all require it.
+There is nothing to configure. The platform's AI services (Gemini for speech generation and evaluation, Groq Whisper for transcription) run on the server with central keys, so you do **not** need an API key of your own. Once you are signed in or in guest mode, go straight to Module A.
 
 ---
 
@@ -139,15 +121,9 @@ Click the **💬** button in the bottom-right corner on any screen. Ask it about
 
 ## 9. Troubleshooting
 
-**"Groq API key required" error**
-Go to ⚙ Settings, paste your key (`gsk_...`), test it, and save. See [Section 2](#2-first-time-setup).
-
-**"Invalid API key" when testing**
-Make sure you copied the full key starting with `gsk_`, with no extra spaces. Recreate it on console.groq.com if needed.
-
 **Speech generation or evaluation is slow / fails**
 - If the platform hasn't been used in 15+ minutes, the backend may be "waking up" — this takes 2–3 minutes on the first request, then is fast again.
-- If it's been fast before and suddenly errors, your Groq free-tier rate limit may be temporarily reached — wait a minute and retry.
+- If it's been fast before and suddenly errors, the AI provider's rate limit may be temporarily reached — wait a minute and retry.
 
 **The recording button doesn't appear**
 Your browser needs microphone permission — click the camera/microphone icon in the address bar, allow access, and reload.
@@ -168,7 +144,6 @@ The library doesn't have a matching demo document for that exact topic/domain co
 | Action | Where |
 |---|---|
 | Get in without an account | Login screen → **Continue as Guest** |
-| Add/change your Groq API key | ⚙ Settings (gear icon, top nav) |
 | Generate a speech | Module A — Generate speech |
 | Listen to the speech | Module B — Audio & materials |
 | Download the glossary | Module B → Generate materials → Download glossary |
@@ -178,5 +153,5 @@ The library doesn't have a matching demo document for that exact topic/domain co
 
 ---
 
-*ETIB Interpreter Self-Training Platform — Final Year Project, ESIB, USJ Beirut, 2025–2026*
+*ETIB Interpreter Self-Training Platform — developed during a summer 2026 internship at USJ Beirut (ESIB · ETIB · CINIA)*
 *Supervised by Prof. Lina Sader Feghali and Prof. Wadad Wazen Gergy*
