@@ -6,6 +6,8 @@
 **Stack:** Flask · React (Vite) · MongoDB Atlas · edge-tts · faster-whisper · Groq (Llama 3.3 70B / Whisper)
 **Deployment:** Vercel (frontend) + HuggingFace Spaces Docker (backend) — live, free tier, publicly reachable
 
+> **Update, November 2026:** this report describes the platform as of June 2026. Since then, text generation and evaluation moved from Groq (Llama 3.3 70B, retired by Groq on 17 Aug 2026) to Google Gemini via the REST API, and since 21 Aug 2026 the platform runs on central server-side keys instead of per-student Groq keys stored in the browser. Groq is still used for Whisper speech-to-text. See the [README](../README.md) for the current setup.
+
 ---
 
 ## 1. What Works — All Four Modules Are Complete

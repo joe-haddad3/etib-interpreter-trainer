@@ -130,7 +130,7 @@ class EtibPDF(FPDF):
         self.set_y(self.get_y() + 7)
         self.set_font('Cal', 'B', 10)
         self.set_text_color(*NAVY)
-        self.cell(0, 6, 'Final Year Project  -  ESIB, Universite Saint-Joseph', align='C',
+        self.cell(0, 6, 'Summer 2026 internship  -  ESIB, ETIB, CINIA, Universite Saint-Joseph', align='C',
                   new_x='LMARGIN', new_y='NEXT')
         self.ln(3)
         self.set_font('Cal', 'I', 9)
@@ -368,31 +368,15 @@ def build_user_guide():
 
     # Section 1
     pdf.add_page()
-    pdf.h1('1.  First-Time Setup — Get Your API Key')
+    pdf.h1('1.  First-Time Setup')
     pdf.body(
-        'The platform uses Groq to generate speeches and evaluate your performance. '
-        'Groq is completely free — you just need your own personal key.'
+        'There is nothing to configure. The platform\'s AI services (Gemini for speech '
+        'generation and evaluation, Groq Whisper for transcription) run on the server with '
+        'central keys, so you do not need an API key of your own.'
     )
-    pdf.h2('Step 1 — Create a free Groq account')
-    pdf.bullet('Go to  console.groq.com')
-    pdf.bullet('Sign up with your email address (free, no credit card required)')
-    pdf.bullet('Once logged in, click  API Keys  in the left menu')
-    pdf.bullet('Click  Create API key, give it a name such as "ETIB", and copy the key — it starts with  gsk_')
     pdf.spacer(2)
     pdf.note(
-        'Keep your key private — do not share it with anyone. '
-        'If it leaks, delete it on console.groq.com and create a new one.'
-    )
-    pdf.h2('Step 2 — Save your key in the platform')
-    pdf.bullet('Open the ETIB platform and log in')
-    pdf.bullet('Click the gear icon (Settings) in the top navigation bar')
-    pdf.bullet('Paste your key into the field that shows  gsk_...')
-    pdf.bullet('Click  Test key  — you should see "Key is valid and working"')
-    pdf.bullet('Click  Save key')
-    pdf.spacer(2)
-    pdf.note(
-        'Your key is saved only in your browser. No other student or the server can see it. '
-        'Each student uses their own quota from their own free Groq account.'
+        'Sign in, create an account, or continue as a guest, then go straight to Module A.'
     )
 
     # Section 2
@@ -562,16 +546,11 @@ def build_user_guide():
     # Section 9
     pdf.add_page()
     pdf.h1('9.  Troubleshooting')
-    pdf.h3('"No Groq API key found" error')
-    pdf.body('You have not saved your personal API key. Go to the gear icon (Settings), paste your key (gsk_...), test it, and save it. See Section 1 of this guide.')
-    pdf.h3('"Invalid API key" when testing')
-    pdf.bullet('Make sure you copied the full key — it must start with  gsk_')
-    pdf.bullet('Keys expire if deleted on console.groq.com — create a new one if needed')
-    pdf.bullet('Do not add spaces before or after the key')
     pdf.h3('Speech generation is slow')
-    pdf.body('Normal generation takes 5-15 seconds. If longer than 30 seconds, you may have hit the Groq free-tier rate limit. Wait 1 minute and try again.')
+    pdf.body('Normal generation takes 5-15 seconds. If longer than 30 seconds, the AI provider\'s rate limit may have been reached. Wait 1 minute and try again. '
+             'If the platform has not been used for 15+ minutes, the first request can take 2-3 minutes while the server wakes up.')
     pdf.h3('Transcription takes 2+ minutes')
-    pdf.body('You may have reached the audio limit (2 000 seconds per day). The platform falls back to a local model automatically. Wait until the next day to use Groq Whisper again.')
+    pdf.body('The hosted transcription service may be temporarily unavailable or rate-limited. The platform falls back to a local model automatically, which is slower. Try again later.')
     pdf.h3('The recording button does not appear')
     pdf.body('Your browser needs microphone permission. Click the microphone icon in the address bar, allow access, then reload the page.')
     pdf.h3('Scores seem too low')
@@ -585,7 +564,6 @@ def build_user_guide():
     pdf.table(
         ['Action', 'Where to find it'],
         [
-            ['Add or change your Groq API key',  'Gear icon (Settings) in the navigation bar'],
             ['Generate a training speech',        'Module A — Generate speech'],
             ['Listen to the speech / get audio',  'Module B — Audio & materials'],
             ['Download the glossary (DOCX)',       'Module B > Generate materials > Download glossary'],
@@ -646,23 +624,23 @@ def build_technical_doc():
     pdf.add_page()
     pdf.h1('Architecture')
     pdf.code(
-        'Browser (React + Vite)\n'
-        '  |  fetch() with X-Groq-Api-Key header\n'
+        'Browser (React + Vite, hosted on Vercel)\n'
+        '  |  fetch() -- JSON bodies, auth token in the body\n'
         '  v\n'
-        'Flask backend  (Python 3.11)\n'
-        '  +-- before_request  -->  flask.g.groq_api_key\n'
-        '  +-- /api/module-a   -->  LLM speech generation  (llm_service.py -> Groq)\n'
-        '  +-- /api/module-b   -->  TTS (edge-tts) + materials (Groq)\n'
+        'Flask backend  (Python 3.11, Docker on Hugging Face Spaces)\n'
+        '  +-- /api/module-a   -->  LLM speech generation  (llm_service.py -> Gemini)\n'
+        '  +-- /api/module-b   -->  TTS (edge-tts) + materials (Gemini)\n'
         '  +-- /api/module-c   -->  ASR transcription (Groq Whisper / faster-whisper)\n'
-        '  +-- /api/module-d   -->  Evaluation + feedback (Groq) + sessions (MongoDB)\n'
+        '  +-- /api/module-d   -->  Evaluation + feedback (Gemini) + sessions (MongoDB)\n'
         '  +-- /api/library    -->  UN Digital Library search + PDF download\n'
-        '  +-- /api/auth       -->  Login / signup / validate-groq-key'
+        '  +-- /api/chat       -->  Chat endpoint\n'
+        '  +-- /api/auth       -->  Login / signup'
     )
     pdf.spacer(2)
     pdf.note(
-        'No server-side Groq key — each student supplies their own free key via the '
-        'Settings modal. The key lives only in their browser (localStorage) and is '
-        'sent per-request as the X-Groq-Api-Key HTTP header.'
+        'Central server-side keys: the backend holds the API keys (Gemini for text '
+        'generation and evaluation, Groq for Whisper ASR). Students do not need an API '
+        'key of their own, and no key is stored in or sent from the browser.'
     )
 
     # Tech stack
@@ -672,12 +650,13 @@ def build_technical_doc():
         [
             ['Frontend',    'React 18, Vite, plain CSS (no UI framework)'],
             ['Backend',     'Flask 3, Python 3.11'],
-            ['LLM',         'Groq API — llama-3.3-70b-versatile (speech gen, eval, feedback)'],
+            ['LLM',         'Google Gemini via REST API (default gemini-3.5-flash-lite); Groq and local Aya supported'],
             ['ASR',         'Groq hosted whisper-large-v3 — falls back to local faster-whisper'],
             ['TTS',         'edge-tts (Microsoft Azure Neural voices, free)'],
             ['Embeddings',  'paraphrase-multilingual-MiniLM-L12-v2 (sentence-transformers) for RAG'],
             ['Database',    'MongoDB (local) with in-memory fallback for development'],
-            ['UN Library',  'UN Digital Library MARCXML API + curl PDF download (browser UA)'],
+            ['UN Library',  'UN Digital Library MARCXML API + curl PDF download'],
+            ['Deployment',  'Vercel (frontend), Hugging Face Spaces Docker (backend)'],
         ],
         col_widths=[35, 135]
     )
@@ -693,18 +672,19 @@ def build_technical_doc():
 
     pdf.h2('1 — Clone and configure')
     pdf.code(
-        'git clone https://github.com/chrisswhb/ETIB-Interpreter-Trainer.git\n'
-        'cd ETIB-Interpreter-Trainer\n'
-        'git checkout joe-main'
+        'git clone https://github.com/joe-haddad3/etib-interpreter-trainer.git\n'
+        'cd etib-interpreter-trainer'
     )
-    pdf.body('Create  backend/.env :')
+    pdf.body('Copy  backend/.env.example  to  backend/.env  and fill in at least:')
     pdf.code(
-        'LLM_PROVIDER=groq\n'
+        'LLM_PROVIDER=gemini\n'
+        'GOOGLE_AI_KEY=your_google_ai_key_here   # Gemini\n'
+        'GROQ_API_KEY=your_groq_api_key_here     # Whisper ASR\n'
         'FLASK_SECRET_KEY=change-me-in-production\n'
         'FLASK_DEBUG=true\n'
         'UPLOAD_FOLDER=./uploads\n'
         'AUDIO_OUTPUT_FOLDER=./audio_outputs\n'
-        '# GROQ_API_KEY intentionally omitted -- students supply their own key'
+        '# MONGODB_URI is optional; without it, sessions are kept in memory'
     )
 
     pdf.h2('2 — Backend')
@@ -726,55 +706,26 @@ def build_technical_doc():
         '# Opens at http://localhost:5173'
     )
 
-    # API key model
+    # API keys
     pdf.add_page()
-    pdf.h1('Per-Student API Key Model')
-    pdf.body('Complete flow for every Groq-backed request:')
-    pdf.code(
-        '1. Student saves key in Settings modal\n'
-        '   --> localStorage: etib_groq_api_key = "gsk_..."\n'
-        '\n'
-        '2. Every fetch() in api.js calls groqHeaders()\n'
-        '   --> adds X-Groq-Api-Key: gsk_...  header to the HTTP request\n'
-        '\n'
-        '3. Flask before_request hook in app.py reads the header\n'
-        '   --> flask.g.groq_api_key = key  (lives only for this request)\n'
-        '\n'
-        '4. get_groq_client() in backend/utils/groq_client.py\n'
-        '   --> reads flask.g.groq_api_key\n'
-        '   --> raises RuntimeError if None  (no key = no generation)\n'
-        '   --> creates Groq(api_key=key) and caches it per key value\n'
-        '\n'
-        '5. Groq API call is charged to the student\'s own account'
-    )
-    pdf.note(
-        'To restore the shared server-key approach (one key for all students), '
-        'switch to the  api-key-commun  branch.'
-    )
-
-    # Groq limits
-    pdf.h1('Groq Free Tier Limits  (as of 2026)')
-    pdf.table(
-        ['Model', 'Req / min', 'Tokens / min', 'Tokens / day'],
-        [
-            ['llama-3.3-70b-versatile', '30', '12 000', '100 000'],
-            ['whisper-large-v3',        '20', '—',       '2 000 audio-sec'],
-        ],
-        col_widths=[82, 28, 35, 25]
+    pdf.h1('API Keys')
+    pdf.body(
+        'The platform runs on central server-side keys, set as environment variables on the '
+        'backend (GOOGLE_AI_KEY for Gemini, GROQ_API_KEY for Whisper ASR). They are never '
+        'stored in the repository. Students sign in with an account; they never handle API keys.'
     )
     pdf.body(
-        'A typical session (generate + transcribe + evaluate) uses approximately '
-        '3 000-5 000 tokens. The free tier supports roughly 20-30 full sessions '
-        'per day per student key.'
+        'Free-tier quotas of both providers change over time, so check the current limits on '
+        'Google AI Studio and console.groq.com before load testing.'
     )
 
     # Project structure
     pdf.add_page()
     pdf.h1('Project Structure')
     pdf.code(
-        'ETIB-Interpreter-Trainer/\n'
+        'etib-interpreter-trainer/\n'
         '|-- backend/\n'
-        '|   |-- app.py               Flask app, blueprints, CORS, before_request hook\n'
+        '|   |-- app.py               Flask app, blueprints, CORS\n'
         '|   |-- config.py            All environment variables and constants\n'
         '|   |-- requirements.txt\n'
         '|   |-- modules/\n'
@@ -784,15 +735,16 @@ def build_technical_doc():
         '|   |   |-- module_d.py      Evaluation, feedback, sessions, adaptive params\n'
         '|   |   |-- module_library.py  UN Digital Library search + fetch\n'
         '|   |   |-- alignment.py     WhisperX forced alignment + LLM analysis\n'
-        '|   |   `-- auth.py          Login, signup, validate-groq-key endpoint\n'
+        '|   |   |-- chat.py          Chat endpoint\n'
+        '|   |   `-- auth.py          Login and signup\n'
         '|   |-- services/\n'
-        '|   |   `-- llm_service.py   LLM provider abstraction (Groq / Gemini / local)\n'
-        '|   `-- utils/\n'
-        '|       `-- groq_client.py   Per-request Groq client factory\n'
+        '|   |   `-- llm_service.py   LLM provider abstraction (Gemini / Groq / local Aya)\n'
+        '|   |-- utils/               Groq client, RAG retrieval, UN documents, Arabic utils\n'
+        '|   `-- tests/               pytest tests\n'
         '|-- Frontend/\n'
         '|   |-- src/\n'
         '|   |   |-- App.jsx          All React components + UI strings (EN/AR/FR)\n'
-        '|   |   `-- api.js           All fetch helpers with groqHeaders()\n'
+        '|   |   `-- api.js           All fetch helpers (auth token in the JSON body)\n'
         '|   |-- styles/\n'
         '|   |   |-- main.css\n'
         '|   |   `-- rtl.css\n'
@@ -801,18 +753,6 @@ def build_technical_doc():
         '    |-- USER_GUIDE.md\n'
         '    |-- ETIB_User_Guide.pdf\n'
         '    `-- ETIB_Technical_Documentation.pdf'
-    )
-
-    # Branches
-    pdf.h1('Git Branches')
-    pdf.table(
-        ['Branch', 'Purpose'],
-        [
-            ['joe-main',        'Main development branch — all features, per-student API key'],
-            ['api-key-commun',  'Backup: shared server-key approach (one key for all students)'],
-            ['kevin-main',      "Kevin's contributions (merged into joe-main)"],
-        ],
-        col_widths=[52, 118]
     )
 
     # Module A technical
@@ -827,7 +767,7 @@ def build_technical_doc():
 
     pdf.h2('UN grounding')
     pdf.bullet('Searches UN Digital Library MARCXML API — tries up to 5 results in 3 languages (EN/FR/ES)')
-    pdf.bullet('Downloads PDF using curl with browser User-Agent headers (WAF bypass)')
+    pdf.bullet('Downloads the document PDF with curl and extracts its text')
     pdf.bullet('20-second per-PDF timeout; minimum 40 words to count as a valid document')
     pdf.bullet('Falls back to ungrounded generation with factual accuracy rules if no document found')
 
@@ -896,12 +836,12 @@ def build_technical_doc():
             ['/api/auth/login',              'POST', 'Log in with email and password'],
             ['/api/auth/me',                 'GET',  'Check current session state'],
             ['/api/auth/logout',             'POST', 'End the session (clear cookie)'],
-            ['/api/auth/validate-groq-key',  'POST', 'Test a Groq API key with a live call'],
+            ['/api/auth/validate-groq-key',  'POST', 'Legacy: test a Groq API key (no longer used by the UI)'],
         ],
         col_widths=[75, 20, 75]
     )
     pdf.note(
-        'Sessions use Flask server-side cookies. '
+        'Authentication uses a token sent in the JSON body of each request. '
         'MongoDB stores user accounts when available; an in-memory dict is used otherwise. '
         'Seed accounts (student@etib.edu, instructor@etib.edu) are created on first run.'
     )
@@ -912,8 +852,8 @@ def build_technical_doc():
     pdf.table(
         ['Standard', 'How it applies'],
         [
-            ['GDPR',             'User data minimised; no personal data sent to Groq beyond the speech content'],
-            ['ISO/IEC 27001',    'API keys never stored server-side; session tokens use signed cookies'],
+            ['GDPR',             'User data minimised; only speech and transcript content is sent to the AI providers'],
+            ['ISO/IEC 27001',    'API keys kept in server environment variables, never in the repository or browser'],
             ['IEEE 12207',       'Git version control with feature branches; modular service architecture'],
             ['ISO 9241',         'Consistent UI design; full RTL (right-to-left) support for Arabic'],
         ],
