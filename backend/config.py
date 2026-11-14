@@ -14,13 +14,16 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GOOGLE_AI_KEY = os.getenv('GOOGLE_AI_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # paid fallback only
 
-# ── Arabic evaluation micro-service (Ali's FastAPI wrapper) ─────────────────
-# Independent Arabic i'rab/tanween/pronunciation service. We only talk to it
-# over HTTP, so this Flask app never imports FastAPI code or loads the heavy
-# wav2vec2 models. Empty URL = feature off (existing evaluation unchanged).
+# ── Arabic evaluation micro-service (Ali's "Sawt" ZeroGPU Space) ────────────
+# Independent Arabic i'rab/tashkeel service. We only talk to it over HTTP, so
+# this Flask app never loads the heavy speech model. Value = Space id
+# (Ali-Alii/sawt-arabic-gpu) or its https://….hf.space URL. Empty = feature off
+# (existing evaluation unchanged).
 ARABIC_WRAPPER_URL = os.getenv('ARABIC_WRAPPER_URL', '').strip()
-ARABIC_WRAPPER_API_KEY = os.getenv('ARABIC_WRAPPER_API_KEY', '').strip()
 ARABIC_WRAPPER_TIMEOUT = int(os.getenv('ARABIC_WRAPPER_TIMEOUT', '180'))
+# Hugging Face token (read-only is enough). ZeroGPU time is charged to this
+# account; without it the shared anonymous quota runs out almost immediately.
+HF_TOKEN = (os.getenv('HF_TOKEN') or os.getenv('ARABIC_WRAPPER_API_KEY') or '').strip()
 
 LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'gemini')  # gemini | groq | local_aya | remote_aya
 PRIMARY_LLM_MODEL = 'openai/gpt-oss-120b'        # via Groq (free) — llama-3.3-70b

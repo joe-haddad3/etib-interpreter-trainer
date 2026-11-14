@@ -543,6 +543,14 @@ const UI = {
     iraabUncertain: 'Uncertain',
     iraabAccuracy: 'Ending accuracy',
     iraabDiacritized: 'Vocalized hypothesis',
+    iraabUnavailable: {
+      too_long: 'The case-ending check works on recordings up to 2 minutes. This recording is longer, so it was not checked — record a shorter segment to get i\'rab feedback.',
+      too_large: 'The recording is larger than 25 MB, so the case-ending check was skipped.',
+      too_short: 'The recording is too short for the case-ending check.',
+      quota: 'The case-ending check has reached its daily limit. Please try again tomorrow.',
+      timeout: 'The case-ending check took too long and was skipped this time. Please try again.',
+      error: 'The case-ending check is temporarily unavailable. The rest of the evaluation is complete.',
+    },
   },
   ar: {
     uiLanguage: 'لغة الواجهة',
@@ -1034,6 +1042,14 @@ const UI = {
     iraabUncertain: 'غير مؤكَّد',
     iraabAccuracy: 'دقة الإعراب',
     iraabDiacritized: 'النص المشكَّل (فرضية)',
+    iraabUnavailable: {
+      too_long: 'يعمل فحص أواخر الكلمات على التسجيلات التي لا تتجاوز دقيقتين. هذا التسجيل أطول فلم يُفحَص؛ سجِّل مقطعًا أقصر للحصول على ملاحظات الإعراب.',
+      too_large: 'حجم التسجيل يتجاوز 25 ميغابايت، فلم يُجرَ فحص أواخر الكلمات.',
+      too_short: 'التسجيل قصير جدًّا لفحص أواخر الكلمات.',
+      quota: 'بلغ فحص أواخر الكلمات حدَّه اليومي. يُرجى المحاولة غدًا.',
+      timeout: 'استغرق فحص أواخر الكلمات وقتًا طويلًا فلم يُجرَ هذه المرة. يُرجى المحاولة مجددًا.',
+      error: 'فحص أواخر الكلمات غير متاح مؤقتًا. أمّا بقية التقييم فمكتملة.',
+    },
   },
   fr: {
     uiLanguage: 'Langue de l’interface',
@@ -1525,6 +1541,14 @@ const UI = {
     iraabUncertain: 'Incertain',
     iraabAccuracy: 'Précision des désinences',
     iraabDiacritized: 'Hypothèse vocalisée',
+    iraabUnavailable: {
+      too_long: 'La vérification des désinences fonctionne pour les enregistrements de 2 minutes maximum. Cet enregistrement est plus long et n\'a pas été vérifié — enregistrez un segment plus court pour obtenir un retour sur l\'i\'râb.',
+      too_large: 'L\'enregistrement dépasse 25 Mo : la vérification des désinences a été ignorée.',
+      too_short: 'L\'enregistrement est trop court pour la vérification des désinences.',
+      quota: 'La vérification des désinences a atteint sa limite quotidienne. Veuillez réessayer demain.',
+      timeout: 'La vérification des désinences a pris trop de temps et n\'a pas été effectuée cette fois. Veuillez réessayer.',
+      error: 'La vérification des désinences est temporairement indisponible. Le reste de l\'évaluation est complet.',
+    },
   }
 };
 
@@ -5169,6 +5193,7 @@ const IRAAB_ENDINGS = {
   tanwin_fath: ['تنوين فتح', 'an'],
   tanwin_damm: ['تنوين ضمّ', 'un'],
   tanwin_kasr: ['تنوين كسر', 'in'],
+  sukun:       ['سكون', '◌ْ'],
 };
 function IraabEnding({ code }) {
   const [ar, roman] = IRAAB_ENDINGS[code] || [code || '—', ''];
@@ -5695,6 +5720,18 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
               new_arabic_solution module. Reports what the student ACTUALLY
               pronounced from the audio; the transcript is left verbatim and
               wrong endings are never "corrected". */}
+          {/* The check could not run (recording > 2 min, daily GPU quota,
+              timeout, service down): say so explicitly instead of hiding it. */}
+          {report.arabic_module?.unavailable && !report.arabic_module?.pronunciation?.available && (
+            <div className="card">
+              <h3 className="report-section-title">📐 {labels.iraabTitle}</h3>
+              <p className="info-tip" style={{ fontSize: '0.85rem' }}>
+                ℹ️ {(labels.iraabUnavailable || {})[report.arabic_module.unavailable.code]
+                  || (labels.iraabUnavailable || {}).error}
+              </p>
+            </div>
+          )}
+
           {report.arabic_module?.pronunciation?.available && (() => {
             const pron = report.arabic_module.pronunciation;
             const sum = pron.summary || {};
@@ -5758,7 +5795,9 @@ function ModuleD({ labels, lastTranscript, lastGeneratedScript, lastRecordingBlo
                         <span style={{ color: 'var(--warm-gray)' }}>{labels.iraabDetected}: </span>
                         <span style={{ color }}><IraabEnding code={f.detected_ending} /></span>
                       </div>
-                      {f.explanation && <div className="eval-explanation" dir="auto">{f.explanation}</div>}
+                      {/* The service attaches the same generic note to every
+                          word; only show it where it helps (not on "correct"). */}
+                      {f.explanation && f.status !== 'correct' && <div className="eval-explanation" dir="auto">{f.explanation}</div>}
                     </div>
                   );
                 })}
